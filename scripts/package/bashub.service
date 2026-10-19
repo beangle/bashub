@@ -1,0 +1,24 @@
+[Unit]
+Description=Beangle BAS console server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bashub
+Group=beangle
+Environment=HOME=/var/lib/bashub
+WorkingDirectory=/var/lib/bashub
+# profile 定位到 /var/lib/beangle-ems/<profile>
+ExecStart=/usr/bin/bashub --ems.profile=bas --ems.base=/var/lib/beangle-ems
+Restart=on-failure
+# 配置或数据库初始化失败时 exit 2，不进行无意义的重启。
+RestartPreventExitStatus=2
+StartLimitBurst=5
+StartLimitInterval=120
+StandardOutput=journal
+StandardError=journal
+UMask=0002
+
+[Install]
+WantedBy=multi-user.target

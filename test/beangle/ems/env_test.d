@@ -73,6 +73,8 @@ unittest {
 unittest {
   assert(findHome(["ems.home": "/data/ems/bas"]) == "/data/ems/bas");
   assert(findHome(["ems.home": "", "ems.base": "/data/ems", "ems.profile": "bas"]) == "/data/ems/bas");
+  assert(findHome(["ems.base": "/var/lib/beangle-ems", "ems.profile": "bas"]) ==
+      "/var/lib/beangle-ems/bas");
   assert(findHome(["HOME": "/root", "ems.profile": "x"]) == "/root/.ems/x");
 
   auto base = uniqueTempDir("bashub-ems-home-");

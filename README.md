@@ -11,7 +11,7 @@ BAS 控制台这一个产品的 monorepo，两部分各自独立构建：
 pnpm build:web                              # 前端 → packages/web/dist
 dub test --compiler=ldc2                    # D 后端：跑测试
 dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
-./target/d/bashub -f bashub.xml             # 起 D 后端（缺省读 ./bashub.xml）
+./target/d/bashub --ems.profile=bas         # 起 D 后端（从 ems profile 读取部署配置）
 ```
 
 控制台 API 与部署配置分发由 D 后端唯一实现，目标是**低功耗运行**。原 JVM 后端已于 2026-10
@@ -214,7 +214,7 @@ src/bashub/                 业务：BAS 控制台这一份
 
 ```bash
 dub build -b release --compiler=ldc2     # 出 target/d/bashub
-./target/d/bashub -f bashub.xml          # 缺省读 ./bashub.xml
+./target/d/bashub --ems.profile=bas      # 从 ~/.ems/bas 读取部署配置
 dub test --compiler=ldc2                 # 跑单测
 ```
 
@@ -226,7 +226,9 @@ dub test --compiler=ldc2                 # 跑单测
 ./target/d/bashub -f bashub.xml --check-schema
 ```
 
-`-f`/`--file` 指定配置文件；`--ems.profile`、`--ems.home`、`--ems.base` 覆盖同名环境变量。
+`-f`/`--file` 可选：不写时必须提供 `--ems.profile`（或 `--ems.home`/`--ems.base`），此时使用
+内置 `<bashub/>` 默认，数据库、CAS 与应用属性全部从 ems profile 推导。
+`--ems.profile`、`--ems.home`、`--ems.base` 覆盖同名环境变量。
 JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报错退出，不会忽略或透传给 vibe。
 
 **为什么还要自己接管 argv**：bashub 需要先消费自己的选项，再把剩余参数交给 vibe。编译期开
@@ -294,6 +296,28 @@ curl -s -i -H 'Accept: application/vnd.api+json' -H "Cookie: URP_SID=$SID" \
 curl -s -H 'Accept: application/vnd.api+json' \
   'http://127.0.0.1:18080/api/hub/profiles/search?filter%5Borg.name%5D=beangle&include=org'
 ```
+
+## 安装包
+
+`build_rpm.sh` / `build_deb.sh` 只构建并打包 D 后端，产物在 `target/`：
+
+```bash
+scripts/build_rpm.sh          # Fedora/RHEL：target/bashub-<version>-<release>.x86_64.rpm
+scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revision>_amd64.deb
+```
+
+两个脚本都接受一个可选的 revision 参数。安装布局：
+
+- `/usr/bin/bashub`
+- `/var/lib/beangle-ems/`：ems 根目录
+- `/var/lib/bashub/repository`、`/var/log/bashub`
+- `/usr/lib/systemd/system/bashub.service`
+
+服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，不再安装 `bashub.xml`。
+ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `/var/lib/beangle-ems/bas`；
+端口、数据库、CAS 等都来自该 profile 的内置缺省与应用文件。前端 SPA 按 `packages/web`
+自己的发布流程单独部署，并把 `/api/` 反代到 bashub。准备好 profile 后启动
+`systemctl enable --now bashub`。
 
 ## 功能边界（尚未实现与已补齐）
 

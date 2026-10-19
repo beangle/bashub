@@ -145,6 +145,8 @@ unittest {
   assert(cfg.hasDb);
   assert(cfg.dbUrl ==
       "host=localhost port=5432 dbname=bas user=openurp password=openurp application_name=bas-hub");
+  // 不给 -f 时走内置 <bashub/>，数据库仍从同一个 ems profile 推导
+  assert(loadBashub("", ems).dbUrl == cfg.dbUrl);
 
   // bashub.xml 里写了连接串就以它为准（ems 那份只当缺省）
   write(buildPath(home, "explicit.xml"),

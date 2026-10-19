@@ -87,10 +87,10 @@ HubArgs parseArgs(string[] args) {
 }
 
 private void printUsage() {
-  writeln("Usage: bashub [-f <bashub.xml>] [--check-schema]");
-  writeln("              [--ems.profile=<name>] [--ems.home=<dir>] [--ems.base=<dir>]");
+  writeln("Usage: bashub [--ems.profile=<name>] [--ems.home=<dir>] [--ems.base=<dir>]");
+  writeln("              [-f <bashub.xml>] [--check-schema]");
   writeln();
-  writeln("  -f, --file <path>    配置文件路径（缺省 ./bashub.xml）");
+  writeln("  -f, --file <path>    可选配置文件；不写时使用内置默认 + ems profile");
   writeln("  --check-schema       只检查库表/列是否与资源定义一致，然后退出");
   writeln("  --ems.profile=<name> 指定 ems 部署 profile，如 --ems.profile=bas");
   writeln("  --ems.home=<dir>     直接指定 ems home，如 --ems.home=/data/ems/bas");
@@ -116,18 +116,21 @@ int main(string[] args) {
   }
   setCommandLineArgs(parsedArgs.rest);
 
+  // 环境变量 + 命令行部署选项（后者覆盖前者）
+  auto ems = emsFromEnvironment(systemVars(parsedArgs.options));
   auto configFile = parsedArgs.configFile;
-  if (configFile is null)
-    configFile = "bashub.xml";
-  configFile = expandTilde(configFile);
-  if (!exists(configFile)) {
-    stderr.writeln("bashub: config file[" ~ configFile ~ "] not exists!");
+  if (configFile.length > 0) {
+    configFile = expandTilde(configFile);
+    if (!exists(configFile)) {
+      stderr.writeln("bashub: config file[" ~ configFile ~ "] not exists!");
+      return ExitStartupError;
+    }
+  } else if (ems is null) {
+    stderr.writeln("bashub: specify -f <bashub.xml> or --ems.profile=<profile>");
     return ExitStartupError;
   }
 
   HubConfig cfg;
-  // 环境变量 + 命令行部署选项（后者覆盖前者）
-  auto ems = emsFromEnvironment(systemVars(parsedArgs.options));
   try {
     cfg = loadBashub(configFile, ems);
     applyBashubLogging(cfg.logFile, cfg.logLevel);

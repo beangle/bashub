@@ -167,12 +167,16 @@ HubConfig loadBashub(string configFile) {
 
 /** 同上，但 ems 常量由调用方给（app.d 建好之后顺手把「用了哪套 ems」打进日志）。
  *
+ * `configFile` 为空表示不读 XML：用 `<bashub/>` 的内置默认，再由 ems profile
+ * 补齐数据库、CAS 与应用属性。
+ *
  * 顺带补上 `<db>` 的缺省：`bashub.xml` 里没写连接串时，从 ems 的应用文件（scala
  * `EmsApp.getAppFile`）或 `resources.xml` 里读 `<datasource>`——真实部署里库连接就写在那一份
  * XML 上，两条实现路线读同一份文件，运维才不用维护两套。
  */
 HubConfig loadBashub(string configFile, Ems ems) {
-  auto cfg = parseBashub(readConfigText(configFile), ems);
+  auto content = configFile.length > 0 ? readConfigText(configFile) : "<bashub/>";
+  auto cfg = parseBashub(content, ems);
   if (!cfg.hasDb && ems !is null)
     cfg.dbUrl = emsDbUrl(cfg.appName, ems.env.home);
   return cfg;
