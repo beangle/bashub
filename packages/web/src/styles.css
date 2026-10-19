@@ -1,0 +1,164 @@
+/* 壳层（AppShell / MicroShell）样式由 @beangle/ems-app 提供，表格色板由 @beangle/bui-vue 自带。 */
+
+/*
+ * 查询面板的几何与默认色板由 @beangle/bui-vue/styles/query-form.css 提供（各 SPA 共用），
+ * 这里只覆盖色板：浅色沿用线上 exam 的取值，深色回落到 TDesign 令牌。
+ */
+:root {
+  --bui-panel-subtle-bg: #f8fafc;
+  --bui-border-color: #d0d7de;
+  --bui-query-title-color: #475467;
+  --bui-query-label-color: #57606a;
+  --bui-drawer-form-label-color: #57606a;
+}
+
+[theme-mode='dark'] {
+  --bui-panel-subtle-bg: var(--td-bg-color-container-hover);
+  --bui-border-color: var(--td-component-stroke);
+  --bui-query-title-color: var(--td-text-color-secondary);
+  --bui-query-label-color: var(--td-text-color-secondary);
+  --bui-drawer-form-label-color: var(--td-text-color-secondary);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px 0;
+  margin-bottom: 0;
+}
+
+.page-head > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+}
+
+.page-head > div:first-child > .detail-back {
+  flex-basis: 100%;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.page-subtitle {
+  margin: 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
+}
+
+.page-subtitle code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--td-bg-color-container-hover);
+}
+
+/* 工作台外框与栅格由 @beangle/bui-vue/styles/workbench.css 提供（各 SPA 共用）。 */
+
+.data-region {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 必填查询条件（菜单管理的「应用」）未选时的占位提示：此时不查列表。 */
+.data-region__gate {
+  margin: 0;
+  padding: 48px 16px;
+  color: var(--td-text-color-placeholder);
+  text-align: center;
+}
+
+/*
+ * 工作台页面要求通栏（与 exam 的面板一致）：壳层内容区的 14px 内边距会把工作台推离页面边缘，
+ * 让左栏色带与表格看起来像两张浮起的卡片。只在该页去掉。
+ */
+.bui-app-shell__content:has(> .page-panel--workbench) {
+  padding: 0;
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+  background: var(--td-bg-color-container);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tile:hover {
+  border-color: var(--td-brand-color);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+}
+
+.tile-icon {
+  font-size: 22px;
+  color: var(--td-brand-color);
+}
+
+.tile-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tile-desc {
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
+}
+
+/*
+ * 通用列表的图标单元格（`ResourceListView` 的 iconText / icons）。
+ * 尺寸对齐原 FTL：平台图标 30px，系统特性 logo 高 20px（host/list.ftl）。
+ */
+.cell-icon-text img,
+.cell-icon-text i {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.cell-icons img {
+  max-height: 20px;
+  max-width: 28px;
+  margin-right: 4px;
+  vertical-align: middle;
+  object-fit: contain;
+}
+
+/* 关联集合列：条目横向紧凑排布（放不下才换行），单条不折行（如群集管理的「服务」）。 */
+.cell-ref-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  line-height: 1.45;
+}
+
+.cell-ref-item {
+  white-space: nowrap;
+}
+
+.cell-ref-muted {
+  color: var(--td-text-color-placeholder);
+}
+
+/* 应用部署的可升级标记：绿色向上箭头（原 webapp/list.ftl 的 fa-circle-up 提示）。 */
+.cell-update-arrow {
+  color: var(--td-success-color);
+  font-weight: 600;
+}

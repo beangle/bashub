@@ -1,0 +1,3 @@
+<bashub listen="127.0.0.1:8082" log-level="info">
+  <api prefix="/api/hub" auth="none"/>
+</bashub>

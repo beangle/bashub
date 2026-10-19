@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<db engine="PostgreSQL" version="UNDEFINED">
+  <schemas>
+    <schema name="bas">
+      <tables>
+        <table name="cdn_components" comment="Micdn 可复用组件目录">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="kind" type="varchar(32)" nullable="false" comment="组件类型:static_bundle/www_doc"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="组件名称"/>
+            <column name="mount_name" type="varchar(255)" nullable="false" comment="部署挂载名"/>
+            <column name="remark" type="varchar(255)" comment="备注"/>
+            <column name="spec" type="jsonb" nullable="false" comment="组件规格(JSON)"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cdn_components" columns="id"/>
+            <unique-key name="uq_cdn_components_kind_name" columns="kind,name"/>
+            <unique-key name="uq_cdn_components_kind_mount_name" columns="kind,mount_name"/>
+          </constraints>
+        </table>
+        <table name="cfg_artifacts" comment="Artifact?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="arch" type="integer" nullable="false" comment="arch?"/>
+            <column name="artifact_id" type="varchar(255)" nullable="false" comment="artifactId?"/>
+            <column name="classifier" type="varchar(255)" comment="classifier?"/>
+            <column name="context_path" type="varchar(255)" nullable="false" comment="contextPath?"/>
+            <column name="description" type="varchar(255)" nullable="false" comment="description?"/>
+            <column name="group_id" type="varchar(255)" nullable="false" comment="groupId?"/>
+            <column name="jsp_support" type="boolean" nullable="false" defaultValue="false" comment="jspSupport?"/>
+            <column name="latest_version" type="varchar(255)" nullable="false" comment="latestVersion?"/>
+            <column name="packaging" type="varchar(255)" nullable="false" comment="packaging?"/>
+            <column name="profile_id" type="bigint" comment="Profile?ID"/>
+            <column name="resolve_support" type="boolean" nullable="false" defaultValue="false" comment="resolveSupport?"/>
+            <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
+            <column name="websocket_support" type="boolean" nullable="false" defaultValue="false" comment="websocketSupport?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_tad8i3qmw6mrbmtjttp73cdmc" columns="id"/>
+            <foreign-key name="fk_a7f49ddsu3kc6uk8vkw4xo77c" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_engines" comment="Engine?">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="jsp_support" type="boolean" nullable="false" defaultValue="false" comment="jspSupport?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="profile_id" type="bigint" comment="Profile?ID"/>
+            <column name="remark" type="varchar(255)" comment="备注"/>
+            <column name="typ" type="varchar(255)" nullable="false" comment="typ?"/>
+            <column name="version" type="varchar(255)" nullable="false" comment="version?"/>
+            <column name="websocket_support" type="boolean" nullable="false" defaultValue="false" comment="websocketSupport?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_acei4b9b5rgit3s9frejijynw" columns="id"/>
+            <foreign-key name="fk_pf2599235ft4eksuquro2vhfp" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_engines_jars" comment="jars?">
+          <columns>
+            <column name="engine_id" type="integer" nullable="false" comment="Engine?ID"/>
+            <column name="value_" type="varchar(255)" nullable="false" comment="jars?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_9brdhi9nr6fn6na2yr9kfv80h" columns="engine_id,value_"/>
+            <foreign-key name="fk_3iaro588atcdt1plrnxioe3wl" column="engine_id" referenced-table="bas.cfg_engines" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_29fg6n1sclcq6coy09lhjttqw" columns="engine_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_engines_listeners" comment="listeners?">
+          <columns>
+            <column name="engine_id" type="integer" nullable="false" comment="Engine?ID"/>
+            <column name="value_" type="varchar(255)" nullable="false" comment="listeners?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_dqyugw5yjj87a6th3uvlnh1fl" columns="engine_id,value_"/>
+            <foreign-key name="fk_uv3un0lyhqp1ednb6weyxxb" column="engine_id" referenced-table="bas.cfg_engines" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_in6ec9d0g28776rkhib4s06f6" columns="engine_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_farms" comment="Farm?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="engine_id" type="integer" nullable="false" comment="Engine?ID"/>
+            <column name="max_heap_size" type="integer" nullable="false" defaultValue="0" comment="maxHeapSize?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="proxy_options" type="varchar(255)" comment="proxyOptions?"/>
+            <column name="server_options" type="varchar(255)" comment="serverOptions?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_9x0b7lmr0gp2idusf2n0gvldl" columns="id"/>
+            <foreign-key name="fk_o5hjxilgy98qkpctvs832b9ua" column="engine_id" referenced-table="bas.cfg_engines" referenced-column="id"/>
+            <foreign-key name="fk_emp368rqvkf0kwugk8calggkq" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_farms_hosts" comment="hosts?">
+          <columns>
+            <column name="farm_id" type="bigint" nullable="false" comment="Farm?ID"/>
+            <column name="host_id" type="bigint" nullable="false" comment="Host?ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_oljlfcx7uoopu7cgsfwejk3be" columns="farm_id,host_id"/>
+            <foreign-key name="fk_sxtnipv9mpvjc7wnhh7tuag9f" column="farm_id" referenced-table="bas.cfg_farms" referenced-column="id"/>
+            <foreign-key name="fk_t26o41udid3xf7g6f2ok931cg" column="host_id" referenced-table="bas.cfg_hosts" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_1ushahopqhn0hay3xm8bff2nx" columns="farm_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_hosts" comment="Host?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="arch" type="integer" nullable="false" comment="arch?"/>
+            <column name="cores" type="integer" nullable="false" defaultValue="0" comment="cores?"/>
+            <column name="cpu" type="varchar(200)" nullable="false" comment="cpu?"/>
+            <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>
+            <column name="memory" type="integer" nullable="false" defaultValue="0" comment="memory?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
+            <column name="platform_version" type="varchar(255)" nullable="false" comment="platformVersion?"/>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_pxfg014nyayvye1gd3xih526i" columns="id"/>
+            <foreign-key name="fk_jc0d7xlflxli8uc7j0r0xp9jo" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_ink15ixrk8phkxswi12nq21am" column="platform_id" referenced-table="bas.cfg_platforms" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_hosts_features" comment="features?">
+          <columns>
+            <column name="host_id" type="bigint" nullable="false" comment="Host?ID"/>
+            <column name="platform_feature_id" type="bigint" nullable="false" comment="PlatformFeature?ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_i8temx3nxcj9cthlmr33epa05" columns="host_id,platform_feature_id"/>
+            <foreign-key name="fk_gcsyj0c6figqowmuo944lw8w2" column="host_id" referenced-table="bas.cfg_hosts" referenced-column="id"/>
+            <foreign-key name="fk_o6ltu1760m2ftj74lig5udh9w" column="platform_feature_id" referenced-table="bas.cfg_platform_features" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_tpaxgb7ixvpsjsvhqdc8e6ave" columns="host_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_organizations" comment="Organization?">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="logo_url" type="varchar(255)" nullable="false" comment="logoUrl?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="short_title" type="varchar(255)" nullable="false" comment="shortTitle?"/>
+            <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_83pd8mp2u8psc99n31rbvsn65" columns="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_platform_feature_scripts" comment="PlatformFeatureScript?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="feature_id" type="bigint" nullable="false" comment="PlatformFeature?ID"/>
+            <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
+            <column name="scripts" type="varchar(4000)" nullable="false" comment="scripts?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_rmm7vn5sjxej75psvfy2drsl2" columns="id"/>
+            <foreign-key name="fk_jog57ijvhnujc2n1vb889cx8c" column="feature_id" referenced-table="bas.cfg_platform_features" referenced-column="id"/>
+            <foreign-key name="fk_tn5avaugjeejhifxstb9ro16h" column="platform_id" referenced-table="bas.cfg_platforms" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_s6d9t6afcb79jfbamk81hj90m" columns="feature_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_platform_features" comment="PlatformFeature?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="description" type="varchar(255)" nullable="false" comment="description?"/>
+            <column name="logo" type="varchar(255)" nullable="false" comment="logo?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="version" type="varchar(255)" nullable="false" comment="version?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_801cr12kkx4lqccjq8yo31rxj" columns="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_platform_features_dependencies" comment="dependencies?">
+          <columns>
+            <column name="from_feature_id" type="bigint" nullable="false" comment="PlatformFeature?ID"/>
+            <column name="platform_feature_id" type="bigint" nullable="false" comment="PlatformFeature?ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_i89r1dro2uhe54fe1ta7e2iyg" columns="from_feature_id,platform_feature_id"/>
+            <foreign-key name="fk_70atmhqmevy2qa1fd0xvekk1p" column="from_feature_id" referenced-table="bas.cfg_platform_features" referenced-column="id"/>
+            <foreign-key name="fk_s1u0hlwtti8pmijx0ehhnx5rm" column="platform_feature_id" referenced-table="bas.cfg_platform_features" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_m7sd32ln741hkgmm2b276pyee" columns="from_feature_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_platforms" comment="Platform?">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="fonticon" type="varchar(255)" nullable="false" comment="fonticon?"/>
+            <column name="major_version" type="varchar(255)" nullable="false" comment="majorVersion?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_giwqec5q65yu05qsao5ijus8e" columns="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_profile_micdn" comment="Profile 的 Micdn 配置">
+          <columns>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="config" type="jsonb" nullable="false" comment="Micdn 配置(JSON)"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_profile_micdn" columns="profile_id"/>
+            <foreign-key name="fk_cfg_profile_micdn_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_profile_micdn_components" comment="Profile 的 Micdn 组件绑定">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="component_id" type="bigint" nullable="false" comment="组件 ID"/>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="sortno" type="integer" nullable="false" defaultValue="0" comment="排序号"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_profile_micdn_components" columns="id"/>
+            <unique-key name="uq_profile_micdn_component" columns="profile_id,component_id"/>
+            <foreign-key name="fk_profile_micdn_components_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_profile_micdn_components_component" column="component_id" referenced-table="bas.cdn_components" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_cfg_profile_micdn_components_component" columns="component_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_profiles" comment="Profile?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="enableHttps?"/>
+            <column name="force_https" type="boolean" nullable="false" defaultValue="true" comment="forceHttps?"/>
+            <column name="hostname" type="varchar(255)" comment="hostname?"/>
+            <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="httpPort?"/>
+            <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="httpsPort?"/>
+            <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>
+            <column name="&quot;key&quot;" type="varchar(255)" nullable="false" comment="key?"/>
+            <column name="local_repo" type="varchar(255)" nullable="false" comment="localRepo?"/>
+            <column name="maxconn" type="integer" nullable="false" defaultValue="30000" comment="maxconn?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="org_id" type="integer" nullable="false" comment="Organization?ID"/>
+            <column name="proxy_engine" type="varchar(255)" nullable="false" comment="proxyEngine?"/>
+            <column name="remote_repo" type="varchar(255)" nullable="false" comment="remoteRepo?"/>
+            <column name="bas_version" type="varchar(255)" nullable="false" comment="basVersion?"/>
+            <column name="ssl_ciphers" type="varchar(255)" comment="sslCiphers?"/>
+            <column name="ssl_protocols" type="varchar(255)" comment="sslProtocols?"/>
+            <column name="ssl_certificate" type="text" comment="sslCertificate?"/>
+            <column name="ssl_certificate_key" type="text" comment="sslCertificateKey?"/>
+            <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_hh10tdbnl5j7ncrvpm5mp4cci" columns="id"/>
+            <foreign-key name="fk_4vpslg7jh4pk1hg6wdkmttahs" column="org_id" referenced-table="bas.cfg_organizations" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_servers" comment="Server?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="farm_id" type="bigint" nullable="false" comment="Farm?ID"/>
+            <column name="host_id" type="bigint" nullable="false" comment="Host?ID"/>
+            <column name="http_port" type="integer" nullable="false" defaultValue="0" comment="httpPort?"/>
+            <column name="max_heap_size" type="integer" nullable="false" defaultValue="0" comment="maxHeapSize?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="proxy_http_port" type="integer" comment="proxyHttpPort?"/>
+            <column name="proxy_options" type="varchar(255)" comment="proxyOptions?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_n1kin1jg3pxkwhq69v9oodwgn" columns="id"/>
+            <foreign-key name="fk_jhhuv6qg9ym0564nvt2l9wkv6" column="host_id" referenced-table="bas.cfg_hosts" referenced-column="id"/>
+            <foreign-key name="fk_nbm1wemgp4l7srr9c62963yqt" column="farm_id" referenced-table="bas.cfg_farms" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_j2s4cn47mq1a9qjtl9h44lo93" columns="farm_id"/>
+          </indexes>
+        </table>
+        <table name="cfg_webapps" comment="Webapp?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="artifact_id" type="bigint" nullable="false" comment="Artifact?ID"/>
+            <column name="context_path" type="varchar(255)" nullable="false" comment="contextPath?"/>
+            <column name="libs" type="varchar(255)" comment="libs?"/>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="unpack" type="boolean" nullable="false" defaultValue="false" comment="unpack?"/>
+            <column name="urls" type="jsonb" nullable="false" comment="urls?"/>
+            <column name="version" type="varchar(255)" nullable="false" comment="version?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_drfaoltpyejnt1b86ynk6f4a4" columns="id"/>
+            <foreign-key name="fk_61bk808awvse0xme3hlm6vrcy" column="artifact_id" referenced-table="bas.cfg_artifacts" referenced-column="id"/>
+            <foreign-key name="fk_d8tq1dhvfqudy0otroaw2nwit" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_webapps_targets" comment="targets?">
+          <columns>
+            <column name="server_id" type="bigint" nullable="false" comment="Server?ID"/>
+            <column name="webapp_id" type="bigint" nullable="false" comment="Webapp?ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_5x2tbawi1eus1x8tgrrfng3e3" columns="webapp_id,server_id"/>
+            <foreign-key name="fk_26axwe4ib5in1ow603l0fbcv3" column="webapp_id" referenced-table="bas.cfg_webapps" referenced-column="id"/>
+            <foreign-key name="fk_1fdi9tds8uijp1hp1rq2c6gwp" column="server_id" referenced-table="bas.cfg_servers" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_igjx23gjat79rj5lkvviauo60" columns="webapp_id"/>
+          </indexes>
+        </table>
+        <table name="ems_app_groups" comment="AppGroup?">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_fbmgaea8dkl0rnp9yfuwc0cc0" columns="id"/>
+          </constraints>
+        </table>
+        <table name="ems_apps" comment="App?">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="artifact_id" type="varchar(255)" nullable="false" comment="artifactId?"/>
+            <column name="group_id" type="integer" nullable="false" comment="AppGroup?ID"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="services" type="varchar(255)" comment="services?"/>
+            <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_8cahbt1b85c9wpnrl7ehx43hd" columns="id"/>
+            <foreign-key name="fk_o095x400ixmsly9dqrvpyq3ty" column="group_id" referenced-table="bas.ems_app_groups" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="ems_channels" comment="应用端">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="app_id" type="integer" nullable="false" comment="应用ID"/>
+            <column name="base" type="varchar(200)" nullable="false" comment="上下文地址"/>
+            <column name="channel_type" type="varchar(20)" nullable="false" comment="端类型(pc/mobile)"/>
+            <column name="embed_mode" type="varchar(20)" nullable="false" comment="嵌入方式(iframe/wujie)"/>
+            <column name="enabled" type="boolean" nullable="false" defaultValue="false" comment="是否启用"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_1yi5whvx5ialppx8bcmejakj5" columns="id"/>
+            <foreign-key name="fk_fnfitp6dm7fobk5b0bw67oc7d" column="app_id" referenced-table="bas.ems_apps" referenced-column="id"/>
+            <unique-key name="idx_ems_channel" columns="app_id,channel_type"/>
+          </constraints>
+        </table>
+        <table name="ems_menus" comment="菜单">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="app_id" type="integer" nullable="false" comment="App?ID"/>
+            <column name="en_name" type="varchar(255)" nullable="false" comment="enName?"/>
+            <column name="enabled" type="boolean" nullable="false" defaultValue="false" comment="是否启用"/>
+            <column name="entry_id" type="integer" comment="入口资源ID"/>
+            <column name="fonticon" type="varchar(255)" comment="fonticon?"/>
+            <column name="indexno" type="varchar(255)" nullable="false" comment="顺序号"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="params" type="varchar(255)" comment="params?"/>
+            <column name="parent_id" type="integer" comment="菜单ID"/>
+            <column name="remark" type="varchar(255)" comment="备注"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_njtud98p8314fiicyo0xe2mkh" columns="id"/>
+            <foreign-key name="fk_6kied0fuxbrhfdy9awjfybqpb" column="app_id" referenced-table="bas.ems_apps" referenced-column="id"/>
+            <foreign-key name="fk_dfibsv12bihrf3ubu8t3je09u" column="parent_id" referenced-table="bas.ems_menus" referenced-column="id"/>
+            <foreign-key name="fk_oxc0v0pjdx3atr7102qv4dwui" column="entry_id" referenced-table="bas.ems_resources" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_83jo3q4ran84y9bhcfn062qdo" columns="parent_id"/>
+          </indexes>
+        </table>
+        <table name="ems_menus_resources" comment="resources?">
+          <columns>
+            <column name="menu_id" type="integer" nullable="false" comment="菜单ID"/>
+            <column name="resource_id" type="integer" nullable="false" comment="资源ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_gdv0xbg06sy84ur7hxrfo8fch" columns="menu_id,resource_id"/>
+            <foreign-key name="fk_fd7t5866kpeou1vp8ivouqniv" column="menu_id" referenced-table="bas.ems_menus" referenced-column="id"/>
+            <foreign-key name="fk_p4rrfs4kdlmyorp0cgbb43nqf" column="resource_id" referenced-table="bas.ems_resources" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_8663nggim2n448wsyygff27s0" columns="menu_id"/>
+          </indexes>
+        </table>
+        <table name="ems_resources" comment="资源">
+          <columns>
+            <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="actions" type="varchar(255)" comment="actions?"/>
+            <column name="app_id" type="integer" nullable="false" comment="App?ID"/>
+            <column name="enabled" type="boolean" nullable="false" defaultValue="false" comment="是否启用"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="remark" type="varchar(255)" comment="备注"/>
+            <column name="&quot;scope&quot;" type="integer" nullable="false" comment="scope?"/>
+            <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_nr89evw3ueq159rpu4dp2k1gc" columns="id"/>
+            <foreign-key name="fk_8dchlgbyvt5qbeqkrv0dv88er" column="app_id" referenced-table="bas.ems_apps" referenced-column="id"/>
+          </constraints>
+        </table>
+      </tables>
+    </schema>
+  </schemas>
+</db>

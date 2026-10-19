@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+
+allowBuilds:
+  esbuild: true
+
+# 团队自有包刚发布即使用，关闭 pnpm 的发布成熟期门槛。
+minimumReleaseAge: 0

@@ -1,8 +1,24 @@
 *~
 .*
+# 例外：@beangle 作用域指向本地 registry（无密钥），需要随仓库分发
+!/.npmrc
 
 # Build output directies
 target
+dist
+node_modules
+*.zip
+
+# D (dub)：.dub 被上面的 .* 覆盖，这里只补对象/静态库
+*.o
+*.a
+
+# npm lock files are not allowed, this repo is managed by pnpm
+package-lock.json
+npm-shrinkwrap.json
+
+# frontend release archives
+packages/web/release/
 
 # Eclipse specific files/directories
 .classpath
@@ -17,15 +33,3 @@ target
 *.iml
 *.ipr
 *.iws
-
-# sbt specific
-dist/*
-target/
-lib_managed/
-src_managed/
-project/boot/
-project/plugins/project/
-
-# Scala-IDE specific
-.scala_dependencies
-test-output

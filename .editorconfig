@@ -18,3 +18,17 @@ indent_size = 2
 [*.dt]
 indent_style = tab
 indent_size = 1
+
+# D（dfmt）：行宽 120、otbs、逗号/运算符后留空格
+[*.{d,di}]
+indent_style = space
+indent_size = 2
+max_line_length = 120
+dfmt_brace_style = otbs
+dfmt_space_after_cast = true
+dfmt_space_after_comma = true
+dfmt_space_around_operators = true
+dfmt_align_switch_cases = true
+dfmt_max_empty_lines = 1
+dfmt_trim_trailing_whitespace = true
+dfmt_align_switch_statements = true
