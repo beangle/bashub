@@ -17,7 +17,7 @@
 
 ## 功能盘点
 
-### 1. Hub 管理台 `/api/hub`
+### 1. Hub 管理台 `/api/bashub`
 
 #### 1.1 JSON:API 基础能力
 
@@ -74,7 +74,7 @@
 | `POST /sessions/logout` | ✅ | 本地会话清理与 CAS 登出地址 |
 | `GET /agents/status` | ✅ | 在线节点快照，按 profile 排序；断连即从登记册摘除 |
 
-### 2. 配置分发 `/api/{profile}`
+### 2. 配置分发 `/api/bashub/{profile}`
 
 部署配置直接输出文本，不再依赖模板运行时。
 
@@ -92,7 +92,7 @@
 这一组是 basctl 部署闭环的第一优先级。`server` 配置还承担节点通道地址与 Profile key 的
 下发，必须先于 WebSocket 通道完成。
 
-### 3. 节点通道 `/api/{profile}/agents`
+### 3. 节点通道 `/api/bashub/{profile}/agents`
 
 通道主体、`log:read` 与 `service:*` 已移植；启停动作由 basctl agent 执行，hub 等待 `result`。
 
@@ -104,10 +104,10 @@
 | `report:os`、`report:bas` | ✅ | 整份替换现状快照，保留各自 `at` |
 | `pong`、`result` | ✅ | `pong` 已接收；`result` 按请求号唤醒等待者，超时与断连都会收敛为错误 |
 | Hub 下发 `ping` | ✅ | 每条连接 30s 一次 app 层 ping |
-| Hub 下发 `report:now` | ✅ | `POST /api/hub/agents/{profile}/report`；按 `hello.supports` 门禁 |
-| Hub 下发 `log:read` | ✅ | `GET /api/hub/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
-| 浏览器日志跟随 | ✅ | `GET /api/hub/agents/{profile}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
-| `service:start/stop/restart` | ✅ | `POST /api/hub/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
+| Hub 下发 `report:now` | ✅ | `POST /api/bashub/agents/{profile}/report`；按 `hello.supports` 门禁 |
+| Hub 下发 `log:read` | ✅ | `GET /api/bashub/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
+| 浏览器日志跟随 | ✅ | `GET /api/bashub/agents/{profile}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
+| `service:start/stop/restart` | ✅ | `POST /api/bashub/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
 | 在线节点登记与摘除 | ✅ | 只摘自己那条，旧连接迟到的关闭不会挤掉新连接 |
 
 ### 4. 原生发行包仓库（已迁至 micdn）
@@ -220,7 +220,7 @@
 ## 迁移完成状态
 
 1. ✅ 管理台 SPA 的所有现有页面只连 D 后端。
-2. ✅ basctl 能通过 `/api/{profile}/config/server` 获取配置，通过 `/api/{profile}/agents` 建立通道。
+2. ✅ basctl 能通过 `/api/bashub/{profile}/config/server` 获取配置，通过 `/api/bashub/{profile}/agents` 建立通道。
 3. ✅ 生产部署所需文本配置、菜单、静态资产和主机脚本均可由 D 输出。
 4. ✅ 登录、会话、权限和登出行为与迁移前基线一致。
 5. ✅ 原 JVM 后端已退役，代码与专用构建已删除。

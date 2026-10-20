@@ -7,11 +7,12 @@
  */
 
 module bashub.profile.server;
-/// `GET /api/{profile}/config/server`：把 Profile 的服务器、主机、webapp 与引擎
+/// `GET /api/bashub/{profile}/config/server`：把 Profile 的服务器、主机、webapp 与引擎
 /// 渲染成 basctl 使用的 server.xml。原 Scala 版是 Freemarker 模板；这里没有模板运行时，
 /// 但输出结构保持一致。
 
 import bashub.profile.distribution : ProfileData, artifactGav, loadProfileData, webappGav;
+import bashub.profile.micdnconfig : micdnDownloadKey;
 import bashub.profile.resolver : ProfileContext;
 
 import beangle.commons.xml : escapeXml;
@@ -29,7 +30,11 @@ import std.conv : to;
 import std.string : strip;
 
 /// 渲染 server.xml；返回内容只依赖数据库，不读请求上下文。
-string renderServerXml(Store store, Registry reg, const ProfileContext context) {
+///
+/// SNAPSHOT 上游的令牌取 Profile 的 micdn `<auth download-key>`：有值才写 `token`，
+/// 空值即匿名下载。`maskSecrets` 只用于 SPA 预览，机器下载端点必须传 false。
+string renderServerXml(Store store, Registry reg, const ProfileContext context,
+    bool maskSecrets = false) {
   auto data = loadProfileData(store, reg, context);
   auto farms = data.farms.dup;
   auto hosts = data.hosts.dup;
@@ -50,7 +55,11 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context) 
   xml.put("  <repository remote=\"");
   xml.put(escapeXml(attributeText(context.data, "remoteRepo")));
   xml.put("\"/>\n");
-  xml.put("  <snapshot-repo remote=\"${bas_remote_url}/maven\" token=\"${bas_remote_token}\"/>\n");
+  xml.put("  <snapshot-repo remote=\"${bas_remote_url}/maven\"");
+  auto downloadKey = micdnDownloadKey(store, reg, context.id);
+  if (downloadKey.length > 0)
+    putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
+  xml.put("/>\n");
 
   xml.put("  <engines>\n");
   foreach (engineId; engineIds) {

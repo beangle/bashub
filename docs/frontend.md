@@ -76,13 +76,13 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 `DRY_RUN=1` 可只打印目标 registry）。
 
 `src/auth.ts` 是唯一的接线点：创建 `runtimeConfig` 与 `auth`，并暴露 `loadRuntimeConfig()` /
-`initializeAuth()`。运行时配置来自 `/api/hub/configs.json`，按 ems-app 的约定只含 `ems_base`（外加 `app_name`/`logoUrl`），CAS 地址由 ems-app 在 `ems_base` 后拼接 `/cas`。`/api/hub/sessions/logout` 由 `logoutUrl` 选项指定。
+`initializeAuth()`。运行时配置来自 `/api/bashub/configs.json`，按 ems-app 的约定只含 `ems_base`（外加 `app_name`/`logoUrl`），CAS 地址由 ems-app 在 `ems_base` 后拼接 `/cas`。`/api/bashub/sessions/logout` 由 `logoutUrl` 选项指定。
 
 ## 环境变量（Vite）
 
 | 变量 | 用途 |
 |---|---|
-| `VITE_APP_BASE` | 部署前缀，默认 `/bas/hub/`，须与 web 服务器部署目录一致 |
+| `VITE_APP_BASE` | 部署前缀，默认 `/bashub/`，须与 web 服务器部署目录一致 |
 | `VITE_API_BASE` | 开发环境后端 origin，dev server 用它把同源 `/api` 代理到后端 |
 | `VITE_CAS_*` | 可选的 CAS 构建期兜底；正常由 `configs.json` 的 `ems_base` 推导 |
 
@@ -158,8 +158,8 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 - 平台功能详情页 `/platform-features/:id`（`PlatformFeatureDetailView.vue`，对应原 `platformFeature/info.ftl`）：
   卡片墙由 `schema.cardLink` 指过来（卡片点击进详情，不再开抽屉），页面里功能自身「修改」就地编辑，
   每个平台一份脚本就地查看/修改、就地保存与删除，标题栏右侧「增加脚本」追加一行编辑态。
-  脚本按 `filter[platformFeatureScript.feature.id]=<id>` 拉取（别名即实体简单名），平台下拉取 `/api/hub/platforms`；
-  写入走 JSON:API 的 POST/PATCH/DELETE `/api/hub/platform-feature-scripts`。该资源因此**没有独立列表页**，
+  脚本按 `filter[platformFeatureScript.feature.id]=<id>` 拉取（别名即实体简单名），平台下拉取 `/api/bashub/platforms`；
+  写入走 JSON:API 的 POST/PATCH/DELETE `/api/bashub/platform-feature-scripts`。该资源因此**没有独立列表页**，
   SPA 里也不再有对应的 schema。
 - Profile 详情页 `/profiles/:id`（`ProfileDetailView.vue`）：从配置列表的名称列或编辑抽屉进入，
   左侧导航切换概览、Haproxy/Nginx、Setline、证书、BAS 服务与 Micdn，右侧以卡片展示配置和关联资源；

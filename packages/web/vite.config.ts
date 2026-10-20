@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
     ],
     envDir: repoRoot,
     // SPA 由独立的 web 服务器部署，该前缀必须与部署目录一致。
-    base: env.VITE_APP_BASE || '/bas/hub/',
+    base: env.VITE_APP_BASE || '/bashub/',
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
       dedupe: ['vue', 'vue-router', 'tdesign-vue-next', 'tdesign-icons-vue-next'],

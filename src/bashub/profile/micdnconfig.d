@@ -302,6 +302,14 @@ bool loadMicdnState(Store store, Registry reg, string profileId, out MicdnState 
   return true;
 }
 
+/// Profile 的 micdn 下载凭证（`<auth download-key>`）；未配置或读取失败时为空。
+string micdnDownloadKey(Store store, Registry reg, string profileId) {
+  Json config;
+  readMicdnConfig(store, reg, profileId, config);
+  auto auth = jsonGet(config, "auth");
+  return field(auth, "downloadKey").strip;
+}
+
 /// 只读取并归一 Micdn 配置，不加载组件与绑定。配置行缺失时返回缺省配置。
 void readMicdnConfig(Store store, Registry reg, string profileId, out Json config) {
   config = defaultMicdnConfig();

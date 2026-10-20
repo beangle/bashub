@@ -4,7 +4,7 @@
       <div>
         <h2 class="page-title">BAS 配置中心</h2>
         <p class="page-subtitle">
-          后端只提供 JSON:API（<code>/api/hub</code>），本页由独立部署的 SPA 渲染。
+          后端只提供 JSON:API（<code>/api/bashub</code>），本页由独立部署的 SPA 渲染。
         </p>
       </div>
     </div>

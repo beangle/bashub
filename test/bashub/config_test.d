@@ -34,7 +34,7 @@ unittest {
   ]);
   auto cfg = loadBashub(ems);
   assert(cfg.listen == "127.0.0.1:8080");
-  assert(cfg.apiPrefix == "/api/hub");
+  assert(cfg.apiPrefix == "/api/bashub");
   assert(!cfg.authRequired);
   assert(cfg.artifactRefreshMinutes == 360);
   assert(cfg.emsBase == "https://sas.openurp.net");

@@ -33,7 +33,7 @@ unittest {
   assert(ems.isPlatform("/cas"));
   assert(ems.isPlatform("/api/platform"));
   assert(ems.isPlatform("/portal"));
-  assert(!ems.isPlatform("/api/hub"));
+  assert(!ems.isPlatform("/api/bashub"));
 }
 
 @("avatarUrl 是 md5 的小写 hex（对齐 scala EmsTest 钉的形态）")

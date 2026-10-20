@@ -16,19 +16,19 @@ import beangle.security.authz : Scope;
 import std.exception : assertThrown;
 
 private enum resourcesJson = `[
-  {"name":"/api/hub/profiles","scope":"Private","roles":[1,2]},
-  {"name":"/api/hub/hosts","scope":"Protected","roles":[]}
+  {"name":"/api/bashub/profiles","scope":"Private","roles":[1,2]},
+  {"name":"/api/bashub/hosts","scope":"Protected","roles":[]}
 ]`;
 
 @("resources.json 解析 name/scope/roles，数字角色转成字符串")
 unittest {
   auto domain = authorityDomainFromJson(resourcesJson);
   assert(domain.size == 2);
-  auto profiles = domain.find("/api/hub/profiles");
+  auto profiles = domain.find("/api/bashub/profiles");
   assert(profiles !is null);
   assert(profiles.level == Scope.private_);
   assert(profiles.roles == ["1", "2"]);
-  assert(domain.find("/api/hub/hosts").level == Scope.protected_);
+  assert(domain.find("/api/bashub/hosts").level == Scope.protected_);
 }
 
 @("坏 JSON / 非数组 / 空文本抛异常")

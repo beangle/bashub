@@ -1,10 +1,10 @@
 import { EmsJsonApiClient, jsonApiContentType } from '@beangle/ems-app'
 import { sessionService } from '@/auth'
+import { API_PREFIX } from './prefix'
 
 export const JSONAPI_CONTENT_TYPE = jsonApiContentType
 
-/** hub 管理接口前缀，资源名为英文复数。 */
-export const API_PREFIX = '/api/hub'
+export { API_PREFIX }
 
 /**
  * 统一使用 ems-app 的 `EmsJsonApiClient`：JSON:API 内容协商、

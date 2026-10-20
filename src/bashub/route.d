@@ -7,7 +7,7 @@
  */
 
 module bashub.route;
-/// `/api/hub` 下的路由：hub 自己的端点（`configs`、`sessions`、`profiles/{id}/reset-key`）在这里，
+/// `/api/bashub` 下的路由：hub 自己的端点（`configs`、`sessions`、`profiles/{id}/reset-key`）在这里，
 /// 通用 CRUD（`{resource}/search`、`{resource}/{id}`）交给 beangle.jsonapi 的 `JsonApiService`。
 ///
 /// 资源名是路由参数，所以「支持哪些资源」只由 `hubRegistry()` 决定，路由不用跟着改。
@@ -59,7 +59,7 @@ import std.base64 : Base64;
 import std.conv : ConvException, to;
 import std.file : read;
 import std.functional : toDelegate;
-import std.string : endsWith, indexOf, startsWith, strip, toLower;
+import std.string : indexOf, startsWith, strip, toLower;
 
 /// `log/follow` 的轮询节拍与窗口。agent 侧仍是普通 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
 private enum int LogFollowIntervalSeconds = 3;
@@ -171,7 +171,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET /api/{profile}/config/server`：basctl 拉取的 server.xml。
+  /// `GET /api/bashub/{profile}/config/server`：basctl 拉取的 server.xml。
   ///
   /// 机器端点不属于 JSON:API，也不走浏览器登录；Profile 名定位记录，`Authorization:
   /// Bearer <profile>:<Profile.key>` 证明这台机器有权取走配置。不再接受可伪造的 `ip:` 头。
@@ -195,7 +195,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/profiles/{id}/config/server`：管理台查看最终 server.xml。
+  /// `GET /api/bashub/profiles/{id}/config/server`：管理台查看最终 server.xml。
   ///
   /// 与机器下载端点分开：这里按登录会话鉴权，不要求 Profile key，也不接受 `ip:` 头。
   void profileServerView(HTTPServerRequest req, HTTPServerResponse res) {
@@ -209,14 +209,14 @@ class HubService {
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, profile), HTTPStatus.ok, "application/xml");
+      res.writeBody(renderServerXml(store, reg, profile, true), HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
       res.writeBody("", HTTPStatus.internalServerError);
     }
   }
 
-  /// `GET /api/{profile}/config/proxy`：按 Profile 的 `proxyEngine` 输出 haproxy / nginx。
+  /// `GET /api/bashub/{profile}/config/proxy`：按 Profile 的 `proxyEngine` 输出 haproxy / nginx。
   /// 机器下载与 `config/server` 使用同一个 Profile key；未知引擎与不存在的 Profile 一样返回 404。
   void profileProxy(HTTPServerRequest req, HTTPServerResponse res) {
     auto profileName = req.params.get("profile", "");
@@ -242,12 +242,12 @@ class HubService {
     }
   }
 
-  /// `GET /api/{profile}/config/certificate`：setline 拉取的 PEM 公钥证书。
+  /// `GET /api/bashub/{profile}/config/certificate`：setline 拉取的 PEM 公钥证书。
   void profileCertificate(HTTPServerRequest req, HTTPServerResponse res) {
     writeProfileCertificate(req, res, false);
   }
 
-  /// `GET /api/{profile}/config/certificate-key`：setline 拉取的 PEM 私钥。
+  /// `GET /api/bashub/{profile}/config/certificate-key`：setline 拉取的 PEM 私钥。
   void profileCertificateKey(HTTPServerRequest req, HTTPServerResponse res) {
     writeProfileCertificate(req, res, true);
   }
@@ -274,7 +274,7 @@ class HubService {
     res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
   }
 
-  /// `GET /api/{profile}/config/setline-peers`：setline 的 peer 列表机器下载端点。
+  /// `GET /api/bashub/{profile}/config/setline-peers`：setline 的 peer 列表机器下载端点。
   void profilePeers(HTTPServerRequest req, HTTPServerResponse res) {
     auto profileName = req.params.get("profile", "");
     ProfileContext profile;
@@ -289,7 +289,7 @@ class HubService {
     writePeers(res, profile, "attachment");
   }
 
-  /// `GET /api/{profile}/config/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
+  /// `GET /api/bashub/{profile}/config/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
   /// agent 先比清单，只下载变化项；值与对应下载端点的响应 Body 完全一致。
   void profileManifest(HTTPServerRequest req, HTTPServerResponse res) {
     auto profileName = req.params.get("profile", "");
@@ -322,7 +322,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/profiles/{id}/config/proxy`：管理台查看最终代理配置。
+  /// `GET /api/bashub/profiles/{id}/config/proxy`：管理台查看最终代理配置。
   void profileProxyView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -346,7 +346,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/profiles/{id}/config/setline-peers`：管理台查看 setline peers。
+  /// `GET /api/bashub/profiles/{id}/config/setline-peers`：管理台查看 setline peers。
   void profilePeersView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -359,7 +359,7 @@ class HubService {
     writePeers(res, profile, "inline");
   }
 
-  /// `GET /api/{profile}/ems/menus/{appName}`：当前 Profile 部署应用的资源与菜单 XML。
+  /// `GET /api/bashub/{profile}/ems/menus/{appName}`：当前 Profile 部署应用的资源与菜单 XML。
   void profileEmsMenus(HTTPServerRequest req, HTTPServerResponse res) {
     ProfileContext profile;
     if (!resolveProfile(reg, store, req.params.get("profile", ""), req.headers.get("ip", ""), profile)) {
@@ -379,7 +379,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/{profile}/micdn.xml`：micdn 拉取的完整配置。
+  /// `GET /api/bashub/{profile}/micdn.xml`：micdn 拉取的完整配置。
   ///
   /// 只按 `{org.name}` 找 Profile，不再要求 `ip` 头；令牌必须等于 `profile.key`。
   /// 同时接受 `X-Micdn-Token`、`Authorization: Bearer` 和 `Authorization: Basic`
@@ -401,7 +401,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/profiles/{id}/micdn`：管理台聚合视图（密钥脱敏）。
+  /// `GET /api/bashub/profiles/{id}/micdn`：管理台聚合视图（密钥脱敏）。
   void profileMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -419,7 +419,7 @@ class HubService {
     }
   }
 
-  /// `PATCH /api/hub/profiles/{id}/micdn`：一次保存配置与组件绑定。
+  /// `PATCH /api/bashub/profiles/{id}/micdn`：一次保存配置与组件绑定。
   void updateProfileMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -441,7 +441,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/profiles/{id}/micdn.xml`：下载真实配置（含密钥）。
+  /// `GET /api/bashub/profiles/{id}/micdn.xml`：下载真实配置（含密钥）。
   void downloadProfileMicdnXml(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -459,7 +459,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/cdn-components`：可复用组件目录（bucket key 脱敏）。
+  /// `GET /api/bashub/cdn-components`：可复用组件目录（bucket key 脱敏）。
   void cdnComponents(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -476,7 +476,7 @@ class HubService {
     }
   }
 
-  /// `POST /api/hub/cdn-components`：新建组件。
+  /// `POST /api/bashub/cdn-components`：新建组件。
   void createCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -505,7 +505,7 @@ class HubService {
     }
   }
 
-  /// `PATCH /api/hub/cdn-components/{id}`：修改组件；bucket key 留空时沿用旧值。
+  /// `PATCH /api/bashub/cdn-components/{id}`：修改组件；bucket key 留空时沿用旧值。
   void updateCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -554,7 +554,7 @@ class HubService {
     }
   }
 
-  /// `DELETE /api/hub/cdn-components/{id}`：仍被 Profile 引用时由外键拒绝。
+  /// `DELETE /api/bashub/cdn-components/{id}`：仍被 Profile 引用时由外键拒绝。
   void deleteCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -585,7 +585,7 @@ class HubService {
   }
 
   private string profileMicdnUrl(string origin, string qualifiedName) {
-    return origin ~ profileApiPrefix(opts.prefix) ~ "/" ~ qualifiedName ~ "/micdn.xml";
+    return origin ~ opts.prefix ~ "/" ~ qualifiedName ~ "/micdn.xml";
   }
 
   private void writePeers(HTTPServerResponse res, const ProfileContext profile, string disposition) {
@@ -713,7 +713,7 @@ class HubService {
     writeJsonApi(res, errorDocument(500, "Micdn 配置处理失败", e.msg), HTTPStatus.internalServerError);
   }
 
-  /// `GET /api/{profile}/script/{host}`：按 Host.ip 生成该主机的检查脚本。
+  /// `GET /api/bashub/{profile}/script/{host}`：按 Host.ip 生成该主机的检查脚本。
   void profileHostScript(HTTPServerRequest req, HTTPServerResponse res) {
     ProfileContext profile;
     if (!resolveProfile(reg, store, req.params.get("profile", ""), req.headers.get("ip", ""), profile)) {
@@ -733,7 +733,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/{profile}/agents`：basctl 的出站 WebSocket。
+  /// `GET /api/bashub/{profile}/agents`：basctl 的出站 WebSocket。
   ///
   /// 鉴权在升级前完成：`Authorization: Bearer <profile>:<Profile.key>` 不对就直接 401，
   /// 也兼容只发 `<Profile.key>` 的旧客户端。
@@ -756,7 +756,7 @@ class HubService {
     serveAgentSocket(agents, name, req, res);
   }
 
-  /// `GET /api/hub/agents/status`：在线节点现状，只在线的、只留最近一次。
+  /// `GET /api/bashub/agents/status`：在线节点现状，只在线的、只留最近一次。
   void agentStatus(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -765,7 +765,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `POST /api/hub/agents/{profile}/report`：要求在线 agent 立即上报一次。
+  /// `POST /api/bashub/agents/{profile}/report`：要求在线 agent 立即上报一次。
   ///
   /// `report:now` 没有 body 回执，真正的 `report:os` / `report:bas` 会随后到达并覆盖快照；
   /// 因此这里只表示「指令已入队」，返回 202。
@@ -788,7 +788,7 @@ class HubService {
     writeJsonApi(res, okDocument(), HTTPStatus.accepted);
   }
 
-  /// `POST /api/hub/agents/{profile}/service/{action}`：对在线节点上的实例执行启停。
+  /// `POST /api/bashub/agents/{profile}/service/{action}`：对在线节点上的实例执行启停。
   ///
   /// body 只有 `{"instance":"farm.server"}`，`action` 取 `start` / `stop` / `restart`。
   /// agent 按 `hello.supports` 的能力协商接收，动作完成后以 `result` 回执快照里的
@@ -840,7 +840,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/agents/{profile}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
+  /// `GET /api/bashub/agents/{profile}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
   void agentLog(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -880,7 +880,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/hub/agents/{profile}/log/follow`：以 SSE 持续跟随实例日志。
+  /// `GET /api/bashub/agents/{profile}/log/follow`：以 SSE 持续跟随实例日志。
   ///
   /// hub 仍按 `log:read` 的区间语义向 agent 拉取：首次取 `tail`，之后从 `上次 to + 1`
   /// 继续；检测到 `total` 回退就重新取尾部并下发 `reset=true`。对浏览器保持一条
@@ -1621,7 +1621,7 @@ class HubService {
   }
 }
 
-/// 组装 `/api/hub` 下的路由：具体端点先注册，其余交给资源名分派。
+/// 组装 `/api/bashub` 下的路由：具体端点先注册，其余交给资源名分派。
 HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store, SessionRepo sessions = null,
     AgentRegistry agents = null, HubSecurity security = null) {
   auto router = new URLRouter("");
@@ -1633,16 +1633,16 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   auto hub = new HubService(cfg, reg, store, opts, sessions, agents, security);
 
   router.get(opts.prefix ~ "/configs", &hub.configs);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/server", &hub.profileServer);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/proxy", &hub.profileProxy);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/certificate", &hub.profileCertificate);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/certificate-key", &hub.profileCertificateKey);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/setline-peers", &hub.profilePeers);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/setline-manifest", &hub.profileManifest);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/ems/menus/:appName", &hub.profileEmsMenus);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/micdn.xml", &hub.profileMicdnXml);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/script/:host", &hub.profileHostScript);
-  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/agents", &hub.profileAgents);
+  router.get(opts.prefix ~ "/:profile/config/server", &hub.profileServer);
+  router.get(opts.prefix ~ "/:profile/config/proxy", &hub.profileProxy);
+  router.get(opts.prefix ~ "/:profile/config/certificate", &hub.profileCertificate);
+  router.get(opts.prefix ~ "/:profile/config/certificate-key", &hub.profileCertificateKey);
+  router.get(opts.prefix ~ "/:profile/config/setline-peers", &hub.profilePeers);
+  router.get(opts.prefix ~ "/:profile/config/setline-manifest", &hub.profileManifest);
+  router.get(opts.prefix ~ "/:profile/ems/menus/:appName", &hub.profileEmsMenus);
+  router.get(opts.prefix ~ "/:profile/micdn.xml", &hub.profileMicdnXml);
+  router.get(opts.prefix ~ "/:profile/script/:host", &hub.profileHostScript);
+  router.get(opts.prefix ~ "/:profile/agents", &hub.profileAgents);
   router.get(opts.prefix ~ "/profiles/:id/config/server", &hub.profileServerView);
   router.get(opts.prefix ~ "/profiles/:id/config/proxy", &hub.profileProxyView);
   router.get(opts.prefix ~ "/profiles/:id/config/setline-peers", &hub.profilePeersView);
@@ -1694,11 +1694,6 @@ private string hostOfUrl(string url) {
   if (colon >= 0)
     text = text[0 .. colon];
   return text;
-}
-
-/// Hub 前缀是 `/api/hub` 时，配置分发沿用 webmvc 的 `/api/{profile}`。
-private string profileApiPrefix(string hubPrefix) {
-  return hubPrefix.endsWith("/hub") ? hubPrefix[0 .. $ - 4] : "/api";
 }
 
 /// 周期刷新与手动刷新共用：状态非 200 或取不到内容都当作「本次跳过」。

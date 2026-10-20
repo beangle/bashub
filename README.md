@@ -5,7 +5,7 @@ BAS 控制台这一个产品的 monorepo，两部分各自独立构建：
 | 部分 | 位置 | 构建 | 产物 |
 |---|---|---|---|
 | 前端 SPA | `packages/web` | pnpm + vite | `packages/web/dist`、`release/bashub-web.zip` |
-| D 后端 | `src/beangle`、`src/bashub` | dub | `target/d/bashub`（`/api/hub`、`/api/{profile}`） |
+| D 后端 | `src/beangle`、`src/bashub` | dub | `target/d/bashub`（`/api/bashub`、`/api/bashub/{profile}`） |
 
 ```bash
 pnpm build:web                              # 前端 → packages/web/dist
@@ -135,28 +135,28 @@ src/bashub/                 业务：BAS 控制台这一份
   就多一个资源，路由不用改）。
 - **`configs` / `sessions`**：`GET {prefix}/configs`（免登录，前端据此知道 ems 地址）、
   `GET {prefix}/sessions`、`POST {prefix}/sessions/logout`。
-- **Profile 配置分发**：`GET /api/{profile}/config/server` 用
+- **Profile 配置分发**：`GET /api/bashub/{profile}/config/server` 用
   `Authorization: Bearer <profile>:<Profile.key>` 鉴权（也兼容只发 key 的旧客户端），
   下载端点也接受用户名是 Profile 名的 HTTP Basic，不再依赖可伪造的 `ip` 头；server.xml 只收窄到
   本 Profile 的 farms/hosts/webapps 及其引用到的 engines、servers、artifacts。管理台另用
-  `GET /api/hub/profiles/{id}/config/server`（登录会话鉴权）查看同一份结果。
-  `GET /api/{profile}/config/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
+  `GET /api/bashub/profiles/{id}/config/server`（登录会话鉴权）查看同一份结果。
+  `GET /api/bashub/{profile}/config/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
   只按请求 `path` 做 `map_beg` 路由，只有带 targets 的 webapp 参与，按 farm + server 集合分组。
   proxy 下载使用同样的 Bearer 凭证。
   Profile 的 `sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥；管理台只回显公钥，
-  私钥始终脱敏。setline 用同一凭证分别拉取 `GET /api/{profile}/config/certificate` 与
+  私钥始终脱敏。setline 用同一凭证分别拉取 `GET /api/bashub/{profile}/config/certificate` 与
   `config/certificate-key`，落成 `/etc/setline/certs/cert.pem`、`key.pem` 和 haproxy 的
   `bundle.pem`。未配置证书时两个端点返回空 Body。
-  `GET /api/{profile}/config/setline-peers` 输出 sidecar 的 peer 列表（JSON）：
+  `GET /api/bashub/{profile}/config/setline-peers` 输出 sidecar 的 peer 列表（JSON）：
   `peers` 由 Profile 下的 web 节点以及 Micdn 配置中登记的服务器合并生成；Micdn 服务器
   使用各自的 `adminListen`。没有节点时返回空数组。`setline pull` 直接把这组 peers 写回
   节点自己的 `setline.conf`，`setline.json` 仍只保存本机监听与路由。各节点自己的 setline
   仍需把读入口开到 sidecar 可达，并把 sidecar 主机 IP 写进 `peerReaders`。
-  `GET /api/{profile}/config/setline-manifest` 用同一凭证一次返回 peers、proxy、certificate、
+  `GET /api/bashub/{profile}/config/setline-manifest` 用同一凭证一次返回 peers、proxy、certificate、
   certificate-key 四个资源的 SHA-256；setline agent 据此只下载变化项，不再每轮拉取全部配置。
-  `GET /api/{profile}/ems/menus/{appName}`
-  按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/{profile}/micdn/asset` 按
-  Profile 关联的静态资源组输出资产清单；`GET /api/{profile}/script/{host}` 按 Host 平台与
+  `GET /api/bashub/{profile}/ems/menus/{appName}`
+  按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/bashub/{profile}/micdn/asset` 按
+  Profile 关联的静态资源组输出资产清单；`GET /api/bashub/{profile}/script/{host}` 按 Host 平台与
   特性依赖生成检查脚本。真实库的 server.xml 已通过 basctl 的 `bas-1.0.0.xsd`。
 - **ems 部署常量**（`beangle.ems`）：宿主配了 `ems.home`（或 `ems.base`/`ems.profile`）就按
   ems 规则读 `home/conf.properties`，推出 base/cas/portal/api/`inner_base` 与两个会话
@@ -180,7 +180,7 @@ src/bashub/                 业务：BAS 控制台这一份
   `{cas}/serviceValidate`，把 CAS 的 `authorities`/`permissions` 映射进账户。JSON 请求未登录回
   401 + `errors[0].meta.redirectUrl`，浏览器导航回 302 到 `{cas}/login?service=...`；已登录但
   Private 资源角色不命中回 403，root 直接放行。资源名沿用原 action 名，取
-  `/api/hub/{resource}`，因此 ems `resources.json` 可以直接复用；未登记资源按
+  `/api/bashub/{resource}`，因此 ems `resources.json` 可以直接复用；未登记资源按
   `unknownIsProtected` 只要求登录。`configs` 不挂 guard，保持登录前可读。
 - **CORS 与安全响应头**：同源不下发 CORS 头；允许来源的预检回 204，不允许的来源回 403；
   `<api cors-origins="https://hub.example.com,https://sas.openurp.net">` 可覆盖缺省的本机来源，
@@ -294,7 +294,7 @@ curl -s "https://sas.openurp.net/cas/session/$SID?format=application/json" | jq 
 
 # 3) 带 cookie 打 bashub：命中 → 真实账号，无效/没有 → 401 + meta.redirectUrl
 curl -s -i -H 'Accept: application/vnd.api+json' -H "Cookie: URP_SID=$SID" \
-  http://127.0.0.1:8080/api/hub/sessions
+  http://127.0.0.1:8080/api/bashub/sessions
 ```
 
 `auth="none"` 时第 3 步拿不到会话是给演示用户（200）而不是 401。
@@ -303,7 +303,7 @@ curl -s -i -H 'Accept: application/vnd.api+json' -H "Cookie: URP_SID=$SID" \
 
 ```bash
 curl -s -H 'Accept: application/vnd.api+json' \
-  'http://127.0.0.1:18080/api/hub/profiles/search?filter%5Borg.name%5D=beangle&include=org'
+  'http://127.0.0.1:18080/api/bashub/profiles/search?filter%5Borg.name%5D=beangle&include=org'
 ```
 
 ## 安装包
@@ -353,14 +353,14 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   当作没有配置（原 JVM 后端借 JDBC 驱动还能吃 mysql/oracle/dm）；也没移植「应用文件与 `resources.xml`
   都没有时去问 `EmsApi.getDatasourceUrl`」那一步（要网络）；`<url>` 只认
   `jdbc:postgresql://host[:port]/db` 与现成的 `key=value` 串，JDBC 的查询参数不搬。
-- **节点通道的写指令**：`log:read` 已接到 `GET /api/hub/agents/{profile}/log`，带请求号等待
+- **节点通道的写指令**：`log:read` 已接到 `GET /api/bashub/agents/{profile}/log`，带请求号等待
   `result`、超时与断连唤醒；`GET .../log/follow` 用 SSE 持续跟随，首次取尾部后按游标增量拉取，
-  轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/hub/agents/{profile}/report`
-  要求节点立即刷新快照。`POST /api/hub/agents/{profile}/service/{action}`（`start` / `stop` /
+  轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/agents/{profile}/report`
+  要求节点立即刷新快照。`POST /api/bashub/agents/{profile}/service/{action}`（`start` / `stop` /
   `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。
   SPA 的 `/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读日志、SSE 跟随，
   以及实例的重启 / 停止（带二次确认）。
-- **`/api/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 资产清单与主机脚本
+- **`/api/bashub/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 资产清单与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。
 - **其余定制动作**：`profiles/{id}/reset-key`、`webapps/upgrade`、`hosts/{id}/webapps`、
   `artifacts/{id}/webapps`、`resources/{id}/menus`、`artifacts/update-version` 与

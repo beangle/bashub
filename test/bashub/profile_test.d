@@ -80,7 +80,7 @@ unittest {
   auto xml = renderServerXml(store, reg, profile);
   assert(xml.canFind(`version="6.0.0"`));
   assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
-  assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="${bas_remote_token}"/>`));
+  assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
   assert(!xml.canFind("<hub"));
   assert(!xml.canFind("<setline"));
 

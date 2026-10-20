@@ -334,7 +334,7 @@ final class AgentRegistry {
     return list;
   }
 
-  /// `GET /api/hub/agents/status` 的数组。
+  /// `GET /api/bashub/agents/status` 的数组。
   Json status() {
     Json[] items;
     foreach (session; online())

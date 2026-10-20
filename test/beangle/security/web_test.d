@@ -31,15 +31,15 @@ private HTTPServerRequest requestOf(string url, string[string] headers = null) {
 
 @("serviceUrl 去掉 ticket/renew/sid_name 并对 query 排序")
 unittest {
-  auto req = requestOf("http://localhost/api/hub/profiles/search?z=2&ticket=ST-1&a=1&renew=true&sid_name=x&b=2");
-  assert(serviceUrl(req) == "http://localhost/api/hub/profiles/search?a=1&b=2&z=2");
+  auto req = requestOf("http://localhost/api/bashub/profiles/search?z=2&ticket=ST-1&a=1&renew=true&sid_name=x&b=2");
+  assert(serviceUrl(req) == "http://localhost/api/bashub/profiles/search?a=1&b=2&z=2");
 }
 
 @("serviceUrl 优先使用 X-Forwarded-Proto/Host/Port")
 unittest {
-  auto req = requestOf("http://internal:8080/api/hub/sessions",
+  auto req = requestOf("http://internal:8080/api/bashub/sessions",
       ["X-Forwarded-Proto": "https", "X-Forwarded-Host": "hub.example.com", "X-Forwarded-Port": "443"]);
-  assert(serviceUrl(req) == "https://hub.example.com/api/hub/sessions");
+  assert(serviceUrl(req) == "https://hub.example.com/api/bashub/sessions");
 }
 
 @("casLoginUrl 保留已有 query，并编码 service")
@@ -52,17 +52,17 @@ unittest {
 
 @("loginUrlFor 没配 CAS 时退回 ems cas 前缀")
 unittest {
-  auto req = requestOf("http://localhost/api/hub/sessions");
+  auto req = requestOf("http://localhost/api/bashub/sessions");
   assert(loginUrlFor(CasConfig.init, req, "https://sas.example/cas") == "https://sas.example/cas");
 }
 
 @("wantsJson 识别 Accept、后缀、format 与 X-Requested-With")
 unittest {
-  assert(wantsJson(requestOf("http://localhost/api/hub/sessions", ["Accept": "application/vnd.api+json"])));
-  assert(wantsJson(requestOf("http://localhost/api/hub/sessions.json")));
-  assert(wantsJson(requestOf("http://localhost/api/hub/sessions?format=json")));
-  assert(wantsJson(requestOf("http://localhost/api/hub/sessions", ["X-Requested-With": "XMLHttpRequest"])));
-  assert(!wantsJson(requestOf("http://localhost/api/hub/sessions", ["Accept": "text/html"])));
+  assert(wantsJson(requestOf("http://localhost/api/bashub/sessions", ["Accept": "application/vnd.api+json"])));
+  assert(wantsJson(requestOf("http://localhost/api/bashub/sessions.json")));
+  assert(wantsJson(requestOf("http://localhost/api/bashub/sessions?format=json")));
+  assert(wantsJson(requestOf("http://localhost/api/bashub/sessions", ["X-Requested-With": "XMLHttpRequest"])));
+  assert(!wantsJson(requestOf("http://localhost/api/bashub/sessions", ["Accept": "text/html"])));
 }
 
 @("selectedProfile 只接受账户上真实存在的 Profile")
@@ -74,9 +74,9 @@ unittest {
   account.profiles = [profile];
   auto session = new Session("sid", account, nowSeconds(), new Agent(), 1800);
 
-  assert(selectedProfile(session, requestOf("http://localhost/api/hub/sessions?contextProfileId=42")) is profile);
-  assert(selectedProfile(session, requestOf("http://localhost/api/hub/sessions?contextProfileId=7")) is null);
-  assert(selectedProfile(session, requestOf("http://localhost/api/hub/sessions",
+  assert(selectedProfile(session, requestOf("http://localhost/api/bashub/sessions?contextProfileId=42")) is profile);
+  assert(selectedProfile(session, requestOf("http://localhost/api/bashub/sessions?contextProfileId=7")) is null);
+  assert(selectedProfile(session, requestOf("http://localhost/api/bashub/sessions",
           ["Cookie": "beangle.security.profileId=42"])) is profile);
-  assert(selectedProfile(null, requestOf("http://localhost/api/hub/sessions?contextProfileId=42")) is null);
+  assert(selectedProfile(null, requestOf("http://localhost/api/bashub/sessions?contextProfileId=42")) is null);
 }

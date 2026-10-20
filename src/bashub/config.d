@@ -32,7 +32,7 @@ struct HubConfig {
   string listen = "127.0.0.1:8080";
   /// libpq 连接串（如 `host=127.0.0.1 port=5432 user=bashub dbname=bas`）；留空则不可用数据库
   string dbUrl;
-  string apiPrefix = "/api/hub";
+  string apiPrefix = "/api/bashub";
   /// 是否要求登录（预演阶段只判有无会话头，不做 CAS）
   bool authRequired = false;
   string logLevel = "info";

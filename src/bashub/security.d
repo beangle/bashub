@@ -121,7 +121,7 @@ class HubSecurity {
     }
   }
 
-  /** 授权资源名：`/api/hub/{resource}/...` → `/api/hub/{resource}`。
+  /** 授权资源名：`/api/bashub/{resource}/...` → `/api/bashub/{resource}`。
    *
    * 与 scala 侧按 action 名登记资源的粒度不同，这里用 URL 资源段；ems 里没有同名资源时
    * 按 unknownIsProtected 只要求登录，因此既可逐步补齐资源定义，也不会误放开写接口。

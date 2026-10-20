@@ -56,7 +56,7 @@ export interface AgentBasSnapshot {
   declared?: AgentInstance[]
 }
 
-/** `GET /api/hub/agents/status` 里的一项：一台在线节点此刻的样子。 */
+/** `GET /api/bashub/agents/status` 里的一项：一台在线节点此刻的样子。 */
 export interface AgentStatus {
   profile: string
   host?: string
