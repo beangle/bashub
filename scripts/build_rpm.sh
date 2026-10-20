@@ -106,11 +106,11 @@ if [ ! -d /var/lib/beangle-ems ]; then
   chown root:beangle /var/lib/beangle-ems
   chmod 2775 /var/lib/beangle-ems
 fi
-mkdir -p /var/lib/bashub /var/log/bashub
+mkdir -p /var/log/beangle-ems/bashub
 
 %post
-chown -R ems:beangle /var/lib/bashub /var/log/bashub
-chmod 2775 /var/lib/bashub /var/log/bashub
+chown -R ems:beangle /var/log/beangle-ems/bashub
+chmod 2775 /var/log/beangle-ems/bashub
 systemctl daemon-reload 2>/dev/null || :
 
 %preun

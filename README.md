@@ -319,7 +319,7 @@ scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revisio
 
 - `/usr/bin/bashub`
 - `/var/lib/beangle-ems/`：ems 根目录
-- `/var/lib/bashub`、`/var/log/bashub`
+- `/var/log/beangle-ems/bashub`：bashub 日志目录
 - `/usr/lib/systemd/system/bashub.service`
 
 服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，监听地址优先取应用文件的

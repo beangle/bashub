@@ -7,8 +7,8 @@ Wants=network-online.target
 Type=simple
 User=ems
 Group=beangle
-Environment=HOME=/var/lib/bashub
-WorkingDirectory=/var/lib/bashub
+Environment=HOME=/var/lib/beangle-ems
+WorkingDirectory=/var/lib/beangle-ems
 # profile 定位到 /var/lib/beangle-ems/<profile>
 ExecStart=/usr/bin/bashub --ems.profile=bas --ems.base=/var/lib/beangle-ems
 Restart=on-failure

@@ -121,14 +121,14 @@ if [ ! -d /var/lib/beangle-ems ]; then
   chown root:beangle /var/lib/beangle-ems
   chmod 2775 /var/lib/beangle-ems
 fi
-mkdir -p /var/lib/bashub /var/log/bashub
+mkdir -p /var/log/beangle-ems/bashub
 PREINST
 
 cat > "$PKGDIR/DEBIAN/postinst" << 'POSTINST'
 #!/bin/sh
 set -e
-chown -R ems:beangle /var/lib/bashub /var/log/bashub
-chmod 2775 /var/lib/bashub /var/log/bashub
+chown -R ems:beangle /var/log/beangle-ems/bashub
+chmod 2775 /var/log/beangle-ems/bashub
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
 fi
