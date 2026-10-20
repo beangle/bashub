@@ -5,8 +5,8 @@
 -- 保留其中一个。新增的 urls 逐条列出对外路径；为空数组表示仍按 context_path 转发。
 --
 -- 执行顺序：**停掉旧后端 → 执行本脚本 → 部署新后端**。
--- 与 0.0.8.sql / 0.0.8-engine-types.sql / 0.0.8-legacy-columns.sql / 0.0.8-schema-rename.sql
--- 相互独立，可单独执行；可重复执行：存量行回填成 [] 后再补 not null，已是 not null 时是空操作。
+-- 与其他脚本相互独立；升级时仍按本目录的文件序号执行。
+-- 可重复执行：存量行回填成 [] 后再补 not null，已是 not null 时是空操作。
 -- 存量数据不需要别的迁移：urls 为 [] 即等价于原来的按 context_path 转发。
 
 alter table bas.cfg_webapps add column if not exists urls jsonb;

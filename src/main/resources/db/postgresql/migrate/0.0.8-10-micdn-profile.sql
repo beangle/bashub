@@ -1,5 +1,6 @@
 -- bashub 0.0.8（附）：以 Profile 为中心的完整 micdn 配置。
 -- 旧 cdn_asset_* 模型不兼容；先把旧静态资产转换为组件与 Profile 绑定，再移除旧表。
+-- 执行顺序：本目录按文件名序号执行；本脚本是 0.0.8 的最后一步。
 -- 脚本可重复执行。
 
 create table if not exists bas.cdn_components (

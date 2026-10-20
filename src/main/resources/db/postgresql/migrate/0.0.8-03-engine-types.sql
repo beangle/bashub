@@ -18,7 +18,7 @@
 -- （若先执行这句，它产出的 `tomcat` 会被本脚本的 `tomcat` -> `tomcat-server` 规则吃掉。）
 --
 -- 执行顺序：**停掉旧后端 → 执行本脚本 → 部署新后端**。
--- 与 0.0.8.sql / 0.0.8-legacy-columns.sql / 0.0.8-schema-rename.sql 相互独立，可单独执行。
+-- 与其他脚本相互独立；升级时仍按本目录的文件序号执行。
 -- 可重复执行：where 里的旧值都不在映射输出值集合内，第二次运行是空操作。
 
 update bas.cfg_engines

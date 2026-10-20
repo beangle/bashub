@@ -360,7 +360,7 @@ PATCH /api/hub/cdn-components/{id}
 
 ## 8. 旧数据转换与移除
 
-迁移脚本 `migrate/0.0.8-micdn-profile.sql` 先创建三张新表，再把旧静态资产转换成新模型：
+迁移脚本 `migrate/0.0.8-10-micdn-profile.sql` 先创建三张新表，再把旧静态资产转换成新模型：
 
 - 每个旧 `cdn_assets` 转成一个 `static_bundle`，`gav` / `location` 按原顺序转成 `jar` / `dir` source；
 - 每个“Profile -> asset group -> asset”关系转成一条 Profile 组件绑定；
@@ -369,13 +369,13 @@ PATCH /api/hub/cdn-components/{id}
 - 有旧静态组的 Profile 若尚无 Micdn 配置，则补充默认配置，并把 `local_repo` / `remote_repo` 写入 Maven 段；
 - 已不存在的 Profile、没有来源的资产和重复挂载名会被跳过，不制造悬挂外键。
 
-已经执行过早期 0.0.8 Micdn Profile 改造的数据库，使用 `migrate/0.0.8-micdn-component-mount.sql`
+已经执行过早期 0.0.8 Micdn Profile 改造的数据库，使用 `migrate/0.0.8-08-micdn-component-mount.sql`
 把绑定表的 `mount_name` 回填到组件目录。该脚本要求每个组件都能从现有绑定中唯一确定挂载名；任何
 无绑定或多挂载名的组件都会让迁移直接失败，不使用组件名补位。
 
-`migrate/0.0.8-micdn-profile-blob.sql` 清理旧的 `blob_bucket` 组件和绑定，并移除 Blob 配置中已废弃的
+`migrate/0.0.8-09-micdn-profile-blob.sql` 清理旧的 `blob_bucket` 组件和绑定，并移除 Blob 配置中已废弃的
 `declared` 字段、补齐 `publicImages`。旧 bucket 的名称和 key 不再迁移；新模型只认 Profile 自身的 name/key。
-`migrate/0.0.8-micdn-profile.sql` 同时移除配置中已废弃的 `remote` 字段。
+`migrate/0.0.8-10-micdn-profile.sql` 同时移除配置中已废弃的 `remote` 字段。
 
 转换完成后删除 `cdn_asset_bundles`、`cdn_asset_groups_profiles`、`cdn_assets`、`cdn_asset_groups`
 四张旧表，并清理对应 sequence。转换与建表均通过 `if not exists` / `on conflict do nothing` 保持可重复执行。

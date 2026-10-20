@@ -1,6 +1,7 @@
 -- Blob bucket 不再属于可复用组件目录：bucket 的 name/key 固定取 Profile。
 -- Blob 是否输出由 Profile key 决定，不再是配置中的 declared 开关；
 -- 这里清理旧字段并补齐 publicImages，随后删除废弃组件与绑定。
+-- 执行顺序：必须在 0.0.8-10-micdn-profile.sql 之前。
 
 do $$
 begin

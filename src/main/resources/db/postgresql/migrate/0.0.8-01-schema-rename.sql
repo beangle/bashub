@@ -3,8 +3,8 @@
 --   cfg_profiles.sas_version 列   sas_version          -> bas_version
 --   public.table_sequences 键名   'sas.<table>'        -> 'bas.<table>'
 --
--- 执行顺序：**先执行本脚本，再执行 0.0.8.sql / 0.0.8-legacy-columns.sql**
--- （后两个脚本的建表、删列语句均已使用 bas. 前缀，须在本脚本之后运行）。
+-- 执行顺序：本目录按文件名序号从小到大执行；本脚本为 01，必须最先执行。
+-- 后续脚本的建表、删列语句均使用 bas. 前缀，须在本脚本之后运行。
 -- 全新安装直接用 init/*.sql 建库即可，无需本脚本。
 -- 脚本可重复执行：schema/列/序列键名改完后再次运行是空操作。
 -- 改名仅调整对象归属，表、索引、外键等 OID 不变，无需重建依赖对象。

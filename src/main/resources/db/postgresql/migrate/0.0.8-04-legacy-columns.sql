@@ -4,7 +4,7 @@
 --   cfg_hosts.os                   22 行中 9 行有值（CentOS/Fedora 版本串，已被 platform + platform_version 取代）
 --   cfg_farms.max_threads          原 HTTP Connector 线程数，已从 Farm 实体、server.xml 模板与 SPA schema 移除
 -- 这些列在实体、模板、SPA schema 中均无引用，直接删除，不做归档。
--- 与 0.0.8.sql 相互独立，可单独执行；已迁移的库再跑是空操作（drop column if exists）。
+-- 与 0.0.8-02-app-channels.sql 相互独立；已迁移的库再跑是空操作（drop column if exists）。
 -- 删列不可逆，如需留底请在执行前自行备份，例如：
 --   create table if not exists bas.cfg_farms_bak_0_0_8 as select id, enable_access_log from bas.cfg_farms;
 

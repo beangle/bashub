@@ -2,7 +2,7 @@
 -- 对应实体 org.beangle.bashub.model.ems.Channel(app/base/channelType/embedMode/enabled)。
 --
 -- 执行顺序：**停掉旧后端 → 执行本脚本 → 部署新后端**。
--- 由 sas 更名的存量库，请先执行同目录的 0.0.8-schema-rename.sql（把 schema sas 改为 bas）。
+-- 由 sas 更名的存量库，必须先执行 0.0.8-01-schema-rename.sql（把 schema sas 改为 bas）。
 -- 第 1 段（建表/回填/计数器）新老后端可共存；第 2 段会删掉 ems_apps 的三列，
 -- 旧后端（实体仍映射 url/base/navStyle）在删列后启动/查询会报错，故务必按上述顺序执行。
 -- 脚本可重复执行（表/约束/列/回填都做了存在性判断），已迁移的库再跑是空操作。
