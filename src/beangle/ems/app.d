@@ -57,6 +57,15 @@ Nullable!string readAppFile(string home, string appPath) {
   return Nullable!string(cast(string) read(file));
 }
 
+/** 读 `${home}${path}.xml` 根元素上的属性；文件或属性不存在返回空串。 */
+string appFileAttribute(string home, string appName, string key) {
+  auto text = readAppFile(home, appPathOf(appName));
+  if (text.isNull)
+    return "";
+  auto root = parseRoot(text.get);
+  return getAttrs(root).get(key, "").strip;
+}
+
 /** 从 XML 文本里读第一个 `<ems app-name="...">` 与它的 `props/prop`；没有 app-name 就返回空值。
  *
  * scala 缺清单时是 `printStackTrace` + `System.exit(1)`；D 侧不该因为一份清单缺失就把进程带走，

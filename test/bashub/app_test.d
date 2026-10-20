@@ -9,7 +9,7 @@
 module test.bashub.app_test;
 
 import bashub.app : createDao, parseArgs;
-import bashub.config : HubConfig;
+import bashub.config : HubConfig, applyListenOverride;
 
 import beangle.data.dao : DaoException;
 
@@ -28,8 +28,9 @@ import std.getopt : GetOptException;
 
 @("D-style command line options are parsed and removed from vibe arguments") unittest {
   auto parsed = parseArgs(["bashub", "--check-schema",
-      "--ems.profile=bas", "--ems.home", "/data/ems/bas", "--ems.base=/tmp/ems"]);
+      "--listen=0.0.0.0:8888", "--ems.profile=bas", "--ems.home", "/data/ems/bas", "--ems.base=/tmp/ems"]);
   assert(parsed.checkSchema);
+  assert(parsed.listen == "0.0.0.0:8888");
   assert(parsed.options["ems.profile"] == "bas");
   assert(parsed.options["ems.home"] == "/data/ems/bas");
   assert(parsed.options["ems.base"] == "/tmp/ems");
@@ -43,4 +44,13 @@ import std.getopt : GetOptException;
   } catch (GetOptException error) {
     assert(error.msg.canFind("-Dems.profile=bas"));
   }
+}
+
+@("command-line listen overrides the application file value") unittest {
+  HubConfig cfg;
+  cfg.listen = "10.0.0.8:8080";
+  applyListenOverride(cfg, "0.0.0.0:8888");
+  assert(cfg.listen == "0.0.0.0:8888");
+  applyListenOverride(cfg, "");
+  assert(cfg.listen == "0.0.0.0:8888");
 }

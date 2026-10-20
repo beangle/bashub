@@ -222,11 +222,13 @@ D/POSIX 风格的长选项，`--key=value` 与 `--key value` 两种写法都支�
 ```bash
 ./target/d/bashub --ems.profile=bas
 ./target/d/bashub --ems.home /data/ems/bas
+./target/d/bashub --ems.profile=bas --listen=0.0.0.0:8888
 ./target/d/bashub --ems.profile=bas --check-schema
 ```
 
-监听、日志、API 前缀、授权刷新与组件版本刷新间隔使用内置缺省；数据库、CAS、EMS 地址与
-会话 cookie 全部从 ems profile 推导。没有 EMS profile 时 bashub 直接拒绝启动。
+日志、API 前缀、授权刷新与组件版本刷新间隔使用内置缺省；监听可由应用文件或命令行覆盖；
+数据库、CAS、EMS 地址与会话 cookie 全部从 ems profile 推导。没有 EMS profile 时 bashub 直接拒绝启动。
+缺省监听 `127.0.0.1:8080`，`--listen` 可用 `host:port` 覆盖绑定地址和端口。
 `--ems.profile`、`--ems.home`、`--ems.base` 覆盖同名环境变量。
 JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报错退出，不会忽略或透传给 vibe。
 
@@ -246,13 +248,38 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 ```
 
 `hub.xml` 的 `<app><resources><datasource name="default">...</datasource></resources></app>`
-提供数据库连接；没有 `default` 数据源时再找 `~/.ems/bas/resources.xml`。
+提供数据库连接；没有 `default` 数据源时再找 `~/.ems/bas/resources.xml`。根元素还可以配置监听地址：
+
+```xml
+<app listen="0.0.0.0:8888">
+  ...
+</app>
+```
+
+监听地址优先级为：命令行 `--listen` > `hub.xml` 的 `<app listen>` > 内置 `127.0.0.1:8080`。
 
 数据库结构检查可以独立执行，不启动 HTTP：
 
 ```bash
 ./target/d/bashub --ems.profile=bas --check-schema
 # 全部存在 → "schema ok"；漂移 → 逐条列出并以退出码 3 结束
+```
+
+systemd 服务默认不传 `--listen`，因此读取应用文件的 `listen`，再没有才使用内置
+`127.0.0.1:8080`。如果要在 systemd 层覆盖应用文件，用 drop-in 重写 `ExecStart`：
+
+```ini
+# /etc/systemd/system/bashub.service.d/listen.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/bashub --ems.profile=bas --ems.base=/var/lib/beangle-ems --listen=0.0.0.0:8888
+```
+
+然后执行：
+
+```bash
+systemctl daemon-reload
+systemctl restart bashub
 ```
 
 **测「取会话」**（接真 CAS，不需要别的应用配合）：
@@ -295,9 +322,10 @@ scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revisio
 - `/var/lib/bashub`、`/var/log/bashub`
 - `/usr/lib/systemd/system/bashub.service`
 
-服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，不使用独立 bashub 配置文件。
+服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，监听地址优先取应用文件的
+`listen`，最后才用内置 `127.0.0.1:8080`；systemd drop-in 仍可用 `--listen` 强制覆盖。
 ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `/var/lib/beangle-ems/bas`；
-端口、数据库、CAS 等都来自该 profile 的内置缺省与应用文件。前端 SPA 按 `packages/web`
+数据库、CAS 等来自该 profile 的应用文件；监听地址也可由命令行覆盖。前端 SPA 按 `packages/web`
 自己的发布流程单独部署，并把 `/api/` 反代到 bashub。准备好 profile 后启动
 `systemctl enable --now bashub`。包安装的服务以 `ems:beangle` 运行；RPM/DEB 只会在
 系统缺少该用户时创建它，不会覆盖已有的 `ems` 用户。

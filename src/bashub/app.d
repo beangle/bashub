@@ -50,6 +50,8 @@ struct HubArgs {
   string[string] options;
   bool checkSchema;
   bool help;
+  /// 命令行 `--listen`；空表示使用应用文件或内置缺省
+  string listen;
   /// 剩下的（含 argv[0]），原样交回 vibe
   string[] rest;
 }
@@ -69,6 +71,7 @@ HubArgs parseArgs(string[] args) {
   getopt(args,
       "check-schema", &parsed.checkSchema,
       "h|help", &parsed.help,
+      "listen", &parsed.listen,
       "ems.profile", &emsProfile,
       "ems.home", &emsHome,
       "ems.base", &emsBase);
@@ -84,9 +87,10 @@ HubArgs parseArgs(string[] args) {
 
 private void printUsage() {
   writeln("Usage: bashub [--ems.profile=<name>] [--ems.home=<dir>] [--ems.base=<dir>]");
-  writeln("              [--check-schema]");
+  writeln("              [--listen=<host:port>] [--check-schema]");
   writeln();
   writeln("  --check-schema       只检查库表/列是否与资源定义一致，然后退出");
+  writeln("  --listen=<host:port> 覆盖应用文件中的监听地址；内置缺省 127.0.0.1:8080");
   writeln("  --ems.profile=<name> 指定 ems 部署 profile，如 --ems.profile=bas");
   writeln("  --ems.home=<dir>     直接指定 ems home，如 --ems.home=/data/ems/bas");
   writeln("  --ems.base=<dir>     指定 ems base，缺省 ~/.ems");
@@ -121,6 +125,7 @@ int main(string[] args) {
   HubConfig cfg;
   try {
     cfg = loadBashub(ems);
+    applyListenOverride(cfg, parsedArgs.listen);
     applyBashubLogging(cfg.logFile, cfg.logLevel);
   } catch (Exception e) {
     stderr.writeln("bashub: " ~ e.msg);

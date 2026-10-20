@@ -9,7 +9,7 @@
 module test.beangle.ems.app_test;
 /// EmsApp 的移植部分：app-name → path、清单元素与 `${home}${path}.xml` 的合并。
 
-import beangle.ems.app : EmsApp, appPathOf, mergeAppFile, readEmsApp;
+import beangle.ems.app : EmsApp, appFileAttribute, appPathOf, mergeAppFile, readEmsApp;
 
 import test.beangle.tempdir : uniqueTempDir;
 
@@ -57,4 +57,16 @@ unittest {
   // 没有那份 xml 时原样返回
   assert(mergeAppFile(app, home ~ "/nope").get.properties["name"] == "platform-testwebapp");
   assert(mergeAppFile(Nullable!EmsApp(), home).isNull);
+}
+
+@("appFileAttribute：读取应用文件根元素属性")
+unittest {
+  auto home = uniqueTempDir("bashub-app-attr-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"), `<app listen="0.0.0.0:8888"/>`);
+
+  assert(appFileAttribute(home, "bas-hub", "listen") == "0.0.0.0:8888");
+  assert(appFileAttribute(home, "bas-hub", "missing").length == 0);
+  assert(appFileAttribute(home ~ "/nope", "bas-hub", "listen").length == 0);
 }

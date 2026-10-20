@@ -7,10 +7,12 @@
  */
 
 module bashub.config;
-/// 运行配置。监听、日志、接口与授权刷新使用内置缺省；EMS 常量与数据库全部来自 `ems.home`。
+/// 运行配置。监听可来自应用文件或命令行；日志、接口与授权刷新使用内置缺省；
+/// EMS 常量与数据库全部来自 `ems.home`。
 /// 不再读取独立的 bashub 配置文件，因此没有可热加载的部分。
 
 import beangle.ems : Ems;
+import beangle.ems.app : appFileAttribute;
 import beangle.ems.datasource : findDatasource, postgresConnInfo;
 import std.conv : to;
 import std.string : lastIndexOf, strip;
@@ -69,9 +71,19 @@ HubConfig loadBashub(Ems ems) {
   cfg.casServer = ems.cas;
   cfg.sessionIdName = ems.sid.name;
   cfg.dbUrl = emsDbUrl(cfg.appName, ems.env.home);
+  auto listen = appFileAttribute(ems.env.home, cfg.appName, "listen");
+  if (listen.length > 0)
+    cfg.listen = parseListen(listen).toString;
   if (cfg.authorityUrl.length == 0 && cfg.emsInnerApi.length > 0)
     cfg.authorityUrl = cfg.emsInnerApi ~ "/platform/security/func/" ~ cfg.appName ~ "/resources.json";
   return cfg;
+}
+
+/// 命令行覆盖应用文件里的监听地址；空串表示命令行未指定。
+void applyListenOverride(ref HubConfig cfg, string listen) {
+  if (listen.length == 0)
+    return;
+  cfg.listen = parseListen(listen).toString;
 }
 
 /** 从 ems 部署里取库连接串；空串 = 没有可用的（调用方按缺少数据库拒绝启动）。

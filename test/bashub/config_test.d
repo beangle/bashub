@@ -71,3 +71,14 @@ unittest {
       "host=localhost port=5432 dbname=bas user=openurp password=openurp application_name=bas-hub");
   assert(emsDbUrl("bas-hub", home ~ "/nope").length == 0);
 }
+
+@("loadBashub reads listen from the application file root attribute")
+unittest {
+  auto home = uniqueTempDir("bashub-ems-listen-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"), `<app listen="0.0.0.0:8899"/>`);
+
+  auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
+  assert(loadBashub(ems).listen == "0.0.0.0:8899");
+}
