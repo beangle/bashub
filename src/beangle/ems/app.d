@@ -11,7 +11,7 @@ module beangle.ems.app;
 /// → 应用名与 path（`/platform/testwebapp`），供前端 `app_name`、blob/资源定位用。
 ///
 /// 口径差别：scala 从 classpath 扫 `beangle.xml`，D 没有 classpath，改成「宿主把 XML 文本交进来」；
-/// 于是 bashub 的 `bashub.xml` 与 scala 的 `beangle.xml` 都能喂进来（两边都是 `<ems app-name=...>` 元素）。
+/// 只要文档里有 `<ems app-name=...>` 元素即可解析。
 ///
 /// 没移植的部分（README 的裁剪清单里也记着）：`redis` 配置、blob 仓库、classpath/HTTP 取资源，
 /// 以及清单值的 PBE 解密（命中 `ENC(...)` 就原样保留，见 `beangle.ems.datasource`）。
@@ -60,7 +60,7 @@ Nullable!string readAppFile(string home, string appPath) {
 /** 从 XML 文本里读第一个 `<ems app-name="...">` 与它的 `props/prop`；没有 app-name 就返回空值。
  *
  * scala 缺清单时是 `printStackTrace` + `System.exit(1)`；D 侧不该因为一份清单缺失就把进程带走，
- * 所以这里返回空 `Nullable`，由调用方决定退回什么缺省（bashub 就用 `bashub.xml` 里的 `app-name`）。
+ * 所以这里返回空 `Nullable`，由调用方决定退回什么缺省。
  */
 Nullable!EmsApp readEmsApp(string xmlText) {
   auto root = parseRoot(xmlText);

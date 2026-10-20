@@ -23,11 +23,11 @@ unittest {
   assert(appPathOf("bas") == "/bas");
 }
 
-@("readEmsApp：从 bashub.xml 形态的文档里读 <ems app-name> 与 props/prop")
+@("readEmsApp：从包含 <ems app-name> 的文档里读清单与 props/prop")
 unittest {
   auto xml = `<?xml version="1.0" encoding="UTF-8"?>
-<bashub listen="0:1"><ems app-name="platform-testwebapp"><props>
-  <prop key="logo"> /static/logo.png </prop></props></ems></bashub>`;
+<app><ems app-name="platform-testwebapp"><props>
+  <prop key="logo"> /static/logo.png </prop></props></ems></app>`;
   auto app = readEmsApp(xml);
   assert(!app.isNull);
   assert(app.get.name == "platform-testwebapp");
@@ -38,8 +38,8 @@ unittest {
 
 @("readEmsApp：没有 <ems app-name> 给 null，不把进程带走")
 unittest {
-  assert(readEmsApp(`<bashub/>`).isNull);
-  assert(readEmsApp(`<bashub><ems/></bashub>`).isNull);
+  assert(readEmsApp(`<app/>`).isNull);
+  assert(readEmsApp(`<app><ems/></app>`).isNull);
   assert(readEmsApp(`<beangle><ems app-name=""><props/></ems></beangle>`).isNull);
 }
 
@@ -51,7 +51,7 @@ unittest {
   write(buildPath(home, "platform/testwebapp.xml"),
       `<app enabled="true"><props><prop key="title"> 测试应用 </prop></props></app>`);
 
-  auto app = readEmsApp(`<bashub><ems app-name="platform-testwebapp"/></bashub>`);
+  auto app = readEmsApp(`<app><ems app-name="platform-testwebapp"/></app>`);
   assert(mergeAppFile(app, home).get.properties["enabled"] == "true");
   assert(mergeAppFile(app, home).get.properties["title"] == "测试应用");
   // 没有那份 xml 时原样返回

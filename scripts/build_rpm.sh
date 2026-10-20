@@ -96,21 +96,21 @@ Main designer: Duan TiHua
 
 %pre
 getent group beangle >/dev/null 2>&1 || groupadd -r beangle
-if ! getent passwd bashub >/dev/null 2>&1; then
-  useradd -r -g beangle -d /var/lib/bashub -s /sbin/nologin -c "Beangle BAS console server" bashub
+if ! getent passwd ems >/dev/null 2>&1; then
+  useradd -r -g beangle -d /var/lib/beangle-ems -s /sbin/nologin -c "Beangle EMS" ems
 else
-  usermod -g beangle bashub 2>/dev/null || :
+  usermod -g beangle ems 2>/dev/null || :
 fi
 if [ ! -d /var/lib/beangle-ems ]; then
   mkdir -p /var/lib/beangle-ems
   chown root:beangle /var/lib/beangle-ems
   chmod 2775 /var/lib/beangle-ems
 fi
-mkdir -p /var/lib/bashub/repository /var/log/bashub
+mkdir -p /var/lib/bashub /var/log/bashub
 
 %post
-chown -R bashub:beangle /var/lib/bashub /var/log/bashub
-chmod 2775 /var/lib/bashub /var/lib/bashub/repository /var/log/bashub
+chown -R ems:beangle /var/lib/bashub /var/log/bashub
+chmod 2775 /var/lib/bashub /var/log/bashub
 systemctl daemon-reload 2>/dev/null || :
 
 %preun

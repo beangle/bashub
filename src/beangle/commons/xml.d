@@ -7,18 +7,15 @@
  */
 
 module beangle.commons.xml;
-/// dxml DOM 上的最小解析辅助：属性表、按名取子元素、取元素文本、读配置文件。
+/// dxml DOM 上的最小解析辅助：属性表、按名取子元素、取元素文本。
 /// 标准库没有 XML，所以框架侧（`beangle.*`）要用 XML 的模块都从这里取这几件小事，
-/// 免得各写一份（原来是 `bashub.xml`，`beangle.ems.app` 要用，所以上移到 commons）。
+/// 免得各写一份。
 
 import dxml.dom;
 import dxml.parser : EntityType;
 import dxml.util : decodeXML;
 
 import std.array : appender;
-import std.file : exists, read;
-import std.format : format;
-import std.path : expandTilde;
 
 /** 起始标签与自闭合标签都算「元素」；其余（文本、注释、XML 声明）不算。 */
 bool isNamedElement(EntityType t) @safe pure nothrow {
@@ -73,14 +70,6 @@ auto parseRoot(R)(R content) {
   if (dom.children.length == 0)
     throw new Exception("empty xml document");
   return dom.children[0];
-}
-
-/** 读配置文件（支持 `~` 展开）。 */
-string readConfigText(string configFile) {
-  auto path = expandTilde(configFile);
-  if (!exists(path))
-    throw new Exception(format("config file[%s] does not exist", configFile));
-  return cast(string) read(path);
 }
 
 /** XML 转义：用于元素文本或双引号属性。

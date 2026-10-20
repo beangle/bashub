@@ -27,9 +27,8 @@ import std.getopt : GetOptException;
 }
 
 @("D-style command line options are parsed and removed from vibe arguments") unittest {
-  auto parsed = parseArgs(["bashub", "-f", "bashub.xml", "--check-schema",
+  auto parsed = parseArgs(["bashub", "--check-schema",
       "--ems.profile=bas", "--ems.home", "/data/ems/bas", "--ems.base=/tmp/ems"]);
-  assert(parsed.configFile == "bashub.xml");
   assert(parsed.checkSchema);
   assert(parsed.options["ems.profile"] == "bas");
   assert(parsed.options["ems.home"] == "/data/ems/bas");

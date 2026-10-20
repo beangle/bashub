@@ -110,26 +110,10 @@
 | `service:start/stop/restart` | ✅ | `POST /api/hub/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
 | 在线节点登记与摘除 | ✅ | 只摘自己那条，旧连接迟到的关闭不会挤掉新连接 |
 
-### 4. 原生发行包仓库 `/repo`
+### 4. 原生发行包仓库（已迁至 micdn）
 
-已移植；仓库根与上传令牌都有显式配置，也可从 ems 应用文件取缺省。
-
-| 功能 | 状态 | 说明 |
-|---|---|---|
-| `HEAD` 访问 | ✅ | 404 / 200、`Last-Modified`，别名请求用 `latest` 带出实际文件名 |
-| `GET` 下载 | ✅ | 真实文件流式输出；SNAPSHOT 别名 302 到时间戳文件 |
-| `POST upload/{path}` | ✅ | `Authorization: Basic ...` 解码后与 `snapshot.usertoken` 全等 |
-| 路径安全 | ✅ | 拒绝绝对路径、`..`、NUL；URL 百分号编码先解码再判定 |
-| SHA-1 校验文件 | ✅ | 构件未到暂存 `<root>/.pending`，构件到达后移到构件旁 |
-| 最新快照解析 | ✅ | 按 `yyyyMMdd.HHmmss-N` 比较时间戳与构建号，构建号按数值排序 |
-| 旧 `/repo/snapshot` | ⏸ | WAR/JAR 快照由 micdn 的 `/maven` 提供；`/repo` 只保留 basctl 原生包 |
-
-仓库 home 缺省 `~/.m2`：正式版落 `<home>/repository`，版本目录含 `-SNAPSHOT` 的落
-`<home>/snapshots`。`<repo home="..." token="..."/>` 可覆盖；`token` 未配置时读
-`${ems.home}${app.path}.xml` 的 `snapshot.usertoken`（与 ems 应用清单同源）。
-
-若 micdn 的 `/maven` 已经完全覆盖正式版快照分发，可先只保留 basctl 需要的原生包读写，
-再决定是否完整移植。
+原生发行包与 WAR/JAR 分发的职责已从 bashub 迁出，统一由
+[micdn](https://github.com/beangle/micdn) 的 `/maven` 负责；bashub 不再暴露 `/repo`。
 
 ### 5. 安全、缓存与运行时
 
@@ -146,7 +130,7 @@
 | ems PBE 密文解密 | ⏸ | 配了 `ENC(...)` 的部署目前需先提供明文 |
 | 远程 `EmsApi` 取配置/数据源 | ⏸ | 当前只读本地 ems 文件 |
 | 热加载 / SIGHUP | ⏸ | 配置启动时读取一次 |
-| 通用 multipart 上传 | ✅ | 菜单 XML + `POST {prefix}/snapshots/upload`（`warfile`，坐标取自 MANIFEST.MF） |
+| 菜单 XML multipart 上传 | ✅ | `POST {prefix}/menus/import`（`app` + `menufile`） |
 | 定时任务框架 | ✅ | 会话心跳 + 组件版本刷新；`<artifacts refresh-minutes>` 控制间隔，0 关闭 |
 
 ### 6. 数据库与 schema
@@ -178,17 +162,16 @@
 验收：同一 Profile、同一数据库、同一请求头下，输出与迁移前基线逐字对比（空白差异单独记录）；
 `config/server` 缺失 Profile 返回 404、token 不匹配返回 401；仍走 IP 的其余端点保持原有 404 口径。
 
-### M2：节点通道与原生仓库（已完成）
+### M2：节点通道（已完成）
 
 1. ✅ WebSocket 握手鉴权、连接登记、保活与断连摘除。
 2. ✅ `hello`、`report:*`、`pong` 与 `ping`、`report:now`、`result` 请求等待表。
 3. ✅ `agents/status`。
-4. ✅ `/repo` 的 HEAD、GET、SNAPSHOT 重定向、上传与 SHA-1 暂存。
-5. ✅ `log:read` 请求/应答、超时与断连唤醒。
-6. ✅ `service:start/stop/restart` 请求/应答：按能力门禁，2 分钟超时；agent 执行后重报实例快照。
+4. ✅ `log:read` 请求/应答、超时与断连唤醒。
+5. ✅ `service:start/stop/restart` 请求/应答：按能力门禁，2 分钟超时；agent 执行后重报实例快照。
 
 验收：用假 agent 覆盖握手拒绝、重连踢旧、心跳、快照覆盖与请求超时；用真实 basctl 完成一次
-出站连接。`/repo` 用真实 tar.gz 与 `.sha1` 验证别名、最新版本和上传顺序。
+出站连接。
 
 ### M3：管理台补齐（已完成）
 

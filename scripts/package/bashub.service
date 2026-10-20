@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=bashub
+User=ems
 Group=beangle
 Environment=HOME=/var/lib/bashub
 WorkingDirectory=/var/lib/bashub

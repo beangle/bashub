@@ -7,7 +7,7 @@
  */
 
 module bashub.app;
-/// 进程入口：读 `-f bashub.xml` → 建资源表/Dao → 装路由 → 起 HTTP。
+/// 进程入口：按 EMS profile 建配置 → 建资源表/Dao → 装路由 → 起 HTTP。
 /// 与 Scala 侧的差别在「没有 Spring/Tomcat 容器」：这里一个进程、一个事件循环，
 /// 配置只在启动时读一次（没有热加载，见 README 的裁剪清单）。
 
@@ -36,10 +36,8 @@ import vibe.core.log : logError, logInfo, logWarn;
 import vibe.http.server : HTTPListener, HTTPServerSettings, listenHTTP;
 
 import core.time : minutes;
-import std.file : exists;
 import std.functional : toDelegate;
 import std.getopt : GetOptException, getopt;
-import std.path : expandTilde;
 import std.stdio : stderr, writeln;
 
 /// 启动阶段失败（systemd 据此不重启）。
@@ -47,9 +45,8 @@ enum ExitStartupError = 2;
 /// `--check-schema` 发现漂移。
 enum ExitSchemaDrift = 3;
 
-/// bashub 自己的命令行：配置文件路径、部署选项，以及「不是 bashub 的那些参数」。
+/// bashub 自己的命令行：EMS 部署选项，以及「不是 bashub 的那些参数」。
 struct HubArgs {
-  string configFile;
   string[string] options;
   bool checkSchema;
   bool help;
@@ -70,7 +67,6 @@ HubArgs parseArgs(string[] args) {
   string emsHome;
   string emsBase;
   getopt(args,
-      "f|file", &parsed.configFile,
       "check-schema", &parsed.checkSchema,
       "h|help", &parsed.help,
       "ems.profile", &emsProfile,
@@ -88,9 +84,8 @@ HubArgs parseArgs(string[] args) {
 
 private void printUsage() {
   writeln("Usage: bashub [--ems.profile=<name>] [--ems.home=<dir>] [--ems.base=<dir>]");
-  writeln("              [-f <bashub.xml>] [--check-schema]");
+  writeln("              [--check-schema]");
   writeln();
-  writeln("  -f, --file <path>    可选配置文件；不写时使用内置默认 + ems profile");
   writeln("  --check-schema       只检查库表/列是否与资源定义一致，然后退出");
   writeln("  --ems.profile=<name> 指定 ems 部署 profile，如 --ems.profile=bas");
   writeln("  --ems.home=<dir>     直接指定 ems home，如 --ems.home=/data/ems/bas");
@@ -118,29 +113,21 @@ int main(string[] args) {
 
   // 环境变量 + 命令行部署选项（后者覆盖前者）
   auto ems = emsFromEnvironment(systemVars(parsedArgs.options));
-  auto configFile = parsedArgs.configFile;
-  if (configFile.length > 0) {
-    configFile = expandTilde(configFile);
-    if (!exists(configFile)) {
-      stderr.writeln("bashub: config file[" ~ configFile ~ "] not exists!");
-      return ExitStartupError;
-    }
-  } else if (ems is null) {
-    stderr.writeln("bashub: specify -f <bashub.xml> or --ems.profile=<profile>");
+  if (ems is null) {
+    stderr.writeln("bashub: specify --ems.profile=<profile> or --ems.home=<dir>");
     return ExitStartupError;
   }
 
   HubConfig cfg;
   try {
-    cfg = loadBashub(configFile, ems);
+    cfg = loadBashub(ems);
     applyBashubLogging(cfg.logFile, cfg.logLevel);
   } catch (Exception e) {
     stderr.writeln("bashub: " ~ e.msg);
     return ExitStartupError;
   }
   // 部署配置最容易搞混的就是「到底读了哪个 ems」，起服务时留一条
-  if (ems !is null)
-    logInfo("Ems deployment: %s (base %s, cookie %s)", ems.env.home, ems.base, ems.sid.name);
+  logInfo("Ems deployment: %s (base %s, cookie %s)", ems.env.home, ems.base, ems.sid.name);
 
   auto reg = hubRegistry();
   if (parsedArgs.checkSchema)
@@ -262,7 +249,8 @@ private SessionRepo createSessionRepo(HubConfig cfg) {
 /// 排查时反而不知道请求到底有没有打到 PostgreSQL。
 Dao createDao(HubConfig cfg) {
   if (!cfg.hasDb())
-    throw new DaoException("no database configured: set <db url=\"...\"> in bashub.xml "
-        ~ "or start with --ems.profile=<profile>");
+    throw new DaoException("no database configured: add <datasource name=\"default\"> "
+        ~ "to the EMS application file (bas/hub.xml) or resources.xml, "
+        ~ "and start with --ems.profile=<profile>");
   return new DbDao(cfg.dbUrl);
 }

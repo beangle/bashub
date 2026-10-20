@@ -1,12 +1,11 @@
 # 后端 API 契约
 
-后端**只提供 API**，页面由独立部署的 SPA 渲染。D 侧路由分三组：
+后端**只提供 API**，页面由独立部署的 SPA 渲染。D 侧路由分两组：
 
 | 用途 | 前缀 | 实现包 | 风格 |
 |---|---|---|---|
 | 管理台接口 | `/api/hub` | `bashub.route` + `beangle.jsonapi` | 手写 JSON:API（复数资源名） |
 | 配置分发（给客户端） | `/api/{profile}` | `bashub.profile.*` | 直接渲染文本/XML |
-| Maven 构件仓库 | `/repo` | `bashub.repo.*` | 直接处理 HTTP |
 
 URL 契约由 `test/bashub/route_test.d` 覆盖，路由变更以该测试为准。
 
@@ -36,7 +35,7 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 | 方法 | 用途 |
 |---|---|
 | `get` / `post` / `patch` / `delete` | JSON:API 读写 |
-| `upload(path, formData)` | multipart 上传（菜单 XML、SNAPSHOT war） |
+| `upload(path, formData)` | multipart 上传（菜单 XML） |
 | `getPlain(path, {query})` | 取非 JSON:API 结构的普通 JSON（如 `{xml}`） |
 
 `packages/web/src/api/resource.ts` 在此基础上提供了通用资源的 `listResource` / `saveResource` /
@@ -132,12 +131,6 @@ Micdn 配置是 Profile 的聚合资源，不通过通用 CRUD 编辑：
 - `GET /api/hub/menus/export?app={appId}` → `{ "xml": "<profile>...</profile>" }`
 - `POST /api/hub/menus/import`（multipart，字段 `app` + `menufile`）→ `{ "success": true }`
 
-### 构件上传：`snapshots`
-
-- `POST /api/hub/snapshots/upload`（multipart，字段 `warfile`）→ `{ "success": true, "path": "..." }`
-- 坐标取自 `META-INF/MANIFEST.MF` 的 `Implementation-Vendor-Id` / `Implementation-Title` /
-  `Implementation-Version`；版本含 `-SNAPSHOT` 时落到仓库的 `snapshots`，否则落 `repository`。
-
 ## `/api/{profile}`（机器分发）
 
 `{profile}` 为配置名。`config/server`、`config/proxy`、`config/setline-peers`、
@@ -169,11 +162,6 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
 `listen` 可被 sidecar 主机访问，并把 sidecar 主机地址写进 `peerReaders`；这条读链路按
 来源地址放行，不带 token。peers 模式没有监听段，也不会常驻：`setline` 渲染
 一轮后退出，由 `setline-agent.timer` 周期拉起并 apply。
-
-## `/repo`
-
-原生发行包（tar.gz/增量补丁）仓库的读写（`bashub.repo`），供代理下载/上传。快照（war/jar）的上传与
-分发已交给 [micdn](https://github.com/beangle/micdn) 的 `/maven`（正式版与 SNAPSHOT 共用一个入口）。
 
 ## 节点通道（WebSocket）
 

@@ -110,25 +110,25 @@ set -e
 if ! getent group beangle >/dev/null 2>&1; then
   addgroup --system beangle
 fi
-if ! getent passwd bashub >/dev/null 2>&1; then
-  adduser --system --ingroup beangle --home /var/lib/bashub --no-create-home --disabled-login bashub 2>/dev/null || \
-  useradd -r -g beangle -d /var/lib/bashub -s /usr/sbin/nologin -c "Beangle BAS console server" bashub
+if ! getent passwd ems >/dev/null 2>&1; then
+  adduser --system --ingroup beangle --home /var/lib/beangle-ems --no-create-home --disabled-login ems 2>/dev/null || \
+  useradd -r -g beangle -d /var/lib/beangle-ems -s /usr/sbin/nologin -c "Beangle EMS" ems
 else
-  usermod -g beangle bashub 2>/dev/null || true
+  usermod -g beangle ems 2>/dev/null || true
 fi
 if [ ! -d /var/lib/beangle-ems ]; then
   mkdir -p /var/lib/beangle-ems
   chown root:beangle /var/lib/beangle-ems
   chmod 2775 /var/lib/beangle-ems
 fi
-mkdir -p /var/lib/bashub/repository /var/log/bashub
+mkdir -p /var/lib/bashub /var/log/bashub
 PREINST
 
 cat > "$PKGDIR/DEBIAN/postinst" << 'POSTINST'
 #!/bin/sh
 set -e
-chown -R bashub:beangle /var/lib/bashub /var/log/bashub
-chmod 2775 /var/lib/bashub /var/lib/bashub/repository /var/log/bashub
+chown -R ems:beangle /var/lib/bashub /var/log/bashub
+chmod 2775 /var/lib/bashub /var/log/bashub
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
 fi

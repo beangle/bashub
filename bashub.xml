@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<bashub listen="127.0.0.1:18080" log-level="info">
-  <!-- libpq 连接串（D 侧直连，不经 Hibernate）；留空且宿主配了 ems 时，
-       从 ~/.ems/<profile>/<app>.xml 的 <datasource> 读 -->
-  <db url="host=127.0.0.1 port=5432 user=bashub dbname=bas"/>
-  <api prefix="/api/hub" auth="none"/>
-  <ems base="https://sas.openurp.net" app-name="bas-hub"
-       cas="https://sas.openurp.net/cas" session-id-name="EMS_SID"/>
-</bashub>

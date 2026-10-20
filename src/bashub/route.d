@@ -30,6 +30,7 @@ import bashub.agent.socket : serveAgentSocket;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.profile.menus : renderEmsMenus;
+import bashub.profile.manifest : renderSetlineManifest;
 import bashub.profile.micdnconfig : MicdnConfigException, MicdnProfileView, MicdnState, loadMicdnProfile, loadMicdnState,
   micdnProfileDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProfile,
   validateComponentName, validateMountName;
@@ -38,7 +39,6 @@ import bashub.profile.resolver : ProfileContext, dataOf, findProfile, findProfil
 import bashub.profile.script : renderHostScript;
 import bashub.profile.server : renderServerXml;
 import bashub.profile.peers : renderPeers;
-import bashub.repo.web : NativeService;
 import bashub.security : HubSecurity;
 import bashub.store : profileKey;
 
@@ -47,7 +47,7 @@ import vibe.data.json : Json;
 import vibe.core.core : sleep;
 import vibe.core.path : toNativeString;
 import vibe.core.log : logDebug, logError;
-import vibe.http.common : HTTPMethod, HTTPStatus;
+import vibe.http.common : HTTPStatus;
 import vibe.http.router : URLRouter;
 import vibe.http.server : HTTPServerRequest, HTTPServerRequestHandler, HTTPServerResponse;
 import beangle.security.web : SecurityContext, requestOrigin;
@@ -287,6 +287,39 @@ class HubService {
       return;
     }
     writePeers(res, profile, "attachment");
+  }
+
+  /// `GET /api/{profile}/config/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
+  /// agent 先比清单，只下载变化项；值与对应下载端点的响应 Body 完全一致。
+  void profileManifest(HTTPServerRequest req, HTTPServerResponse res) {
+    auto profileName = req.params.get("profile", "");
+    ProfileContext profile;
+    if (!findProfile(reg, store, profileName, profile)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    if (!profileTokenAccepted(req, profileName, attributeText(profile.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+
+    Row row;
+    if (!store.fetchRaw(reg.find("profiles"), profile.id, row)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    try {
+      auto peers = renderPeers(store, reg, profile);
+      auto proxy = renderProxy(store, reg, profile);
+      auto certificate = jsonText(rowGet(row, "ssl_certificate"));
+      auto certificateKey = jsonText(rowGet(row, "ssl_certificate_key"));
+      auto text = renderSetlineManifest(peers, proxy, certificate, certificateKey);
+      res.headers["Cache-Control"] = "no-store";
+      res.writeBody(text, HTTPStatus.ok, "application/json");
+    } catch (Exception e) {
+      logError("Render setline manifest failed: %s", e.msg);
+      res.writeBody("", HTTPStatus.internalServerError);
+    }
   }
 
   /// `GET /api/hub/profiles/{id}/config/proxy`：管理台查看最终代理配置。
@@ -1598,7 +1631,6 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   if (security !is null)
     opts.guard = (HTTPServerRequest req, HTTPServerResponse res) => security.guard(req, res);
   auto hub = new HubService(cfg, reg, store, opts, sessions, agents, security);
-  auto native = new NativeService(cfg);
 
   router.get(opts.prefix ~ "/configs", &hub.configs);
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/server", &hub.profileServer);
@@ -1606,6 +1638,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/certificate", &hub.profileCertificate);
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/certificate-key", &hub.profileCertificateKey);
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/setline-peers", &hub.profilePeers);
+  router.get(profileApiPrefix(opts.prefix) ~ "/:profile/config/setline-manifest", &hub.profileManifest);
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/ems/menus/:appName", &hub.profileEmsMenus);
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/micdn.xml", &hub.profileMicdnXml);
   router.get(profileApiPrefix(opts.prefix) ~ "/:profile/script/:host", &hub.profileHostScript);
@@ -1635,25 +1668,8 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(opts.prefix ~ "/resources/:id/menus", &hub.resourceMenus);
   router.get(opts.prefix ~ "/menus/export", &hub.exportMenusXml);
   router.post(opts.prefix ~ "/menus/import", &hub.importMenusXml);
-  router.post(opts.prefix ~ "/snapshots/upload", (HTTPServerRequest req, HTTPServerResponse res) {
-    if (!requireAuth(req, res, opts))
-      return;
-    string path;
-    auto result = native.uploadWar(req, path);
-    if (!result.ok) {
-      writeJsonApi(res, errorDocument(400, "构件上传失败", result.message, "warfile"),
-          HTTPStatus.badRequest);
-      return;
-    }
-    auto doc = okDocument();
-    doc["path"] = Json(path);
-    writeJsonApi(res, doc, HTTPStatus.ok);
-  });
   router.post(opts.prefix ~ "/menus", &hub.createMenu);
   router.patch(opts.prefix ~ "/menus/:id", &hub.updateMenu);
-  router.match(HTTPMethod.HEAD, "/repo/native/*", &native.head);
-  router.get("/repo/native/*", &native.download);
-  router.post("/repo/native/upload/*", &native.upload);
 
   (new JsonApiService(reg, store, opts)).register(router);
   // `.json` / `.jsonapi` 必须在 match 之前剥掉（见 withFormatSuffix 的注释）

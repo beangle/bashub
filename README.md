@@ -5,7 +5,7 @@ BAS 控制台这一个产品的 monorepo，两部分各自独立构建：
 | 部分 | 位置 | 构建 | 产物 |
 |---|---|---|---|
 | 前端 SPA | `packages/web` | pnpm + vite | `packages/web/dist`、`release/bashub-web.zip` |
-| D 后端 | `src/beangle`、`src/bashub` | dub | `target/d/bashub`（`/api/hub`、`/api/{profile}`、`/repo`） |
+| D 后端 | `src/beangle`、`src/bashub` | dub | `target/d/bashub`（`/api/hub`、`/api/{profile}`） |
 
 ```bash
 pnpm build:web                              # 前端 → packages/web/dist
@@ -87,14 +87,13 @@ src/beangle/security/       框架·会话面（与协议无关）
   cas.d         CasConfig/CasSessionRepo：会话查询、续期、过期与登出的 URL 与语义
 
 src/bashub/                 业务：BAS 控制台这一份
-  app.d         进程入口：读配置 → 建 Registry/Dao/Store → 起 HTTP
-  config.d      bashub.xml 解析（监听地址、库连接串、接口前缀、ems 地址；缺省值取自 beangle.ems）
+  app.d         进程入口：按 EMS profile 建配置 → 建 Registry/Dao/Store → 起 HTTP
+  config.d      从 ems.home 推导 EMS 常量、CAS 会话与数据库连接
   resources.d   管理台资源的定义（表名/列/关系/集合/派生属性）
   demo.d        内存后端的演示数据（只供测试显式使用）
   store.d       服务层装配 + bashub 的 fillDefaults（配置的 key）
   profile/      Profile 名称/IP 校验、配置分发共享快照、server.xml / haproxy / nginx /
                 EMS 菜单 / micdn 资产清单 / 主机脚本
-  repo/         原生发行包仓库：正式版/SNAPSHOT 两套根、最新快照解析、SHA-1 暂存与 HTTP 读写
   menus.d       应用资源/菜单 XML 的导入导出
   route.d       bashub 自己的端点 configs/sessions + 把通用 CRUD 挂上同一张 router
   logging.d     日志落到文件或控制台
@@ -111,15 +110,15 @@ src/bashub/                 业务：BAS 控制台这一份
 测试与源码一一对应：`test/beangle/data/`（查询参数、计划）、`test/beangle/jsonapi/`（文档、
 服务层、路由）、`test/beangle/security/`（报文兼容、会话语义、CAS 客户端）、`test/beangle/ems/`
 （环境推导、常量、应用清单、数据源）、`test/beangle/commons/`（properties 解析、XML 取值、环境变量合并）
-共 18 个模块，
+共 20 个模块，
 夹具在 `test/beangle/fixture.d`、`test/beangle/tempdir.d`（临时目录；这份 Phobos 没有
 `mkdirTempDir`）与 `test/beangle/security/fake_cas.d`（假 CAS，前后场共用）；
 `test/bashub/` 是业务的 11 个模块（配置解析、服务层装配、路由契约、会话端点、Profile 配置分发、
-组件版本刷新、节点通道协议、在线登记册、原生仓库布局、原生仓库 HTTP 契约、WAR 坐标解析）。
+组件版本刷新、节点通道协议、在线登记册）。
 
 ## 已经做了什么
 
-一个进程、一个事件循环，`dub` 构建，`bashub.xml` 配置：
+一个进程、一个事件循环，`dub` 构建；运行配置来自内置缺省与 EMS profile：
 
 - **JSON:API 读写**：`GET {prefix}/{resource}/search`、`POST {prefix}/{resource}`、
   `GET|PATCH|DELETE {prefix}/{resource}/{id}`，URL 形状与 bashub 的 `docs/frontend-api.md` 一致。
@@ -153,17 +152,19 @@ src/bashub/                 业务：BAS 控制台这一份
   使用各自的 `adminListen`。没有节点时返回空数组。`setline pull` 直接把这组 peers 写回
   节点自己的 `setline.conf`，`setline.json` 仍只保存本机监听与路由。各节点自己的 setline
   仍需把读入口开到 sidecar 可达，并把 sidecar 主机 IP 写进 `peerReaders`。
+  `GET /api/{profile}/config/setline-manifest` 用同一凭证一次返回 peers、proxy、certificate、
+  certificate-key 四个资源的 SHA-256；setline agent 据此只下载变化项，不再每轮拉取全部配置。
   `GET /api/{profile}/ems/menus/{appName}`
   按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/{profile}/micdn/asset` 按
   Profile 关联的静态资源组输出资产清单；`GET /api/{profile}/script/{host}` 按 Host 平台与
   特性依赖生成检查脚本。真实库的 server.xml 已通过 basctl 的 `bas-1.0.0.xsd`。
 - **ems 部署常量**（`beangle.ems`）：宿主配了 `ems.home`（或 `ems.base`/`ems.profile`）就按
   ems 规则读 `home/conf.properties`，推出 base/cas/portal/api/`inner_base` 与两个会话
-  cookie 常量，再拿它们当 `bashub.xml` 的缺省——所以「换一套 ems 部署」= 换一个 `ems.home`，
-  `session_id_name` 这类量不用在 `bashub.xml` 里再抄一遍（抄错一份就是「拿不到会话」）。
+  cookie 常量，直接用于运行时配置——所以「换一套 ems 部署」= 换一个 `ems.home`，
+  `session_id_name` 这类量不会被另一份 XML 覆盖。
   `EmsApp` 的清单解析（`<ems app-name>` → `/platform/testwebapp`）也一并移植了，供将来用。
-- **数据源取自 ems**（`beangle.ems.datasource`）：`bashub.xml` 没写 `<db url="...">` 时，
-  按 ems 数据源顺序读 `${home}${path}.xml`（path 由 `app-name` 推）
+- **数据源取自 ems**（`beangle.ems.datasource`）：按 ems 数据源顺序读
+  `${home}${path}.xml`（path 由 `app-name` 推）
   与 `${home}/resources.xml`，把 `<datasource name="default">` 的字段翻译成 libpq 连接串
   （`serverName`/`portNumber`/`databaseName`/`user`/`password`，缺省 localhost:5432；`<schema>`
   映射成 `search_path`，`application_name` 填应用名）。真实部署里库连接就写在这份 XML 上，
@@ -198,15 +199,11 @@ src/bashub/                 业务：BAS 控制台这一份
 - **两种 Dao**：libpq 直连的 `DbDao` 与内存的 `MemoryDao`（带演示数据）。可执行程序只接受
   `DbDao`：**没配数据库或连不上时启动失败**，不会自动退回内存把配置错误伪装成正常启动；
   `MemoryDao` 只供测试显式使用。
-- **原生发行包仓库**：`HEAD` / `GET /repo/native/{path}` 与 `POST /repo/native/upload/{path}`。
-  SNAPSHOT 别名解析到最新 `时间戳-构建号` 文件，GET 302 到具体文件、HEAD 用 `latest` 头回带；
-  `.sha1` 可以先于构件上传，暂存在 `<root>/.pending`，构件到达后自动归位。上传令牌
-  `snapshot.usertoken` 从 `<repo token>` 或 ems 应用文件读取。
-- **测试**：业务 12 个模块（配置解析、服务层装配、路由契约、会话端点、安全路由、Profile 配置分发、
-  组件版本刷新、节点通道协议、在线登记册、原生仓库布局、原生仓库 HTTP 契约、WAR 坐标解析），框架 22 个模块（参数
+- **测试**：业务与框架合计 32 个模块。业务覆盖配置解析、服务层装配、路由契约、会话端点、安全路由、
+  Profile 配置分发、组件版本刷新、节点通道协议与在线登记册；框架覆盖参数
   解析、计划、文档、服务层、路由、会话 JSON 报文兼容、会话语义、CAS 客户端、ems 环境
   推导与常量、应用清单、数据源、schema 漂移、properties 解析、XML 取值、环境变量合并、CAS XML、
-  授权域、远程授权刷新、Web 安全上下文与测试夹具），合计 34 个模块，都是
+  授权域、远程授权刷新、Web 安全上下文与测试夹具。全部都是
   `dub test`。`sessionjson_test.d` 里钉的是真实序列化出来的兼容报文；
   `cas_test.d` 起一个独立线程的假 CAS，真 fork curl、真过 TCP。
 
@@ -218,16 +215,18 @@ dub build -b release --compiler=ldc2     # 出 target/d/bashub
 dub test --compiler=ldc2                 # 跑单测
 ```
 
-命令行采用 D/POSIX 风格的长选项，`--key=value` 与 `--key value` 两种写法都支持：
+bashub 没有独立的运行配置文件，也不会从固定路径读取文件。启动时必须提供
+`--ems.profile` 或 `--ems.home`；`--ems.base` 用于指定 profile 根。命令行采用
+D/POSIX 风格的长选项，`--key=value` 与 `--key value` 两种写法都支持：
 
 ```bash
-./target/d/bashub -f bashub.xml --ems.profile=bas
-./target/d/bashub -f bashub.xml --ems.home /data/ems/bas
-./target/d/bashub -f bashub.xml --check-schema
+./target/d/bashub --ems.profile=bas
+./target/d/bashub --ems.home /data/ems/bas
+./target/d/bashub --ems.profile=bas --check-schema
 ```
 
-`-f`/`--file` 可选：不写时必须提供 `--ems.profile`（或 `--ems.home`/`--ems.base`），此时使用
-内置 `<bashub/>` 默认，数据库、CAS 与应用属性全部从 ems profile 推导。
+监听、日志、API 前缀、授权刷新与组件版本刷新间隔使用内置缺省；数据库、CAS、EMS 地址与
+会话 cookie 全部从 ems profile 推导。没有 EMS profile 时 bashub 直接拒绝启动。
 `--ems.profile`、`--ems.home`、`--ems.base` 覆盖同名环境变量。
 JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报错退出，不会忽略或透传给 vibe。
 
@@ -239,45 +238,28 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 宿主需要 `curl`：会话服务是 https，而 D 侧按 Beangle D 路线的惯例关掉了 vibe 的 TLS
 （`dub.json` 的 `notls`），所以取会话走宿主 curl（与 micdn 同一个做法）。
 
-`bashub.xml`：
+使用默认 profile 根 `~/.ems` 时，`--ems.profile=bas` 实际读取：
 
-```xml
-<bashub listen="127.0.0.1:18080" log-level="info">
-  <db url="host=127.0.0.1 port=5432 user=bashub dbname=bas"/>   <!-- 可省略：由 ems profile 提供 -->
-  <!-- auth="required" 时挂登录/权限；authority-url 缺省由 ems innerApi 推出 -->
-  <api prefix="/api/hub" auth="none"
-       authority-refresh-minutes="5"
-       cors-origins="https://hub.example.com,https://sas.openurp.net"/>
-  <!-- 不配 cas 则 sessions 给演示用户；配了 cas 后会话固定按 JSON 读取 -->
-  <ems base="https://sas.openurp.net" app-name="bas-hub"
-       cas="https://sas.openurp.net/cas" session-id-name="EMS_SID"/>
-  <!-- native 仓库；token 未写时从 ems 应用文件的 snapshot.usertoken 读 -->
-  <repo home="~/.m2" token="..."/>
-  <!-- 组件最新版本刷新间隔（分钟）；0 关闭，缺省 360 -->
-  <artifacts refresh-minutes="360"/>
-</bashub>
+```text
+~/.ems/bas/conf.properties       # base、CAS 与会话 cookie 名
+~/.ems/bas/bas/hub.xml           # app-name=bas-hub → 默认数据源
 ```
 
-`<ems>` 里的每一项都可以省：配了 `ems.home`（或 `ems.base`/`ems.profile`，环境变量或 `--ems.*` 都行）时，
-`base`/`cas`/`session-id-name` 由 `~/.ems/<profile>/conf.properties` 推出来；这几项写进 `bashub.xml` 就覆盖它。
+`hub.xml` 的 `<app><resources><datasource name="default">...</datasource></resources></app>`
+提供数据库连接；没有 `default` 数据源时再找 `~/.ems/bas/resources.xml`。
 
 数据库结构检查可以独立执行，不启动 HTTP：
 
 ```bash
-./target/d/bashub -f bashub.xml --check-schema
+./target/d/bashub --ems.profile=bas --check-schema
 # 全部存在 → "schema ok"；漂移 → 逐条列出并以退出码 3 结束
 ```
 
 **测「取会话」**（接真 CAS，不需要别的应用配合）：
 
 ```bash
-# 1) 只留 api 段，让 base/cas/cookie 名全由 ems 推出来
-cat > /tmp/bashub-sess.xml <<'EOF'
-<bashub listen="127.0.0.1:18080" log-level="info">
-  <api prefix="/api/hub" auth="required"/>
-</bashub>
-EOF
-./target/d/bashub -f /tmp/bashub-sess.xml --ems.profile=bas
+# 1) base/cas/cookie 名全由 ems 推出来；缺省监听 127.0.0.1:8080
+./target/d/bashub --ems.profile=bas
 # INFO - Session repo: https://sas.openurp.net/cas/session/{id}?format=application/json (cookie URP_SID, ...)
 
 # 2) 从浏览器（登录过 sas 的任意应用）拿 URP_SID 这个 cookie 的值；先直接问一次 CAS：
@@ -285,7 +267,7 @@ curl -s "https://sas.openurp.net/cas/session/$SID?format=application/json" | jq 
 
 # 3) 带 cookie 打 bashub：命中 → 真实账号，无效/没有 → 401 + meta.redirectUrl
 curl -s -i -H 'Accept: application/vnd.api+json' -H "Cookie: URP_SID=$SID" \
-  http://127.0.0.1:18080/api/hub/sessions
+  http://127.0.0.1:8080/api/hub/sessions
 ```
 
 `auth="none"` 时第 3 步拿不到会话是给演示用户（200）而不是 401。
@@ -310,14 +292,15 @@ scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revisio
 
 - `/usr/bin/bashub`
 - `/var/lib/beangle-ems/`：ems 根目录
-- `/var/lib/bashub/repository`、`/var/log/bashub`
+- `/var/lib/bashub`、`/var/log/bashub`
 - `/usr/lib/systemd/system/bashub.service`
 
-服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，不再安装 `bashub.xml`。
+服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，不使用独立 bashub 配置文件。
 ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `/var/lib/beangle-ems/bas`；
 端口、数据库、CAS 等都来自该 profile 的内置缺省与应用文件。前端 SPA 按 `packages/web`
 自己的发布流程单独部署，并把 `/api/` 反代到 bashub。准备好 profile 后启动
-`systemctl enable --now bashub`。
+`systemctl enable --now bashub`。包安装的服务以 `ems:beangle` 运行；RPM/DEB 只会在
+系统缺少该用户时创建它，不会覆盖已有的 `ems` 用户。
 
 ## 功能边界（尚未实现与已补齐）
 
@@ -359,10 +342,6 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
 - **必填与约束错误**：创建时校验前端声明的必填列、关系和 URI 列表，PATCH 只校验实际提交的字段；
   PostgreSQL 唯一键/外键冲突返回 409，非空/检查约束返回 400，并带字段或约束名。
 - **缓存、热加载、集群**：没有实体缓存，也没有 SIGHUP 重载（配置只在启动时读一次）。
-- **`/repo` 原生发行包仓库**：已做 HEAD / GET / SNAPSHOT 别名与上传；正式版落 `repository`，
-  SNAPSHOT 落 `snapshots`，`.sha1` 可先于构件到达。
-- **multipart 构件上传**：`POST {prefix}/snapshots/upload`（字段 `warfile`）从 WAR/JAR 的
-  `META-INF/MANIFEST.MF` 读取 `Implementation-Vendor-Id/Title/Version`，推导仓库路径后落盘。
 - **schema 漂移**：启动时把资源定义所需的主表/子表/列与 `information_schema` 比较并告警；
   `--check-schema` 提供不启动服务的独立检查。
 - **组件版本刷新**：`<artifacts refresh-minutes>` 周期任务与 `artifacts/update-version`
@@ -382,17 +361,15 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   计划生成时翻成行键（`http_port` / `short_title`）；行键写法也一并接受。
 - `search` 永远分页，`meta.page` 永远存在（对应 she 里 `limit(getPageLimit)` 缺省 20）。
 - 过滤不设白名单：属性存在就能过滤，认不出的键 400 而不是交给数据库报错。
-- **部署常量只在 ems 里定义一处**：`bashub.xml` 的 `session-id-name` > `Ems.sid.name` > `EMS_SID`；
-  `ems_base`/`cas` 同样先看 `bashub.xml`，没写才由 ems 常量推（`cas` 缺省 = `base + "/cas"`，
-  配了 `ems.home` 就等于打开 CAS 会话；不想要就在 `bashub.xml` 里显式写 `cas=""`）。
+- **部署常量只在 ems 里定义一处**：`base`、`cas`、`session_id_name` 直接取 `Ems` 常量
+  （`cas` 缺省 = `base + "/cas"`，配了 `ems.home` 就等于打开 CAS 会话）。
   读的是 `ems.home/conf.properties`，按 **JDK Properties 口径**解析（每个字节当 Latin-1 字符 +
   `\uXXXX` + `\` 续行 + `#`/`!` 注释）——解析口径与 JVM 一致，差一个转义就会配错。
   `ems.home` 优先，其次 `ems.base`（缺省 `~/.ems`）下的一个 profile 目录（`ems.profile` 指定或取
   第一个，只认目录）；命令行没有 JVM 系统属性，改用**同名环境变量 +
   `--ems.home`/`--ems.base`/`--ems.profile` 命令行覆盖**（命令行优先）。
-  三个 `ems.*` 都没配时 `emsFromEnvironment` 返回 null，一切缺省照旧（别让「本机装了 ems」
-  悄悄改掉宿主的配置）。
-- **库连接也是「一处定义」**：`bashub.xml` 的 `<db url>` > ems 应用文件 `${home}${path}.xml` 的
+  三个 `ems.*` 都没配时 `emsFromEnvironment` 返回 null，bashub 拒绝启动。
+- **库连接也是「一处定义」**：ems 应用文件 `${home}${path}.xml` 的
   `<datasource name="default">` > `${home}/resources.xml` > 没有（启动失败，不再退回内存演示数据）。
   解析口径：`<driver>` 空就从 `jdbc:` url 里推 driver 名、
   `props/prop` 用 `name`/`value`（注意 `EmsApp` 那边是 `key`/元素文本，两种写法都对）、

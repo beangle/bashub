@@ -23,8 +23,6 @@ import beangle.data.resource : Registry;
 import beangle.data.value : jsonText;
 import beangle.jsonapi.store : Store;
 
-import test.beangle.tempdir : uniqueTempDir;
-
 import vibe.data.json : Json, parseJson, parseJsonString;
 import vibe.http.common : HTTPMethod;
 import vibe.http.server : HTTPServerRequestHandler, createTestHTTPServerRequest, createTestHTTPServerResponse,
@@ -35,10 +33,9 @@ import vibe.stream.memory : createMemoryOutputStream, createMemoryStream;
 
 import std.algorithm.searching : canFind, endsWith, startsWith;
 import std.base64 : Base64;
-import std.file : exists, read, rmdirRecurse, write;
-import std.path : buildPath;
+import std.digest : LetterCase, toHexString;
+import std.digest.sha : sha256Of;
 import std.string : indexOf;
-import std.zip : ArchiveMember, ZipArchive;
 
 private struct Exchange {
   int status;
@@ -105,37 +102,18 @@ private string multipartBody(string appId, string xml) {
     "--bashub-test--\r\n";
 }
 
-private string multipartWar(string bytes) {
-  return "--bashub-test\r\n" ~
-    "Content-Disposition: form-data; name=\"warfile\"; filename=\"portal-4.20.14-SNAPSHOT.war\"\r\n" ~
-    "Content-Type: application/java-archive\r\n\r\n" ~ bytes ~ "\r\n" ~
-    "--bashub-test--\r\n";
-}
-
-private void[] warWithManifest(string manifest) {
-  auto entry = new ArchiveMember();
-  entry.name = "META-INF/MANIFEST.MF";
-  entry.expandedData = cast(ubyte[]) manifest.dup;
-  auto zip = new ZipArchive();
-  zip.addMember(entry);
-  return zip.build();
-}
-
-private HTTPServerRequestHandler newRouter(bool authRequired = false, AgentRegistry agents = null,
-    string repoHome = null) {
+private HTTPServerRequestHandler newRouter(bool authRequired = false, AgentRegistry agents = null) {
   auto reg = hubRegistry();
-  return newRouterWith(reg, createHubStore(reg, demoDao(reg)), authRequired, agents, repoHome);
+  return newRouterWith(reg, createHubStore(reg, demoDao(reg)), authRequired, agents);
 }
 
 private HTTPServerRequestHandler newRouterWith(Registry reg, Store store, bool authRequired = false,
-    AgentRegistry agents = null, string repoHome = null) {
+    AgentRegistry agents = null) {
   HubConfig cfg;
   cfg.apiPrefix = "/api/hub";
   cfg.emsBase = "https://sas.openurp.net";
   cfg.appName = "bas-hub";
   cfg.authRequired = authRequired;
-  if (repoHome.length > 0)
-    cfg.repoHome = repoHome;
   return buildHubRouter(cfg, reg, store, null, agents);
 }
 
@@ -146,35 +124,6 @@ unittest {
   auto doc = parseJson(ex.body);
   assert(doc["ems_base"].get!string == "https://sas.openurp.net");
   assert(doc["app_name"].get!string == "bas-hub");
-}
-
-@("multipart war upload derives its path from MANIFEST.MF")
-unittest {
-  auto dir = uniqueTempDir("bashub-war-upload-");
-  scope (exit) rmdirRecurse(dir);
-  auto war = buildPath(dir, "portal.war");
-  write(war, warWithManifest(
-      "Implementation-Vendor-Id: org.beangle\r\n" ~
-      "Implementation-Title: beangle-ems-portal\r\n" ~
-      "Implementation-Version: 4.20.14-SNAPSHOT\r\n\r\n"));
-
-  auto router = newRouter(false, null, dir);
-  auto ex = upload(router, "http://localhost/api/hub/snapshots/upload",
-      multipartWar(cast(string) read(war)));
-  assert(ex.status == 200, ex.body);
-  auto path = parseJson(ex.body)["path"].get!string;
-  assert(path ==
-      "org/beangle/beangle-ems-portal/4.20.14-SNAPSHOT/portal-4.20.14-SNAPSHOT.war");
-  assert(exists(buildPath(dir, "snapshots", path)));
-}
-
-@("multipart war upload rejects a request without a file")
-unittest {
-  auto ex = upload(newRouter(), "http://localhost/api/hub/snapshots/upload",
-      "--bashub-test\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nempty\r\n" ~
-      "--bashub-test--\r\n");
-  assert(ex.status == 400);
-  assert(parseJson(ex.body)["errors"][0]["detail"].get!string == "没有发现上传的 war 文件");
 }
 
 @("agent handshake rejects a missing or wrong key before upgrade")
@@ -450,6 +399,38 @@ unittest {
       ["Authorization": "Bearer 0123456789abcdef0123456789abcdef"]);
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["peers"].length == 0);
+}
+
+@("profile config/setline-manifest requires the key and hashes every downloaded body")
+unittest {
+  auto router = newRouter();
+  auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];
+  auto ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/openurp.prod/config/setline-manifest", auth);
+  assert(ex.status == 200, ex.body);
+  assert(ex.contentType == "application/json");
+  auto resources = parseJson(ex.body)["resources"];
+
+  string sha256Lower(string text) {
+    return toHexString!(LetterCase.lower)(sha256Of(text)).idup;
+  }
+  auto peers = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/openurp.prod/config/setline-peers", auth);
+  auto proxy = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/openurp.prod/config/proxy", auth);
+  auto cert = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/openurp.prod/config/certificate", auth);
+  auto key = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/openurp.prod/config/certificate-key", auth);
+  assert(resources["peers"].get!string == sha256Lower(peers.body));
+  assert(resources["proxy"].get!string == sha256Lower(proxy.body));
+  assert(resources["certificate"].get!string == sha256Lower(cert.body));
+  assert(resources["certificate-key"].get!string == sha256Lower(key.body));
+
+  ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/openurp.prod/config/setline-manifest",
+      ["Authorization": "Bearer openurp.prod:wrong"]);
+  assert(ex.status == 401);
 }
 
 @("profile ems menus resolve the app from deployed artifacts and return xml")
