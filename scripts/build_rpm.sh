@@ -16,6 +16,18 @@ ferror(){
   exit 1
 }
 
+# rpm 4.14 起才写入 SHA256HEADER；旧版 rpmbuild 只能写 SHA1 头摘要，
+# 这种包会被要求 SHA256 摘要的新版 rpm 拒绝为 “does not verify: no digest”。
+require_modern_rpmbuild(){
+  local version
+  version="$(rpmbuild --version | awk '{print $3}')"
+  if [ -z "$version" ] || \
+    [ "$(printf '%s\n%s\n' "$version" "4.14" | sort -V | head -n 1)" != "4.14" ]; then
+    ferror "rpmbuild >= 4.14 is required (found ${version:-unknown})" \
+      "A newer rpmbuild is required to emit SHA256HEADER; put it first in PATH."
+  fi
+}
+
 sys_release_version(){
   local os_id
   os_id=$(source /etc/os-release && echo "$ID")
@@ -41,6 +53,7 @@ fcheck dub
 if [ $E -eq 1 ]; then
   ferror "Missing commands on your system:" "$LIST"
 fi
+require_modern_rpmbuild
 
 bashub_prepare_release_build
 
@@ -139,10 +152,17 @@ EOF
 mkdir -p "$RPMDIR"
 sed -i "1i %define _rpmdir $RPMDIR" "$DESTDIR/bashub.spec"
 fakeroot rpmbuild --quiet --buildroot="$DESTDIR/$PKGDIR" -bb --target "$ARCH" \
-  --define '_binary_payload w9.xzdio' "$DESTDIR/bashub.spec"
+  --define '_binary_payload w9.xzdio' \
+  --define '_binary_filedigest_algorithm 8' \
+  --define '_source_filedigest_algorithm 8' "$DESTDIR/bashub.spec"
 
 popd > /dev/null
 mv "$RPMDIR/$ARCH/bashub-$RPMVERSION-$REVISION.$ARCH.rpm" "$DESTDIR/$RPMFILE"
 rm -rf "$RPMDIR" "$DESTDIR/$PKGDIR" "$DESTDIR/bashub.spec"
+
+RPMVERIFY="$(LC_ALL=C rpm -Kv "$DESTDIR/$RPMFILE" 2>&1 || true)"
+if ! grep -q 'Header SHA256 digest: OK' <<<"$RPMVERIFY"; then
+  ferror "Generated RPM has no SHA256 header digest" "$RPMVERIFY"
+fi
 
 echo "Built: $DESTDIR/$RPMFILE"
