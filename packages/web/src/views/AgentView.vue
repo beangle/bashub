@@ -4,7 +4,8 @@
       <div>
         <h2 class="page-title">在线节点</h2>
         <p class="page-subtitle">
-          basctl 主动连到 <code>/api/bashub/{profile}/agents</code> 后上报的系统快照与运行实例。
+          basctl 主动连到 <code>/api/bashub/monitor/agents/{profile}/channel</code>
+          后上报的系统快照与运行实例。
           每 10 秒刷新一次。
         </p>
       </div>

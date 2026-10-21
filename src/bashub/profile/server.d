@@ -7,7 +7,7 @@
  */
 
 module bashub.profile.server;
-/// `GET /api/bashub/{profile}/config/server`：把 Profile 的服务器、主机、webapp 与引擎
+/// `GET /api/bashub/config/{profile}/server`：把 Profile 的服务器、主机、webapp 与引擎
 /// 渲染成 basctl 使用的 server.xml。原 Scala 版是 Freemarker 模板；这里没有模板运行时，
 /// 但输出结构保持一致。
 

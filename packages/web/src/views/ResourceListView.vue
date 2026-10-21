@@ -216,7 +216,7 @@
 import { DataGrid, UnderlineTabs, type DataGridAction, type DataGridColumn, type UnderlineTabItem } from '@beangle/bui-vue'
 import { AddIcon, DeleteIcon, EditIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin, type FormInstanceFunctions, type FormRule, type PageInfo } from 'tdesign-vue-next'
-import { computed, h, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, h, nextTick, onMounted, reactive, ref, shallowRef } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   attributeText,
@@ -231,6 +231,7 @@ import {
   uploadResourceFile,
   type ResourceRow,
 } from '@/api/resource'
+import { apiPath } from '@/api/prefix'
 import { currentProfileId, forgetProfile, isProfileRef, isProfileScoped, profileId, rememberProfile } from '@/current-profile'
 import { rememberedFilterValue, rememberFilterValue } from '@/filter-memory'
 import { getSchema } from '@/resources'
@@ -303,8 +304,8 @@ function defaultSortKey(field: FieldSchema): string | undefined {
   return label ? `${field.refKey || field.key}.${label}` : undefined
 }
 
-const rows = ref<ResourceRow[]>([])
-const includedIndex = ref(indexIncluded([]))
+const rows = shallowRef<ResourceRow[]>([])
+const includedIndex = shallowRef(indexIncluded([]))
 const loading = ref(false)
 const sort = ref(schema.sort || '')
 const pagination = reactive({ current: 1, pageSize: 30, total: 0 })
@@ -448,9 +449,13 @@ function refItemParts(
 ): { main: string; muted: string }[] {
   const template = cell.itemTemplate
   if (!template && !cell.itemMutedTemplate) return []
-  return relationshipTargets(row, field.refKey || field.key)
+  const parts = relationshipTargets(row, field.refKey || field.key)
     .map((target) => includedIndex.value.get(`${target.type}:${target.id}`))
     .filter((item): item is ResourceRow => Boolean(item))
+
+  // 这里运行在表格单元格的 render 中，不能原地排序响应式数组，否则会再次触发
+  // 当前 TR 的更新并形成递归。先复制成普通数组再排序。
+  return Array.from(parts)
     .sort((a, b) => attributeText(a.attributes.name).localeCompare(attributeText(b.attributes.name)))
     .map((item) => ({
       main: template ? fillTemplate(template, item) : '',
@@ -1058,7 +1063,9 @@ function csvCell(value: string): string {
 
 async function exportXml() {
   try {
-    const payload = await getPlainJson<{ xml?: string }>(`${schema.path}/export`, { app: currentAppId.value })
+    const payload = await getPlainJson<{ xml?: string }>(apiPath('ems', `${schema.path}/export`), {
+      app: currentAppId.value,
+    })
     const blob = new Blob([payload.xml || ''], { type: 'application/xml' })
     const url = URL.createObjectURL(blob)
     const link = window.document.createElement('a')

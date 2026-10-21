@@ -32,6 +32,7 @@ import vibe.http.common : HTTPStatus;
 import vibe.http.router : URLRouter;
 import vibe.http.server : HTTPServerRequest, HTTPServerRequestHandler, HTTPServerResponse;
 
+import std.algorithm : canFind;
 import std.string : indexOf;
 
 /// JSON:API 的响应媒体类型（客户端按它解析，缺了会走错分支）。
@@ -62,11 +63,14 @@ class JsonApiService {
   private Registry reg;
   private Store store;
   private RouteOptions opts;
+  private string[] resources;
 
-  this(Registry reg, Store store, in RouteOptions opts) {
+  /// `resources` 非空时只允许这些资源名；关系目标仍由完整 `Registry` 解析。
+  this(Registry reg, Store store, in RouteOptions opts, string[] resources = null) {
     this.reg = reg;
     this.store = store;
     this.opts = opts;
+    this.resources = resources;
   }
 
   /// `GET {prefix}/{resource}/search`
@@ -174,6 +178,11 @@ class JsonApiService {
   /// 取路由参数里的资源；没有就 404（信息里带上资源名，便于定位拼错的 URL）。
   private Resource resourceOf(HTTPServerRequest req, HTTPServerResponse res) {
     auto path = req.params.get("resource", "");
+    if (resources !is null && !resources.canFind(path)) {
+      logInfo("Resource %s is not exposed under %s", path, opts.prefix);
+      writeJsonApi(res, errorDocument(404, "resource not found", "no such resource: " ~ path), HTTPStatus.notFound);
+      return Resource.init;
+    }
     auto res0 = reg.find(path);
     if (res0.path.length == 0) {
       logInfo("Unknown resource: %s", path);

@@ -90,6 +90,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { runtimeConfig } from '@/auth'
+import { apiRootPath } from '@/api/prefix'
 import {
   attributeText,
   fetchDocument,
@@ -135,7 +136,7 @@ const profileName = computed(() =>
 
 const scriptUrl = computed(() =>
   profileName.value && hostIp.value
-    ? runtimeConfig.getApiUrl(`/api/${profileName.value}/script/${hostIp.value}.sh`)
+    ? runtimeConfig.getApiUrl(apiRootPath('config', `/${profileName.value}/script/${hostIp.value}.sh`))
     : '',
 )
 

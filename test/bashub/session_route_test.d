@@ -87,7 +87,7 @@ unittest {
   auto reg = hubRegistry();
   auto router = newRouter(cfg, repo, reg, demoDao(reg));
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions", "EMS_SID=SID-1");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-1");
   assert(ex.status == 200);
   auto doc = parseJson(ex.body);
   assert(doc["code"].get!string == "admin");
@@ -95,7 +95,7 @@ unittest {
   assert(cas.requests.length == 1);
 
   // 第二次走缓存，不再问 CAS
-  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions", "EMS_SID=SID-1").status == 200);
+  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-1").status == 200);
   assert(cas.requests.length == 1);
 }
 
@@ -107,13 +107,13 @@ unittest {
   auto reg = hubRegistry();
   auto router = newRouter(cfg, repo, reg, demoDao(reg));
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions");
   assert(ex.status == 401);
   auto redirect = parseJson(ex.body)["errors"][0]["meta"]["redirectUrl"].get!string;
   assert(redirect.startsWith("https://sas.openurp.net/cas/login?service="));
 
   // CAS 那边已经没有这个会话（404）也是同样待遇，而且不会发第二次请求
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions", "EMS_SID=SID-9");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-9");
   assert(ex.status == 401);
   assert(cas.requests.length == 1);
   cas.stop();
@@ -123,7 +123,7 @@ unittest {
 unittest {
   auto reg = hubRegistry();
   auto ex = call(newRouter(casConfig(false), null, reg, demoDao(reg)), HTTPMethod.GET,
-      "http://localhost/api/bashub/sessions");
+      "http://localhost/api/bashub/ems/sessions");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["code"].get!string == "demo");
 }
@@ -140,8 +140,8 @@ unittest {
   auto reg = hubRegistry();
   auto router = newRouter(cfg, repo, reg, demoDao(reg));
 
-  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions", "EMS_SID=SID-1").status == 200);
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/sessions/logout", "EMS_SID=SID-1");
+  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-1").status == 200);
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/ems/sessions/logout", "EMS_SID=SID-1");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["logoutUrl"].get!string == "https://sas.openurp.net/cas/logout");
   assert(ex.hasSessionCookie);
@@ -149,6 +149,6 @@ unittest {
   assert(cas.requests.length == 1); // 只清了本地缓存
 
   // 缓存清了，下一次还得回源
-  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions", "EMS_SID=SID-1").status == 200);
+  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-1").status == 200);
   assert(cas.requests.length == 2);
 }

@@ -7,7 +7,7 @@
  */
 
 module bashub.profile.menus;
-/// `GET /api/bashub/{profile}/ems/menus/{appName}`：按 Profile 部署的 webapp 找到 EMS 应用，
+/// `GET /api/bashub/ems/{profile}/menus/{appName}`：按 Profile 部署的 webapp 找到 EMS 应用，
 /// 再输出该应用的资源与菜单 XML。应用匹配口径与 Scala `EmsWS.menus` 一致：
 /// `webapp.artifact.groupId == app.group.name` 且 `artifact.artifactId == app.artifactId`。
 

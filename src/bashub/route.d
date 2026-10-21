@@ -7,7 +7,7 @@
  */
 
 module bashub.route;
-/// `/api/bashub` 下的路由：hub 自己的端点（`configs`、`sessions`、`profiles/{id}/reset-key`）在这里，
+/// `/api/bashub/{ems,config,micdn,monitor}` 下的路由：hub 自己的端点在这里，
 /// 通用 CRUD（`{resource}/search`、`{resource}/{id}`）交给 beangle.jsonapi 的 `JsonApiService`。
 ///
 /// 资源名是路由参数，所以「支持哪些资源」只由 `hubRegistry()` 决定，路由不用跟着改。
@@ -27,6 +27,7 @@ import bashub.artifactversion : refreshArtifactVersions;
 import bashub.agent.channel : bearer;
 import bashub.agent.registry : AgentRegistry, RequestOutcome;
 import bashub.agent.socket : serveAgentSocket;
+import bashub.api : ApiPrefixes, hubApiPrefixes, isEmsResource;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.profile.menus : renderEmsMenus;
@@ -147,22 +148,24 @@ class HubService {
   private Registry reg;
   private Store store;
   private RouteOptions opts;
+  private ApiPrefixes api;
   private SessionRepo sessions;
   private AgentRegistry agents;
   private HubSecurity security;
 
-  this(HubConfig cfg, Registry reg, Store store, in RouteOptions opts, SessionRepo sessions = null,
-      AgentRegistry agents = null, HubSecurity security = null) {
+  this(HubConfig cfg, Registry reg, Store store, in RouteOptions opts, in ApiPrefixes api,
+      SessionRepo sessions = null, AgentRegistry agents = null, HubSecurity security = null) {
     this.cfg = cfg;
     this.reg = reg;
     this.store = store;
     this.opts = opts;
+    this.api = api;
     this.sessions = sessions;
     this.agents = agents is null ? new AgentRegistry() : agents;
     this.security = security;
   }
 
-  /// `GET {prefix}/configs`：登录前就要可读，前端据此知道 ems 地址与 CAS 前缀。
+  /// `GET /api/bashub/ems/configs`：登录前就要可读，前端据此知道 ems 地址与 CAS 前缀。
   void configs(HTTPServerRequest req, HTTPServerResponse res) {
     auto doc = Json.emptyObject;
     doc["ems_base"] = Json(cfg.emsBase);
@@ -171,7 +174,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET /api/bashub/{profile}/config/server`：basctl 拉取的 server.xml。
+  /// `GET /api/bashub/config/{profile}/server`：basctl 拉取的 server.xml。
   ///
   /// 机器端点不属于 JSON:API，也不走浏览器登录；Profile 名定位记录，`Authorization:
   /// Bearer <profile>:<Profile.key>` 证明这台机器有权取走配置。不再接受可伪造的 `ip:` 头。
@@ -195,7 +198,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/profiles/{id}/config/server`：管理台查看最终 server.xml。
+  /// `GET /api/bashub/config/profiles/{id}/server`：管理台查看最终 server.xml。
   ///
   /// 与机器下载端点分开：这里按登录会话鉴权，不要求 Profile key，也不接受 `ip:` 头。
   void profileServerView(HTTPServerRequest req, HTTPServerResponse res) {
@@ -216,7 +219,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/{profile}/config/proxy`：按 Profile 的 `proxyEngine` 输出 haproxy / nginx。
+  /// `GET /api/bashub/config/{profile}/proxy`：按 Profile 的 `proxyEngine` 输出 haproxy / nginx。
   /// 机器下载与 `config/server` 使用同一个 Profile key；未知引擎与不存在的 Profile 一样返回 404。
   void profileProxy(HTTPServerRequest req, HTTPServerResponse res) {
     auto profileName = req.params.get("profile", "");
@@ -242,12 +245,12 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/{profile}/config/certificate`：setline 拉取的 PEM 公钥证书。
+  /// `GET /api/bashub/config/{profile}/certificate`：setline 拉取的 PEM 公钥证书。
   void profileCertificate(HTTPServerRequest req, HTTPServerResponse res) {
     writeProfileCertificate(req, res, false);
   }
 
-  /// `GET /api/bashub/{profile}/config/certificate-key`：setline 拉取的 PEM 私钥。
+  /// `GET /api/bashub/config/{profile}/certificate-key`：setline 拉取的 PEM 私钥。
   void profileCertificateKey(HTTPServerRequest req, HTTPServerResponse res) {
     writeProfileCertificate(req, res, true);
   }
@@ -274,7 +277,7 @@ class HubService {
     res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
   }
 
-  /// `GET /api/bashub/{profile}/config/setline-peers`：setline 的 peer 列表机器下载端点。
+  /// `GET /api/bashub/config/{profile}/setline-peers`：setline 的 peer 列表机器下载端点。
   void profilePeers(HTTPServerRequest req, HTTPServerResponse res) {
     auto profileName = req.params.get("profile", "");
     ProfileContext profile;
@@ -289,7 +292,7 @@ class HubService {
     writePeers(res, profile, "attachment");
   }
 
-  /// `GET /api/bashub/{profile}/config/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
+  /// `GET /api/bashub/config/{profile}/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
   /// agent 先比清单，只下载变化项；值与对应下载端点的响应 Body 完全一致。
   void profileManifest(HTTPServerRequest req, HTTPServerResponse res) {
     auto profileName = req.params.get("profile", "");
@@ -322,7 +325,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/profiles/{id}/config/proxy`：管理台查看最终代理配置。
+  /// `GET /api/bashub/config/profiles/{id}/proxy`：管理台查看最终代理配置。
   void profileProxyView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -346,7 +349,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/profiles/{id}/config/setline-peers`：管理台查看 setline peers。
+  /// `GET /api/bashub/config/profiles/{id}/setline-peers`：管理台查看 setline peers。
   void profilePeersView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -359,7 +362,7 @@ class HubService {
     writePeers(res, profile, "inline");
   }
 
-  /// `GET /api/bashub/{profile}/ems/menus/{appName}`：当前 Profile 部署应用的资源与菜单 XML。
+  /// `GET /api/bashub/ems/{profile}/menus/{appName}`：当前 Profile 部署应用的资源与菜单 XML。
   void profileEmsMenus(HTTPServerRequest req, HTTPServerResponse res) {
     ProfileContext profile;
     if (!resolveProfile(reg, store, req.params.get("profile", ""), req.headers.get("ip", ""), profile)) {
@@ -379,7 +382,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/{profile}/micdn.xml`：micdn 拉取的完整配置。
+  /// `GET /api/bashub/micdn/{profile}/micdn.xml`：micdn 拉取的完整配置。
   ///
   /// 只按 `{org.name}` 找 Profile，不再要求 `ip` 头；令牌必须等于 `profile.key`。
   /// 同时接受 `X-Micdn-Token`、`Authorization: Bearer` 和 `Authorization: Basic`
@@ -401,7 +404,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/profiles/{id}/micdn`：管理台聚合视图（密钥脱敏）。
+  /// `GET /api/bashub/micdn/profiles/{id}`：管理台聚合视图（密钥脱敏）。
   void profileMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -419,7 +422,7 @@ class HubService {
     }
   }
 
-  /// `PATCH /api/bashub/profiles/{id}/micdn`：一次保存配置与组件绑定。
+  /// `PATCH /api/bashub/micdn/profiles/{id}`：一次保存配置与组件绑定。
   void updateProfileMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -441,7 +444,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/profiles/{id}/micdn.xml`：下载真实配置（含密钥）。
+  /// `GET /api/bashub/micdn/profiles/{id}/micdn.xml`：下载真实配置（含密钥）。
   void downloadProfileMicdnXml(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -459,7 +462,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/cdn-components`：可复用组件目录（bucket key 脱敏）。
+  /// `GET /api/bashub/micdn/components`：可复用组件目录（bucket key 脱敏）。
   void cdnComponents(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -476,7 +479,7 @@ class HubService {
     }
   }
 
-  /// `POST /api/bashub/cdn-components`：新建组件。
+  /// `POST /api/bashub/micdn/components`：新建组件。
   void createCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -505,7 +508,7 @@ class HubService {
     }
   }
 
-  /// `PATCH /api/bashub/cdn-components/{id}`：修改组件；bucket key 留空时沿用旧值。
+  /// `PATCH /api/bashub/micdn/components/{id}`：修改组件；bucket key 留空时沿用旧值。
   void updateCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -554,7 +557,7 @@ class HubService {
     }
   }
 
-  /// `DELETE /api/bashub/cdn-components/{id}`：仍被 Profile 引用时由外键拒绝。
+  /// `DELETE /api/bashub/micdn/components/{id}`：仍被 Profile 引用时由外键拒绝。
   void deleteCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -585,7 +588,7 @@ class HubService {
   }
 
   private string profileMicdnUrl(string origin, string qualifiedName) {
-    return origin ~ opts.prefix ~ "/" ~ qualifiedName ~ "/micdn.xml";
+    return origin ~ api.micdn ~ "/" ~ qualifiedName ~ "/micdn.xml";
   }
 
   private void writePeers(HTTPServerResponse res, const ProfileContext profile, string disposition) {
@@ -713,7 +716,7 @@ class HubService {
     writeJsonApi(res, errorDocument(500, "Micdn 配置处理失败", e.msg), HTTPStatus.internalServerError);
   }
 
-  /// `GET /api/bashub/{profile}/script/{host}`：按 Host.ip 生成该主机的检查脚本。
+  /// `GET /api/bashub/config/{profile}/script/{host}`：按 Host.ip 生成该主机的检查脚本。
   void profileHostScript(HTTPServerRequest req, HTTPServerResponse res) {
     ProfileContext profile;
     if (!resolveProfile(reg, store, req.params.get("profile", ""), req.headers.get("ip", ""), profile)) {
@@ -733,7 +736,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/{profile}/agents`：basctl 的出站 WebSocket。
+  /// `GET /api/bashub/monitor/agents/{profile}/channel`：basctl 的出站 WebSocket。
   ///
   /// 鉴权在升级前完成：`Authorization: Bearer <profile>:<Profile.key>` 不对就直接 401，
   /// 也兼容只发 `<Profile.key>` 的旧客户端。
@@ -756,7 +759,7 @@ class HubService {
     serveAgentSocket(agents, name, req, res);
   }
 
-  /// `GET /api/bashub/agents/status`：在线节点现状，只在线的、只留最近一次。
+  /// `GET /api/bashub/monitor/agents/status`：在线节点现状，只在线的、只留最近一次。
   void agentStatus(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -765,7 +768,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `POST /api/bashub/agents/{profile}/report`：要求在线 agent 立即上报一次。
+  /// `POST /api/bashub/monitor/agents/{profile}/report`：要求在线 agent 立即上报一次。
   ///
   /// `report:now` 没有 body 回执，真正的 `report:os` / `report:bas` 会随后到达并覆盖快照；
   /// 因此这里只表示「指令已入队」，返回 202。
@@ -788,7 +791,7 @@ class HubService {
     writeJsonApi(res, okDocument(), HTTPStatus.accepted);
   }
 
-  /// `POST /api/bashub/agents/{profile}/service/{action}`：对在线节点上的实例执行启停。
+  /// `POST /api/bashub/monitor/agents/{profile}/service/{action}`：对在线节点上的实例执行启停。
   ///
   /// body 只有 `{"instance":"farm.server"}`，`action` 取 `start` / `stop` / `restart`。
   /// agent 按 `hello.supports` 的能力协商接收，动作完成后以 `result` 回执快照里的
@@ -840,7 +843,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/agents/{profile}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
+  /// `GET /api/bashub/monitor/agents/{profile}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
   void agentLog(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -880,7 +883,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/agents/{profile}/log/follow`：以 SSE 持续跟随实例日志。
+  /// `GET /api/bashub/monitor/agents/{profile}/log/follow`：以 SSE 持续跟随实例日志。
   ///
   /// hub 仍按 `log:read` 的区间语义向 agent 拉取：首次取 `tail`，之后从 `上次 to + 1`
   /// 继续；检测到 `total` 回退就重新取尾部并下发 `reset=true`。对浏览器保持一条
@@ -1013,7 +1016,7 @@ class HubService {
     }
   }
 
-  /** `GET {prefix}/sessions`：当前登录用户。
+  /** `GET /api/bashub/ems/sessions`：当前登录用户。
    *
    * 配了 CAS 就从会话 cookie 里取会话（顺带 `access` 一次：续期、判过期）；
    * 没有会话且要鉴权就 401（前端据此跳 CAS），否则给演示用户——见 README 的裁剪清单。
@@ -1043,7 +1046,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `POST {prefix}/sessions/logout`：只清本地缓存（scala `SessionWS.logout` 也只 evict，
+  /// `POST /api/bashub/ems/sessions/logout`：只清本地缓存（scala `SessionWS.logout` 也只 evict，
   /// 不 expire——CAS 那边的会话让它自己按 tti 过期），再让前端去 CAS 登出。
   void logout(HTTPServerRequest req, HTTPServerResponse res) {
     auto doc = Json.emptyObject;
@@ -1102,7 +1105,7 @@ class HubService {
     return result;
   }
 
-  /** `POST {prefix}/profiles/{id}/reset-key`：重置通道凭证。
+  /** `POST /api/bashub/config/profiles/{id}/reset-key`：重置通道凭证。
    *
    * 重置即**吊销**：机器丢了、人走了、配置外泄了，换一个 key 就作废，旧 key 的连接下次握手
    * 就被拒（已经在线的连接要等它自己重连）。返回新 key，前端直接显示给操作者去更新那台机器。
@@ -1126,7 +1129,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `POST {prefix}/webapps/upgrade`：把选中的应用版本提到组件的 `latestVersion`。
+  /// `POST /api/bashub/config/webapps/upgrade`：把选中的应用版本提到组件的 `latestVersion`。
   void upgradeWebapps(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1163,7 +1166,7 @@ class HubService {
     writeJsonApi(res, okDocument(), HTTPStatus.ok);
   }
 
-  /// `GET {prefix}/hosts/{id}/webapps`：部署到该主机上运行的应用。
+  /// `GET /api/bashub/config/hosts/{id}/webapps`：部署到该主机上运行的应用。
   ///
   /// webapp 经 `targets` 指向 server，server 才指向 host；现有查询计划没有 to-many 过滤，
   /// 所以这里先取一页足够大的 webapp，再按 target.host 过滤。控制台的数据量很小。
@@ -1210,7 +1213,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET {prefix}/artifacts/{id}/webapps`：使用该组件部署的应用（原 `ArtifactAction.info`）。
+  /// `GET /api/bashub/config/artifacts/{id}/webapps`：使用该组件部署的应用（原 `ArtifactAction.info`）。
   ///
   /// webapp 到 artifact 是 to-one 关系，直接走查询计划的关系过滤，分页/排序/其他过滤条件都保留。
   void artifactWebapps(HTTPServerRequest req, HTTPServerResponse res) {
@@ -1229,7 +1232,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET {prefix}/resources/{id}/menus`：引用该资源的菜单（原 `ResourceAction.info`）。
+  /// `GET /api/bashub/ems/resources/{id}/menus`：引用该资源的菜单（原 `ResourceAction.info`）。
   ///
   /// `menus.resources` 是多对多，当前查询计划不做 to-many 过滤；控制台菜单量小，
   /// 先取全量再由关系行过滤。返回的是本次匹配的完整集合，`meta.page` 同步改为总数。
@@ -1266,7 +1269,7 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `POST {prefix}/artifacts/update-version`：从 Maven Central 刷新所选组件的最新版本。
+  /// `POST /api/bashub/config/artifacts/update-version`：从 Maven Central 刷新所选组件的最新版本。
   void updateArtifactVersions(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1283,7 +1286,7 @@ class HubService {
     writeJsonApi(res, okDocument(), HTTPStatus.ok);
   }
 
-  /// `GET {prefix}/menus/export?app={id}`：导出应用的资源与菜单为 XML。
+  /// `GET /api/bashub/ems/menus/export?app={id}`：导出应用的资源与菜单为 XML。
   void exportMenusXml(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1297,7 +1300,7 @@ class HubService {
     }
   }
 
-  /// `POST {prefix}/menus/import`：multipart 字段 `app` + `menufile`。
+  /// `POST /api/bashub/ems/menus/import`：multipart 字段 `app` + `menufile`。
   void importMenusXml(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1325,7 +1328,7 @@ class HubService {
     writeJsonApi(res, errorDocument(e.status, title, e.msg), status);
   }
 
-  /// `POST {prefix}/menus`：菜单保存后按 `indexno` 请求值重排同级节点。
+  /// `POST /api/bashub/ems/menus`：菜单保存后按 `indexno` 请求值重排同级节点。
   void createMenu(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1348,7 +1351,7 @@ class HubService {
     }
   }
 
-  /// `PATCH {prefix}/menus/{id}`：只有请求里带 `indexno` 时才调整位置。
+  /// `PATCH /api/bashub/ems/menus/{id}`：只有请求里带 `indexno` 时才调整位置。
   void updateMenu(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1621,57 +1624,82 @@ class HubService {
   }
 }
 
-/// 组装 `/api/bashub` 下的路由：具体端点先注册，其余交给资源名分派。
+/// 组装 `/api/bashub` 下的路由：按能力域分组，具体端点先注册，其余交给资源名分派。
 HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store, SessionRepo sessions = null,
     AgentRegistry agents = null, HubSecurity security = null) {
   auto router = new URLRouter("");
-  auto opts = RouteOptions(cfg.apiPrefix, cfg.authRequired, cfg.emsBase ~ "/cas", cfg.sessionIdName);
+  auto api = hubApiPrefixes(cfg.apiPrefix);
+  auto opts = RouteOptions(api.root, cfg.authRequired, cfg.emsBase ~ "/cas", cfg.sessionIdName);
   if (security is null && (cfg.authRequired || sessions !is null))
     security = new HubSecurity(cfg, sessions);
   if (security !is null)
     opts.guard = (HTTPServerRequest req, HTTPServerResponse res) => security.guard(req, res);
-  auto hub = new HubService(cfg, reg, store, opts, sessions, agents, security);
+  auto hub = new HubService(cfg, reg, store, opts, api, sessions, agents, security);
 
-  router.get(opts.prefix ~ "/configs", &hub.configs);
-  router.get(opts.prefix ~ "/:profile/config/server", &hub.profileServer);
-  router.get(opts.prefix ~ "/:profile/config/proxy", &hub.profileProxy);
-  router.get(opts.prefix ~ "/:profile/config/certificate", &hub.profileCertificate);
-  router.get(opts.prefix ~ "/:profile/config/certificate-key", &hub.profileCertificateKey);
-  router.get(opts.prefix ~ "/:profile/config/setline-peers", &hub.profilePeers);
-  router.get(opts.prefix ~ "/:profile/config/setline-manifest", &hub.profileManifest);
-  router.get(opts.prefix ~ "/:profile/ems/menus/:appName", &hub.profileEmsMenus);
-  router.get(opts.prefix ~ "/:profile/micdn.xml", &hub.profileMicdnXml);
-  router.get(opts.prefix ~ "/:profile/script/:host", &hub.profileHostScript);
-  router.get(opts.prefix ~ "/:profile/agents", &hub.profileAgents);
-  router.get(opts.prefix ~ "/profiles/:id/config/server", &hub.profileServerView);
-  router.get(opts.prefix ~ "/profiles/:id/config/proxy", &hub.profileProxyView);
-  router.get(opts.prefix ~ "/profiles/:id/config/setline-peers", &hub.profilePeersView);
-  router.get(opts.prefix ~ "/profiles/:id/micdn.xml", &hub.downloadProfileMicdnXml);
-  router.get(opts.prefix ~ "/profiles/:id/micdn", &hub.profileMicdn);
-  router.patch(opts.prefix ~ "/profiles/:id/micdn", &hub.updateProfileMicdn);
-  router.get(opts.prefix ~ "/cdn-components", &hub.cdnComponents);
-  router.post(opts.prefix ~ "/cdn-components", &hub.createCdnComponent);
-  router.patch(opts.prefix ~ "/cdn-components/:id", &hub.updateCdnComponent);
-  router.delete_(opts.prefix ~ "/cdn-components/:id", &hub.deleteCdnComponent);
-  router.get(opts.prefix ~ "/agents/:profile/log/follow", &hub.agentLogFollow);
-  router.get(opts.prefix ~ "/agents/:profile/log", &hub.agentLog);
-  router.post(opts.prefix ~ "/agents/:profile/service/:action", &hub.agentService);
-  router.post(opts.prefix ~ "/agents/:profile/report", &hub.agentReportNow);
-  router.get(opts.prefix ~ "/agents/status", &hub.agentStatus);
-  router.get(opts.prefix ~ "/sessions", &hub.currentSession);
-  router.post(opts.prefix ~ "/sessions/logout", &hub.logout);
-  router.post(opts.prefix ~ "/profiles/:id/reset-key", &hub.resetKey);
-  router.post(opts.prefix ~ "/webapps/upgrade", &hub.upgradeWebapps);
-  router.post(opts.prefix ~ "/artifacts/update-version", &hub.updateArtifactVersions);
-  router.get(opts.prefix ~ "/hosts/:id/webapps", &hub.hostWebapps);
-  router.get(opts.prefix ~ "/artifacts/:id/webapps", &hub.artifactWebapps);
-  router.get(opts.prefix ~ "/resources/:id/menus", &hub.resourceMenus);
-  router.get(opts.prefix ~ "/menus/export", &hub.exportMenusXml);
-  router.post(opts.prefix ~ "/menus/import", &hub.importMenusXml);
-  router.post(opts.prefix ~ "/menus", &hub.createMenu);
-  router.patch(opts.prefix ~ "/menus/:id", &hub.updateMenu);
+  // config：机器配置分发与配置详情
+  router.get(api.config ~ "/:profile/server", &hub.profileServer);
+  router.get(api.config ~ "/:profile/proxy", &hub.profileProxy);
+  router.get(api.config ~ "/:profile/certificate", &hub.profileCertificate);
+  router.get(api.config ~ "/:profile/certificate-key", &hub.profileCertificateKey);
+  router.get(api.config ~ "/:profile/setline-peers", &hub.profilePeers);
+  router.get(api.config ~ "/:profile/setline-manifest", &hub.profileManifest);
+  router.get(api.config ~ "/:profile/script/:host", &hub.profileHostScript);
+  router.get(api.config ~ "/profiles/:id/server", &hub.profileServerView);
+  router.get(api.config ~ "/profiles/:id/proxy", &hub.profileProxyView);
+  router.get(api.config ~ "/profiles/:id/setline-peers", &hub.profilePeersView);
 
-  (new JsonApiService(reg, store, opts)).register(router);
+  // micdn：下载配置、管理台聚合视图与组件目录
+  router.get(api.micdn ~ "/:profile/micdn.xml", &hub.profileMicdnXml);
+  router.get(api.micdn ~ "/profiles/:id/micdn.xml", &hub.downloadProfileMicdnXml);
+  router.get(api.micdn ~ "/profiles/:id", &hub.profileMicdn);
+  router.patch(api.micdn ~ "/profiles/:id", &hub.updateProfileMicdn);
+  router.get(api.micdn ~ "/components", &hub.cdnComponents);
+  router.post(api.micdn ~ "/components", &hub.createCdnComponent);
+  router.patch(api.micdn ~ "/components/:id", &hub.updateCdnComponent);
+  router.delete_(api.micdn ~ "/components/:id", &hub.deleteCdnComponent);
+
+  // monitor：在线节点、日志与实例启停
+  router.get(api.monitor ~ "/agents/status", &hub.agentStatus);
+  router.get(api.monitor ~ "/agents/:profile/log/follow", &hub.agentLogFollow);
+  router.get(api.monitor ~ "/agents/:profile/log", &hub.agentLog);
+  router.post(api.monitor ~ "/agents/:profile/service/:action", &hub.agentService);
+  router.post(api.monitor ~ "/agents/:profile/report", &hub.agentReportNow);
+  router.get(api.monitor ~ "/agents/:profile/channel", &hub.profileAgents);
+
+  // ems：登录前配置、会话、EMS 菜单与管理台资源
+  router.get(api.ems ~ "/configs", &hub.configs);
+  router.get(api.ems ~ "/sessions", &hub.currentSession);
+  router.post(api.ems ~ "/sessions/logout", &hub.logout);
+  router.get(api.ems ~ "/:profile/menus/:appName", &hub.profileEmsMenus);
+  router.post(api.config ~ "/profiles/:id/reset-key", &hub.resetKey);
+  router.post(api.config ~ "/webapps/upgrade", &hub.upgradeWebapps);
+  router.post(api.config ~ "/artifacts/update-version", &hub.updateArtifactVersions);
+  router.get(api.config ~ "/hosts/:id/webapps", &hub.hostWebapps);
+  router.get(api.config ~ "/artifacts/:id/webapps", &hub.artifactWebapps);
+  router.get(api.ems ~ "/resources/:id/menus", &hub.resourceMenus);
+  router.get(api.ems ~ "/menus/export", &hub.exportMenusXml);
+  router.post(api.ems ~ "/menus/import", &hub.importMenusXml);
+  router.post(api.ems ~ "/menus", &hub.createMenu);
+  router.patch(api.ems ~ "/menus/:id", &hub.updateMenu);
+
+  // 通用 CRUD 按能力域拆分：EMS 只暴露菜单、channel 与菜单关联资源，其余平台配置走 config。
+  string[] configResources;
+  string[] emsResources;
+  foreach (item; reg.all) {
+    if (item.path != "cdn-components" && item.path != "profile-micdn"
+        && item.path != "profile-micdn-components") {
+      if (isEmsResource(item.path))
+        emsResources ~= item.path;
+      else
+        configResources ~= item.path;
+    }
+  }
+  auto configOpts = opts;
+  configOpts.prefix = api.config;
+  (new JsonApiService(reg, store, configOpts, configResources)).register(router);
+  auto emsOpts = opts;
+  emsOpts.prefix = api.ems;
+  (new JsonApiService(reg, store, emsOpts, emsResources)).register(router);
   // `.json` / `.jsonapi` 必须在 match 之前剥掉（见 withFormatSuffix 的注释）
   auto origins = cfg.corsOrigins.dup;
   auto emsHost = hostOfUrl(cfg.emsBase);

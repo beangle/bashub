@@ -7,7 +7,7 @@
  */
 
 module bashub.profile.resolver;
-/// `/api/bashub/{profile}` 的共同入口：按 `org.name` 定位 Profile。鉴权由调用方决定：
+/// `/api/bashub/{group}/{profile}` 的共同入口：按 `org.name` 定位 Profile。鉴权由调用方决定：
 /// `config/server`、`micdn.xml`、节点通道走 `Profile.key`，proxy/menus/script 仍按 `ip` 头。
 /// 后续 server/proxy/menus/micdn/script 都从这里拿同一个 Profile 上下文，避免各端点
 /// 对「配置怎么找」出现不同口径。

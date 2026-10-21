@@ -116,10 +116,10 @@ private HTTPServerRequestHandler newRouterWith(Registry reg, Store store, bool a
   return buildHubRouter(cfg, reg, store, null, agents);
 }
 
-@("management API is bound to /api/bashub and keeps machine endpoints under /api/bashub/{profile}")
+@("API is grouped under /api/bashub by capability")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/configs");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/configs");
   assert(ex.status == 200, ex.body);
 
   ex = call(router, HTTPMethod.GET, "http://localhost/api/hub/configs");
@@ -132,18 +132,47 @@ unittest {
   assert(ex.body.length == 0, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/server",
+      "http://localhost/api/bashub/config/openurp.prod/server",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
 }
 
 @("configs is readable before login")
 unittest {
-  auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/configs");
+  auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/ems/configs");
   assert(ex.status == 200);
   auto doc = parseJson(ex.body);
   assert(doc["ems_base"].get!string == "https://sas.openurp.net");
   assert(doc["app_name"].get!string == "bas-hub");
+}
+
+@("API groups keep ems, config and micdn resources separate")
+unittest {
+  auto router = newRouter();
+
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search");
+  assert(ex.status == 200, ex.body);
+
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/menus/search");
+  assert(ex.status == 200, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/channels/search");
+  assert(ex.status == 200, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/resources/search");
+  assert(ex.status == 200, ex.body);
+
+  // 平台配置资源不再挂在 ems 下。
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/profiles/search");
+  assert(ex.status == 404, ex.body);
+
+  // micdn 资源既不在 ems，也不在 config 的通用 CRUD 里。
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/cdn-components/search");
+  assert(ex.status == 404, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/cdn-components/search");
+  assert(ex.status == 404, ex.body);
+
+  // 旧的无域前缀不再兜底
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search");
+  assert(ex.body.length == 0, ex.body);
 }
 
 @("agent handshake rejects a missing or wrong key before upgrade")
@@ -151,16 +180,16 @@ unittest {
   auto router = newRouter();
   string[string] emptyHeaders;
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/agents", emptyHeaders);
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/channel", emptyHeaders);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/agents", ["Authorization": "Bearer wrong"]);
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/channel", ["Authorization": "Bearer wrong"]);
   assert(ex.status == 401);
 
   // 正确的 key 会进入协议升级校验；这条测试请求没有 Upgrade 头，因此是 400，而不是 401
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/agents",
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/channel",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 400);
 }
@@ -170,13 +199,13 @@ unittest {
   auto agents = new AgentRegistry();
   auto router = newRouter(false, agents);
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/agents/status");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/status");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["agents"].get!(Json[]).length == 0);
 
   agents.attach("openurp.prod").host = "app1";
   agents.attach("openurp.demo").host = "app0";
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/agents/status");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/status");
   assert(ex.status == 200);
   auto list = parseJson(ex.body)["agents"].get!(Json[]);
   assert(list.length == 2);
@@ -189,20 +218,20 @@ unittest {
   auto router = newRouter(false, new AgentRegistry());
 
   auto ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log?instance=platform.server1");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log?instance=platform.server1");
   assert(ex.status == 404, ex.body);
   assert(parseJson(ex.body)["errors"][0]["status"].get!string == "404");
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log?instance=..%2Fetc%2Fpasswd");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log?instance=..%2Fetc%2Fpasswd");
   assert(ex.status == 400);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log?instance=platform.server1&from=x");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log?instance=platform.server1&from=x");
   assert(ex.status == 400);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log?instance=platform.server1&tail=-1");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log?instance=platform.server1&tail=-1");
   assert(ex.status == 400);
 }
 
@@ -212,15 +241,15 @@ unittest {
   auto router = newRouter(false, agents);
 
   auto ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log/follow?instance=platform.server1");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log/follow?instance=platform.server1");
   assert(ex.status == 404, ex.body);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log/follow?instance=..%2Fetc%2Fpasswd");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log/follow?instance=..%2Fetc%2Fpasswd");
   assert(ex.status == 400, ex.body);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log/follow?instance=platform.server1&tail=-1");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log/follow?instance=platform.server1&tail=-1");
   assert(ex.status == 400, ex.body);
 
   auto session = agents.attach("openurp.prod");
@@ -229,7 +258,7 @@ unittest {
       "body":{"host":"app1","supports":["hello","report:os","report:bas"]}}`, hello));
   session.accept(hello);
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/agents/openurp.prod/log/follow?instance=platform.server1");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/log/follow?instance=platform.server1");
   assert(ex.status == 409, ex.body);
   assert(parseJson(ex.body)["errors"][0]["detail"].get!string == "unsupported:log:read");
 }
@@ -240,7 +269,7 @@ unittest {
   auto router = newRouter(false, agents);
 
   auto ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/report");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report");
   assert(ex.status == 404, ex.body);
 
   auto session = agents.attach("openurp.prod");
@@ -250,7 +279,7 @@ unittest {
   session.accept(hello);
 
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/report");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report");
   assert(ex.status == 409, ex.body);
   assert(session.takeOutbound().length == 0);
 
@@ -258,7 +287,7 @@ unittest {
       "body":{"host":"app1","supports":["hello","report:now"]}}`, hello));
   session.accept(hello);
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/report");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report");
   assert(ex.status == 202, ex.body);
   auto messages = session.takeOutbound();
   assert(messages.length == 1);
@@ -272,20 +301,20 @@ unittest {
   auto body = `{"instance":"platform.server1"}`;
 
   auto ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/service/reload", body);
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/service/reload", body);
   assert(ex.status == 400, ex.body);
 
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/service/restart", `{}`);
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/service/restart", `{}`);
   assert(ex.status == 400, ex.body);
 
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/service/restart",
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/service/restart",
       `{"instance":"../etc/passwd"}`);
   assert(ex.status == 400, ex.body);
 
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/service/restart", body);
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/service/restart", body);
   assert(ex.status == 404, ex.body);
 
   auto session = agents.attach("openurp.prod");
@@ -294,18 +323,18 @@ unittest {
       "body":{"host":"app1","supports":["hello","report:os","report:bas"]}}`, hello));
   session.accept(hello);
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/agents/openurp.prod/service/restart", body);
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/service/restart", body);
   assert(ex.status == 409, ex.body);
   assert(parseJson(ex.body)["errors"][0]["detail"].get!string == "unsupported:service:restart");
 }
 
 @("configs.json keeps the webmvc suffix working")
 unittest {
-  auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/configs.json");
+  auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/ems/configs.json");
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["app_name"].get!string == "bas-hub");
 
-  ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/sessions.json");
+  ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions.json");
   assert(ex.status == 200, ex.body);
 }
 
@@ -313,7 +342,7 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/server",
+      "http://localhost/api/bashub/config/openurp.prod/server",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
@@ -323,15 +352,15 @@ unittest {
   assert(!ex.body.canFind("undertow"));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/server", ["Authorization": "Bearer wrong"]);
+      "http://localhost/api/bashub/config/openurp.prod/server", ["Authorization": "Bearer wrong"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/server", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/config/openurp.prod/server", ["ip": "10.0.0.11"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/server", string[string].init);
+      "http://localhost/api/bashub/config/openurp.prod/server", string[string].init);
   assert(ex.status == 401);
 }
 
@@ -340,19 +369,19 @@ unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, demoDao(reg));
   auto router = newRouterWith(reg, store);
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1002/config/server");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/server");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(!ex.body.canFind("<hub"));
   assert(!ex.body.canFind("download-secret"));
   assert(ex.body.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="********"/>`));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1002/config/proxy");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/proxy");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/plain");
   assert(ex.body.canFind("upstream prod-farm{"));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1002/config/setline-peers");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/setline-peers");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/json", ex.contentType);
   assert(parseJson(ex.body)["peers"].length == 2);
@@ -363,7 +392,7 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/proxy",
+      "http://localhost/api/bashub/config/openurp.prod/proxy",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/plain");
@@ -371,21 +400,21 @@ unittest {
   assert(ex.body.canFind("location /bas {"));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/proxy",
+      "http://localhost/api/bashub/config/openurp.prod/proxy",
       ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/proxy",
+      "http://localhost/api/bashub/config/openurp.prod/proxy",
       ["Authorization": "Bearer beangle.demo:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/proxy", ["Authorization": "Bearer wrong"]);
+      "http://localhost/api/bashub/config/openurp.prod/proxy", ["Authorization": "Bearer wrong"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/proxy", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/config/openurp.prod/proxy", ["ip": "10.0.0.11"]);
   assert(ex.status == 401);
 }
 
@@ -395,7 +424,7 @@ unittest {
   auto store = createHubStore(reg, demoDao(reg));
   auto router = newRouterWith(reg, store);
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/setline-peers",
+      "http://localhost/api/bashub/config/openurp.prod/setline-peers",
       ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/json");
@@ -410,15 +439,15 @@ unittest {
   auto basic = cast(string) Base64.encode(cast(const(ubyte)[])
       "openurp.prod:fedcba9876543210fedcba9876543210");
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/setline-peers", ["Authorization": "Basic " ~ basic]);
+      "http://localhost/api/bashub/config/openurp.prod/setline-peers", ["Authorization": "Basic " ~ basic]);
   assert(ex.status == 200, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/setline-peers", ["Authorization": "Bearer wrong"]);
+      "http://localhost/api/bashub/config/openurp.prod/setline-peers", ["Authorization": "Bearer wrong"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/beangle.demo/config/setline-peers",
+      "http://localhost/api/bashub/config/beangle.demo/setline-peers",
       ["Authorization": "Bearer 0123456789abcdef0123456789abcdef"]);
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["peers"].length == 0);
@@ -429,7 +458,7 @@ unittest {
   auto router = newRouter();
   auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/setline-manifest", auth);
+      "http://localhost/api/bashub/config/openurp.prod/setline-manifest", auth);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/json");
   auto resources = parseJson(ex.body)["resources"];
@@ -438,20 +467,20 @@ unittest {
     return toHexString!(LetterCase.lower)(sha256Of(text)).idup;
   }
   auto peers = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/setline-peers", auth);
+      "http://localhost/api/bashub/config/openurp.prod/setline-peers", auth);
   auto proxy = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/proxy", auth);
+      "http://localhost/api/bashub/config/openurp.prod/proxy", auth);
   auto cert = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/certificate", auth);
+      "http://localhost/api/bashub/config/openurp.prod/certificate", auth);
   auto key = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/certificate-key", auth);
+      "http://localhost/api/bashub/config/openurp.prod/certificate-key", auth);
   assert(resources["peers"].get!string == sha256Lower(peers.body));
   assert(resources["proxy"].get!string == sha256Lower(proxy.body));
   assert(resources["certificate"].get!string == sha256Lower(cert.body));
   assert(resources["certificate-key"].get!string == sha256Lower(key.body));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/config/setline-manifest",
+      "http://localhost/api/bashub/config/openurp.prod/setline-manifest",
       ["Authorization": "Bearer openurp.prod:wrong"]);
   assert(ex.status == 401);
 }
@@ -460,18 +489,18 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/ems/menus/bas", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/ems/openurp.prod/menus/bas", ["ip": "10.0.0.11"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(ex.body.canFind(`<resource name="/setting/config.action" title="配置管理" scope="Protected"/>`));
   assert(ex.body.canFind(`<menu indexno="1" name="设置" enName="setting"`));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/ems/menus/missing", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/ems/openurp.prod/menus/missing", ["ip": "10.0.0.11"]);
   assert(ex.status == 404);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/ems/menus/bas", ["ip": "192.168.1.1"]);
+      "http://localhost/api/bashub/ems/openurp.prod/menus/bas", ["ip": "192.168.1.1"]);
   assert(ex.status == 404);
 }
 
@@ -480,11 +509,11 @@ unittest {
   auto router = newRouter();
   auto profileKey = "fedcba9876543210fedcba9876543210";
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml", ["Authorization": "Bearer " ~ profileKey]);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["Authorization": "Bearer " ~ profileKey]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(ex.body.canFind(
-      `<micdn listen="0.0.0.0:8888" remote="http://localhost/api/bashub/openurp.prod/micdn.xml" home="/var/lib/micdn">`));
+      `<micdn listen="0.0.0.0:8888" remote="http://localhost/api/bashub/micdn/openurp.prod/micdn.xml" home="/var/lib/micdn">`));
   assert(ex.body.canFind(`<maven base="/var/lib/micdn/maven">`));
   assert(ex.body.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
   assert(ex.body.canFind(`<auth publish-key="publish-secret" download-key="download-secret" max-size="64M"/>`));
@@ -497,44 +526,44 @@ unittest {
   assert(ex.body.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml", ["X-Micdn-Token": profileKey]);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["X-Micdn-Token": profileKey]);
   assert(ex.status == 200, ex.body);
 
   auto basicValue = "prod:" ~ profileKey;
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml",
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Basic " ~ cast(string) Base64.encode(cast(const(ubyte)[]) basicValue)]);
   assert(ex.status == 200, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["ip": "10.0.0.11"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml", ["Authorization": "Bearer wrong"]);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["Authorization": "Bearer wrong"]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml", string[string].init);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", string[string].init);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.missing/micdn.xml", ["Authorization": "Bearer " ~ profileKey]);
+      "http://localhost/api/bashub/micdn/openurp.missing/micdn.xml", ["Authorization": "Bearer " ~ profileKey]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml",
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Bearer " ~ profileKey, "X-Forwarded-Proto": "https",
        "X-Forwarded-Host": "hub.example.com"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body.canFind(
-      `remote="https://hub.example.com/api/bashub/openurp.prod/micdn.xml"`));
+      `remote="https://hub.example.com/api/bashub/micdn/openurp.prod/micdn.xml"`));
 }
 
 @("profile micdn aggregate masks secrets and preserves them on save")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1002/micdn");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/profiles/1002");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["profile"]["qualifiedName"].get!string == "openurp.prod");
@@ -548,7 +577,7 @@ unittest {
   assert(doc["bindings"].get!(Json[]).length == 2);
   assert(doc["components"].get!(Json[]).length == 2);
   assert(doc["xml"].get!string.canFind(
-      `remote="http://localhost/api/bashub/openurp.prod/micdn.xml"`));
+      `remote="http://localhost/api/bashub/micdn/openurp.prod/micdn.xml"`));
   assert(doc["xml"].get!string.canFind(`publish-key="********"`));
   assert(doc["xml"].get!string.canFind(`<bucket name="prod" key="fe**10"/>`));
   assert(!doc["xml"].get!string.canFind("publish-secret"));
@@ -561,11 +590,11 @@ unittest {
   auto body = Json.emptyObject;
   body["config"] = config;
   body["bindings"] = Json(savedBindings);
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/profiles/1002/micdn", body.toString);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/profiles/1002", body.toString);
   assert(ex.status == 200, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml",
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body.canFind(`home="/srv/micdn"`));
@@ -578,10 +607,10 @@ unittest {
   auto cleared = doc["config"];
   cleared["auth"] = Json(["maxSize": Json("64M"), "publishKey": Json(""), "downloadKey": Json("")]);
   body["config"] = cleared;
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/profiles/1002/micdn", body.toString);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/profiles/1002", body.toString);
   assert(ex.status == 200, ex.body);
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/micdn.xml",
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(!ex.body.canFind("<auth"));
@@ -590,10 +619,10 @@ unittest {
 @("profile micdn returns 404 for missing profiles")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/9999/micdn");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/profiles/9999");
   assert(ex.status == 404, ex.body);
 
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/profiles/9999/micdn",
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/profiles/9999",
       `{"config":{"listen":"0.0.0.0:8888","logLevel":"info"}}`);
   assert(ex.status == 404, ex.body);
 }
@@ -601,7 +630,7 @@ unittest {
 @("profile micdn emits blob from the profile key without a saved config row")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1001/micdn");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/profiles/1001");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["profile"]["keySet"].get!bool);
@@ -621,7 +650,7 @@ unittest {
   ]));
   auto router = newRouterWith(reg, store);
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1002");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002");
   assert(ex.status == 200, ex.body);
   auto attributes = parseJson(ex.body)["data"]["attributes"];
   assert(attributes["sslCertificate"].get!string == cert);
@@ -629,17 +658,17 @@ unittest {
   assert(attributes["sslCertificateKey"].get!string == "********");
   assert(!attributes["sslCertificateKey"].get!string.canFind("PRIVATE KEY"));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/openurp.prod/config/certificate");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate");
   assert(ex.status == 401, ex.body);
-  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/openurp.prod/config/certificate",
+  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate",
       ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body == cert);
-  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/openurp.prod/config/certificate-key",
+  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate-key",
       ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body == key);
-  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/openurp.prod/config/certificate-key",
+  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate-key",
       ["Authorization": "Bearer openurp.prod:wrong"]);
   assert(ex.status == 401, ex.body);
 }
@@ -650,7 +679,7 @@ unittest {
 
   auto create = parseJsonString(`{"kind":"static_bundle","name":"test-bundle","mountName":"demo-bundle","remark":"测试",
       "spec":{"sources":[{"kind":"jar","ref":"org.example:demo:1.0.0","inner":""}]}}`);
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/cdn-components", create.toString);
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/micdn/components", create.toString);
   assert(ex.status == 201, ex.body);
   auto bundle = parseJson(ex.body)["data"];
   auto bundleId = bundle["id"].get!string;
@@ -660,7 +689,7 @@ unittest {
 
   auto noMount = parseJsonString(`{"kind":"static_bundle","name":"missing-mount",
       "spec":{"sources":[{"kind":"jar","ref":"org.example:demo:1.0.0"}]}}`);
-  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/cdn-components", noMount.toString);
+  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/micdn/components", noMount.toString);
   assert(ex.status == 400, ex.body);
   assert(parseJson(ex.body)["errors"][0]["source"]["parameter"].get!string == "mountName");
 
@@ -668,24 +697,24 @@ unittest {
       "spec":{"sources":[
         {"kind":"jar","ref":"org.example:demo:1.0.0"},
         {"kind":"dir","ref":"/srv/static"}]}}`);
-  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/cdn-components", mixed.toString);
+  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/micdn/components", mixed.toString);
   assert(ex.status == 400, ex.body);
   assert(parseJson(ex.body)["errors"][0]["source"]["parameter"].get!string.canFind("spec.sources"));
 
   auto badWww = parseJsonString(`{"kind":"www_doc","name":"bad-doc","mountName":"bad-doc",
       "spec":{"source":{"kind":"npm","ref":"demo@1.0.0"},"autoDeploy":true}}`);
-  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/cdn-components", badWww.toString);
+  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/micdn/components", badWww.toString);
   assert(ex.status == 400, ex.body);
 
   auto retiredBucket = parseJsonString(`{"kind":"blob_bucket","name":"retired","mountName":"retired",
       "spec":{"key":"old","publicImages":true}}`);
-  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/cdn-components", retiredBucket.toString);
+  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/micdn/components", retiredBucket.toString);
   assert(ex.status == 400, ex.body);
   assert(parseJson(ex.body)["errors"][0]["source"]["parameter"].get!string == "kind");
 
-  ex = call(router, HTTPMethod.DELETE, "http://localhost/api/bashub/cdn-components/" ~ bundleId);
+  ex = call(router, HTTPMethod.DELETE, "http://localhost/api/bashub/micdn/components/" ~ bundleId);
   assert(ex.status == 200, ex.body);
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/cdn-components");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/components");
   assert(ex.status == 200, ex.body);
   foreach (component; parseJson(ex.body)["data"].get!(Json[]))
     assert(component["id"].get!string != bundleId);
@@ -695,7 +724,7 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/script/10.0.0.11", ["ip": "10.0.0.12"]);
+      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.11", ["ip": "10.0.0.12"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/x-shellscript");
   assert(ex.body.canFind("#!/bin/bash"));
@@ -704,17 +733,17 @@ unittest {
   assert(ex.body.indexOf("java -version") < ex.body.indexOf("node --version"));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/script/10.0.0.12", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.12", ["ip": "10.0.0.11"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body.canFind("#!/bin/bash"));
   assert(!ex.body.canFind("java -version"));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/script/10.0.0.10", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.10", ["ip": "10.0.0.11"]);
   assert(ex.status == 404);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/openurp.prod/script/10.0.0.11", ["ip": "192.168.1.1"]);
+      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.11", ["ip": "192.168.1.1"]);
   assert(ex.status == 404);
 }
 
@@ -722,17 +751,17 @@ unittest {
 unittest {
   auto router = newRouter();
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search?page[size]=1");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search?page[size]=1");
   assert(ex.status == 200);
   auto doc = parseJson(ex.body);
   assert(doc["data"].length == 1);
   assert(doc["meta"]["page"]["total"].get!long == 2);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1001");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1001");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["data"]["attributes"]["name"].get!string == "demo");
 
-  ex = call(router, HTTPMethod.DELETE, "http://localhost/api/bashub/hosts/2001");
+  ex = call(router, HTTPMethod.DELETE, "http://localhost/api/bashub/config/hosts/2001");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["success"].get!bool == true);
 }
@@ -742,33 +771,34 @@ unittest {
   auto router = newRouter();
   // 属性名（camelCase）过滤：前端发的就是这种
   auto ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/profiles/search?filter%5Borg.name%5D=openurp&include=org");
+      "http://localhost/api/bashub/config/profiles/search?filter%5Borg.name%5D=openurp&include=org");
   assert(ex.status == 200);
   auto doc = parseJson(ex.body);
   assert(doc["meta"]["page"]["total"].get!long == 1);
   assert(doc["data"][0]["attributes"]["qualifiedName"].get!string == "openurp.prod");
   assert(doc["included"][0]["type"].get!string == "organizations");
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/hosts/search?filter%5Bprofile%5D=1002&sort=name");
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/hosts/search?filter%5Bprofile%5D=1002&sort=name");
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 2);
 
   // 前端统一带实体别名与引用主键（`filter[profile.name]` / `filter[webapp.profile.id]`）
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/profiles/search?filter%5Bprofile.name%5D=demo&sort=profile.name");
+      "http://localhost/api/bashub/config/profiles/search?filter%5Bprofile.name%5D=demo&sort=profile.name");
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 1);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/resources/search?filter%5Bresource.scope%5D=Private");
+      "http://localhost/api/bashub/ems/resources/search?filter%5Bresource.scope%5D=Private");
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 1);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/platform-feature-scripts/search" ~
+      "http://localhost/api/bashub/config/platform-feature-scripts/search" ~
       "?filter%5BplatformFeatureScript.feature.id%5D=8001");
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 1);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/webapps/search?filter%5Bwebapp.profile.id%5D=1002" ~
+      "http://localhost/api/bashub/config/webapps/search?filter%5Bwebapp.profile.id%5D=1002" ~
       "&include=artifact,targets,targets.host");
   auto webapps = parseJson(ex.body);
   assert(webapps["meta"]["page"]["total"].get!long == 1);
@@ -789,28 +819,29 @@ unittest {
 @("post creates a row and returns 201")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/organizations",
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/organizations",
       `{"data":{"type":"organizations","attributes":{"name":"neworg","title":"新机构"}}}`);
   assert(ex.status == 201);
   auto doc = parseJson(ex.body);
   assert(doc["data"]["attributes"]["name"].get!string == "neworg");
   // 新建后立刻能在列表里查到
-  auto list = call(router, HTTPMethod.GET, "http://localhost/api/bashub/organizations/search?filter[name]=neworg");
+  auto list = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/organizations/search?filter[name]=neworg");
   assert(list.status == 200);
   assert(parseJson(list.body)["meta"]["page"]["total"].get!long == 1);
-  auto all = call(router, HTTPMethod.GET, "http://localhost/api/bashub/organizations/search");
+  auto all = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/organizations/search");
   assert(parseJson(all.body)["meta"]["page"]["total"].get!long == 3);
 }
 
 @("patch updates and 404s on a missing id")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/organizations/1",
+  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/organizations/1",
       `{"data":{"type":"organizations","attributes":{"title":"改名"}}}`);
   assert(ex.status == 200);
   assert(parseJson(ex.body)["data"]["attributes"]["title"].get!string == "改名");
 
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/organizations/9999",
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/organizations/9999",
       `{"data":{"type":"organizations","attributes":{"title":"x"}}}`);
   assert(ex.status == 404);
   assert(parseJson(ex.body)["errors"][0]["status"].get!string == "404");
@@ -819,10 +850,10 @@ unittest {
 @("unknown resource and unknown filter give 404/400")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/nothings/search");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/nothings/search");
   assert(ex.status == 404);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/organizations/search?filter[nope]=1");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/organizations/search?filter[nope]=1");
   assert(ex.status == 400);
   assert(parseJson(ex.body)["errors"][0]["source"]["parameter"].get!string == "filter[nope]");
 }
@@ -830,11 +861,11 @@ unittest {
 @("sessions endpoints")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/sessions");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["code"].get!string == "demo");
 
-  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/sessions/logout");
+  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/ems/sessions/logout");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["logoutUrl"].get!string == "https://sas.openurp.net/cas/logout");
 }
@@ -842,10 +873,10 @@ unittest {
 @("reset-key rotates the profile key and returns the new one")
 unittest {
   auto router = newRouter();
-  auto before = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1001").body);
+  auto before = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1001").body);
   auto oldKey = before["data"]["attributes"]["key"].get!string;
 
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/profiles/1001/reset-key");
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/profiles/1001/reset-key");
   assert(ex.status == 200);
   // 与 Scala 侧 ProfileWS.resetKey 同形：扁平的 {id, key}
   auto doc = parseJson(ex.body);
@@ -855,14 +886,14 @@ unittest {
   assert(isHex(key));
   // 重置即吊销：key 真的换了，而且落到了行上（详情里读到的就是新 key）
   assert(key != oldKey);
-  auto after = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1001").body);
+  auto after = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1001").body);
   assert(after["data"]["attributes"]["key"].get!string == key);
 }
 
 @("reset-key 404s on a missing profile")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/profiles/9999/reset-key");
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/profiles/9999/reset-key");
   assert(ex.status == 404);
   assert(parseJson(ex.body)["errors"][0]["status"].get!string == "404");
 }
@@ -870,23 +901,24 @@ unittest {
 @("webapps upgrade copies the artifact latest version")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/webapps/7001",
+  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/webapps/7001",
       `{"data":{"type":"webapps","attributes":{"version":"0.0.7"}}}`);
   assert(ex.status == 200);
   assert(parseJson(ex.body)["data"]["attributes"]["version"].get!string == "0.0.7");
 
-  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/webapps/upgrade", `{"ids":["7001"]}`);
+  ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/webapps/upgrade", `{"ids":["7001"]}`);
   assert(ex.status == 200);
   assert(parseJson(ex.body)["success"].get!bool);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/webapps/7001");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/webapps/7001");
   assert(parseJson(ex.body)["data"]["attributes"]["version"].get!string == "0.0.8");
 }
 
 @("host webapps only returns deployments targeting that host")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/hosts/2001/webapps?include=artifact");
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/hosts/2001/webapps?include=artifact");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["data"].length == 1);
@@ -899,7 +931,7 @@ unittest {
   }
   assert(hasArtifact);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/hosts/9999/webapps");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/hosts/9999/webapps");
   assert(ex.status == 404);
 }
 
@@ -907,7 +939,7 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/artifacts/6001/webapps?include=artifact");
+      "http://localhost/api/bashub/config/artifacts/6001/webapps?include=artifact");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["meta"]["page"]["total"].get!long == 1);
@@ -920,11 +952,11 @@ unittest {
   }
   assert(hasArtifact);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/artifacts/6002/webapps");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/artifacts/6002/webapps");
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 0);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/artifacts/9999/webapps");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/artifacts/9999/webapps");
   assert(ex.status == 404);
 }
 
@@ -932,31 +964,32 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/resources/13002/menus?include=entry,resources");
+      "http://localhost/api/bashub/ems/resources/13002/menus?include=entry,resources");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["meta"]["page"]["total"].get!long == 1);
   assert(jsonText(doc["data"][0]["id"]) == "14002");
   assert(doc["data"][0]["attributes"]["entryUrl"].get!string == "/setting/config.action");
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/resources/13001/menus");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/resources/13001/menus");
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 1);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/resources/9999/menus");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/resources/9999/menus");
   assert(ex.status == 404);
 }
 
 @("reset-key needs a credential when auth is required")
 unittest {
-  auto ex = call(newRouter(true), HTTPMethod.POST, "http://localhost/api/bashub/profiles/1001/reset-key");
+  auto ex = call(newRouter(true), HTTPMethod.POST,
+      "http://localhost/api/bashub/config/profiles/1001/reset-key");
   assert(ex.status == 401);
   assert(parseJson(ex.body)["errors"][0]["meta"]["redirectUrl"].get!string == "https://sas.openurp.net/cas");
 }
 
 @("menus export emits resources and nested menus as xml")
 unittest {
-  auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/menus/export?app=11001");
+  auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/ems/menus/export?app=11001");
   assert(ex.status == 200, ex.body);
   auto xml = parseJson(ex.body)["xml"].get!string;
   assert(xml.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<profile>"));
@@ -985,12 +1018,12 @@ unittest {
     </children>
   </menu>
 </profile>`;
-  auto ex = upload(router, "http://localhost/api/bashub/menus/import", multipartBody("11001", xml));
+  auto ex = upload(router, "http://localhost/api/bashub/ems/menus/import", multipartBody("11001", xml));
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["success"].get!bool);
 
   auto resources = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/resources/search?filter%5Bapp%5D=11001&page%5Bsize%5D=100").body)["data"];
+      "http://localhost/api/bashub/ems/resources/search?filter%5Bapp%5D=11001&page%5Bsize%5D=100").body)["data"];
   bool foundResource;
   foreach (ref item; resources) {
     auto attrs = item["attributes"];
@@ -1003,7 +1036,7 @@ unittest {
   assert(foundResource);
 
   auto menus = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/search?filter%5Bapp%5D=11001&page%5Bsize%5D=100").body)["data"];
+      "http://localhost/api/bashub/ems/menus/search?filter%5Bapp%5D=11001&page%5Bsize%5D=100").body)["data"];
   string rootId;
   string childId;
   foreach (ref item; menus) {
@@ -1014,13 +1047,13 @@ unittest {
   }
   assert(rootId.length > 0 && childId.length > 0);
   auto detail = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/" ~ childId ~ "?include=entry,resources").body);
+      "http://localhost/api/bashub/ems/menus/" ~ childId ~ "?include=entry,resources").body);
   assert(jsonText(detail["data"]["relationships"]["parent"]["data"]["id"]) == rootId);
   assert(jsonText(detail["data"]["relationships"]["entry"]["data"]["id"]).length > 0);
   auto linked = detail["data"]["relationships"]["resources"]["data"].get!(Json[]);
   assert(linked.length == 2);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/menus/export?app=11001");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/menus/export?app=11001");
   assert(ex.status == 200, ex.body);
   auto exported = parseJson(ex.body)["xml"].get!string;
   assert(exported.canFind("<resource name=\"/setting/new.action\" title=\"新资源\"/>"));
@@ -1032,10 +1065,10 @@ unittest {
 @("menus import requires a file and an existing app")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/menus/import");
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/ems/menus/import");
   assert(ex.status == 400);
 
-  ex = upload(router, "http://localhost/api/bashub/menus/import", multipartBody("9999", "<profile/>"));
+  ex = upload(router, "http://localhost/api/bashub/ems/menus/import", multipartBody("9999", "<profile/>"));
   assert(ex.status == 404);
 }
 
@@ -1048,14 +1081,14 @@ unittest {
       "app":{"data":{"type":"apps","id":"11001"}},
       "parent":{"data":null},
       "entry":{"data":{"type":"resources","id":"13001"}}}}}`;
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/menus", body);
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/ems/menus", body);
   assert(ex.status == 201, ex.body);
   auto created = parseJson(ex.body)["data"];
   auto id = jsonText(created["id"]);
   assert(jsonText(created["attributes"]["indexno"]) == "1");
 
   auto detail = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/" ~ id ~ "?include=entry,resources").body);
+      "http://localhost/api/bashub/ems/menus/" ~ id ~ "?include=entry,resources").body);
   assert(jsonText(detail["data"]["relationships"]["entry"]["data"]["id"]) == "13001");
   bool entryLinked;
   foreach (ref item; detail["data"]["relationships"]["resources"]["data"]) {
@@ -1065,21 +1098,21 @@ unittest {
   assert(entryLinked);
 
   auto oldRoot = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/14001").body)["data"];
+      "http://localhost/api/bashub/ems/menus/14001").body)["data"];
   assert(jsonText(oldRoot["attributes"]["indexno"]) == "2");
   auto oldChild = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/14002").body)["data"];
+      "http://localhost/api/bashub/ems/menus/14002").body)["data"];
   assert(jsonText(oldChild["attributes"]["indexno"]) == "2.1");
 
   body = `{"data":{"type":"menus","attributes":{"indexno":"1"},
     "relationships":{"parent":{"data":{"type":"menus","id":"14001"}}}}}`;
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/menus/" ~ id, body);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/ems/menus/" ~ id, body);
   assert(ex.status == 200, ex.body);
   auto moved = parseJson(ex.body)["data"];
   assert(jsonText(moved["attributes"]["indexno"]) == "2.1");
 
   oldChild = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/14002").body)["data"];
+      "http://localhost/api/bashub/ems/menus/14002").body)["data"];
   assert(jsonText(oldChild["attributes"]["indexno"]) == "2.2");
 }
 
@@ -1087,10 +1120,10 @@ unittest {
 unittest {
   auto router = newRouter();
   auto body = `{"data":{"type":"menus","attributes":{"enabled":false}}}`;
-  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/menus/14001", body);
+  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/ems/menus/14001", body);
   assert(ex.status == 200, ex.body);
   auto child = parseJson(call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/menus/14002").body)["data"];
+      "http://localhost/api/bashub/ems/menus/14002").body)["data"];
   assert(child["attributes"]["enabled"].get!bool == false);
 }
 

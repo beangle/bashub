@@ -7,7 +7,7 @@
  */
 
 module bashub.profile.script;
-/// `GET /api/bashub/{profile}/script/{host}`：生成主机检查脚本。
+/// `GET /api/bashub/config/{profile}/script/{host}`：生成主机检查脚本。
 /// 与 Scala `ScriptWS` 同口径：按 Profile + Host.ip 找机器，递归收集特性的依赖，
 /// 让依赖排在前面，再取该平台对应的脚本。排序遇到同优先级时按 id 固定，避免集合顺序漂移。
 

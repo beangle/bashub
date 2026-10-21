@@ -13,6 +13,7 @@ module bashub.security;
 /// 全部在这一层收口。`configs` 不调用 guard，保持登录前可读。
 
 import bashub.config : HubConfig;
+import bashub.api : hubApiPrefixes, isApiGroup;
 
 import beangle.ems.authority : RemoteAuthoritySource;
 import beangle.security.authz : AuthorityDomain;
@@ -20,7 +21,7 @@ import beangle.security.cas : CasConfig;
 import beangle.security.session : Session, SessionRepo;
 import beangle.security.web : AccessDecision, HttpSecurity, SecurityContext, loginUrlFor, wantsJson;
 
-import std.string : indexOf, startsWith, strip, toLower;
+import std.string : indexOf, startsWith, toLower;
 
 import vibe.core.log : logInfo, logWarn;
 import vibe.http.common : HTTPStatus, httpMethodString;
@@ -121,13 +122,15 @@ class HubSecurity {
     }
   }
 
-  /** 授权资源名：`/api/bashub/{resource}/...` → `/api/bashub/{resource}`。
+  /** 授权资源名：能力域后的第一个资源段决定权限。
    *
+   * `/api/bashub/config/profiles/...` → `/api/bashub/config/profiles`；
+   * `/api/bashub/ems/menus/...` → `/api/bashub/ems/menus`。
    * 与 scala 侧按 action 名登记资源的粒度不同，这里用 URL 资源段；ems 里没有同名资源时
    * 按 unknownIsProtected 只要求登录，因此既可逐步补齐资源定义，也不会误放开写接口。
    */
   private string resourceNameOf(string path) {
-    auto prefix = cfg.apiPrefix.strip;
+    auto prefix = hubApiPrefixes(cfg.apiPrefix).root;
     if (prefix.length == 0 || !path.startsWith(prefix))
       return path;
     auto rest = path[prefix.length .. $];
@@ -135,6 +138,13 @@ class HubSecurity {
       rest = rest[1 .. $];
     auto slash = rest.indexOf('/');
     auto first = slash < 0 ? rest : rest[0 .. slash];
-    return first.length == 0 ? prefix : prefix ~ "/" ~ first;
+    if (first.length == 0)
+      return prefix;
+    if (!isApiGroup(first))
+      return prefix ~ "/" ~ first;
+    auto tail = slash < 0 ? "" : rest[slash + 1 .. $];
+    auto nextSlash = tail.indexOf('/');
+    auto second = nextSlash < 0 ? tail : tail[0 .. nextSlash];
+    return second.length == 0 ? prefix ~ "/" ~ first : prefix ~ "/" ~ first ~ "/" ~ second;
   }
 }

@@ -7,7 +7,7 @@
  */
 
 module bashub.profile.proxy;
-/// `GET /api/bashub/{profile}/config/proxy`：按 `proxyEngine` 输出 haproxy / nginx 配置。
+/// `GET /api/bashub/config/{profile}/proxy`：按 `proxyEngine` 输出 haproxy / nginx 配置。
 /// 分组口径与 Scala `ConfigWS.prepareProxyData` 一致：只有带 targets 的 webapp 参与，
 /// 同一个 farm 内按 server 集合拆后端；多个 server 的集合命名为 `farm2`、`farm3`…。
 

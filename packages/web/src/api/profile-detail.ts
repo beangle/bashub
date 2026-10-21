@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import { getPlainJson } from './resource'
 import { sessionService } from '@/auth'
+import { apiPath } from './prefix'
 
 export interface SetlinePeer {
   name: string
@@ -15,7 +16,7 @@ const contentTypes: Record<ProfileConfigKind, string> = {
 }
 
 export async function readProfileConfig(profileId: string, kind: ProfileConfigKind): Promise<string> {
-  const url = apiClient.resolveUrl(`/profiles/${encodeURIComponent(profileId)}/config/${kind}`)
+  const url = apiClient.resolveUrl(apiPath('config', `/profiles/${encodeURIComponent(profileId)}/${kind}`))
   const response = await fetch(url, {
     credentials: 'include',
     headers: {
@@ -32,7 +33,7 @@ export async function readProfileConfig(profileId: string, kind: ProfileConfigKi
 
 export async function readSetlinePeers(profileId: string): Promise<SetlinePeer[]> {
   const document = await getPlainJson<{ peers?: SetlinePeer[] }>(
-    `/profiles/${encodeURIComponent(profileId)}/config/setline-peers`,
+    apiPath('config', `/profiles/${encodeURIComponent(profileId)}/setline-peers`),
   )
   return document.peers ?? []
 }

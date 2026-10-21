@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { apiPath } from './prefix'
 
 export interface AgentOsInfo {
   name?: string
@@ -56,7 +57,7 @@ export interface AgentBasSnapshot {
   declared?: AgentInstance[]
 }
 
-/** `GET /api/bashub/agents/status` 里的一项：一台在线节点此刻的样子。 */
+/** `GET /api/bashub/monitor/agents/status` 里的一项：一台在线节点此刻的样子。 */
 export interface AgentStatus {
   profile: string
   host?: string
@@ -92,13 +93,13 @@ export interface AgentServiceResult {
 }
 
 export async function listAgents(): Promise<AgentStatus[]> {
-  const result = await apiClient.getPlain<{ agents?: AgentStatus[] }>('/agents/status')
+  const result = await apiClient.getPlain<{ agents?: AgentStatus[] }>(apiPath('monitor', '/agents/status'))
   return result.agents ?? []
 }
 
 /** 要求在线节点立刻上报一次；202 只表示指令已入队，快照随后到达。 */
 export async function requestAgentReport(profile: string): Promise<void> {
-  await apiClient.post(`/agents/${encodeURIComponent(profile)}/report`, {})
+  await apiClient.post(apiPath('monitor', `/agents/${encodeURIComponent(profile)}/report`), {})
 }
 
 /** 让节点启停一个实例；接口等到 agent 执行完才返回最终状态。 */
@@ -108,7 +109,7 @@ export async function serviceAgentInstance(
   action: AgentServiceAction,
 ): Promise<AgentServiceResult> {
   const document = await apiClient.post<AgentServiceResult>(
-    `/agents/${encodeURIComponent(profile)}/service/${action}`,
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/service/${action}`),
     { instance },
   )
   if (!document.data) throw new Error('节点未返回服务状态')
@@ -127,7 +128,7 @@ export function readAgentLog(
   if (to?.trim()) query.to = to.trim()
   if (tail && tail > 0) query.tail = String(tail)
   return apiClient.getPlain<AgentLogWindow>(
-    `/agents/${encodeURIComponent(profile)}/log`,
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/log`),
     { query },
   )
 }
@@ -138,7 +139,7 @@ export function readAgentLog(
  */
 export function followAgentLog(profile: string, instance: string, tail = 200): EventSource {
   const url = apiClient.resolveUrl(
-    `/agents/${encodeURIComponent(profile)}/log/follow`,
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/log/follow`),
     { query: { instance, tail: String(tail) } },
   )
   return new EventSource(url, { withCredentials: true })

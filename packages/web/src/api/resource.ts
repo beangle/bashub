@@ -1,5 +1,6 @@
 import type { JsonApiRelationship, JsonApiResource } from '@beangle/ems-app'
-import { API_PREFIX, apiClient, type ListQuery } from './client'
+import { apiClient, type ListQuery } from './client'
+import { resourceApiPath } from './prefix'
 
 /** 一条资源：保留 JSON:API 的 attributes 与 relationships，便于通用列表/表单渲染。 */
 export interface ResourceRow {
@@ -29,9 +30,14 @@ function toRow(resource: JsonApiResource): ResourceRow {
   }
 }
 
+/** 管理台资源按资源名选择 `ems` / `config` 域；页面仍只传 `/profiles` 这类资源路径。 */
+function resourcePath(path: string): string {
+  return resourceApiPath(path)
+}
+
 export async function listResource(path: string, params: ResourceListQuery = {}): Promise<ResourcePage> {
   const { include, ...rest } = params
-  const document = await apiClient.get<JsonApiResource[]>(`${path}/search`, {
+  const document = await apiClient.get<JsonApiResource[]>(`${resourcePath(path)}/search`, {
     ...rest,
     query: include && include.length > 0 ? { include: include.join(',') } : undefined,
   })
@@ -48,7 +54,7 @@ export async function listResource(path: string, params: ResourceListQuery = {})
 
 /** 取单条记录（`GET {path}/{id}`，JSON:API 单资源文档）。 */
 export async function getResource(path: string, id: string): Promise<ResourceRow> {
-  const document = await apiClient.get<JsonApiResource>(`${path}/${id}`)
+  const document = await apiClient.get<JsonApiResource>(`${resourcePath(path)}/${id}`)
   if (!document.data) throw new Error(`未找到记录：${path}/${id}`)
   return toRow(document.data)
 }
@@ -59,7 +65,7 @@ export async function getResourceDetail(
   id: string,
   include: string[] = [],
 ): Promise<{ row: ResourceRow; included: ResourceRow[] }> {
-  const document = await apiClient.get<JsonApiResource>(`${path}/${id}`, {
+  const document = await apiClient.get<JsonApiResource>(`${resourcePath(path)}/${id}`, {
     query: include.length > 0 ? { include: include.join(',') } : undefined,
   })
   if (!document.data) throw new Error(`未找到记录：${path}/${id}`)
@@ -68,7 +74,7 @@ export async function getResourceDetail(
 
 /** 取自定义动作返回的 JSON:API 文档（如 `/hosts/{id}/webapps`），支持 `include`。 */
 export async function fetchDocument(path: string, query?: Record<string, string>): Promise<ResourcePage> {
-  const document = await apiClient.get<JsonApiResource[]>(path, { query })
+  const document = await apiClient.get<JsonApiResource[]>(resourcePath(path), { query })
   const rows = (document.data || []).map(toRow)
   const included = (document.included || []).map(toRow)
   const page = document.meta?.page
@@ -86,22 +92,22 @@ export async function saveResource(
   if (Object.keys(attributes).length > 0) data.attributes = attributes
   if (Object.keys(relationships).length > 0) data.relationships = relationships
 
-  if (id) await apiClient.patch(`${path}/${id}`, { data })
-  else await apiClient.post(path, { data })
+  if (id) await apiClient.patch(`${resourcePath(path)}/${id}`, { data })
+  else await apiClient.post(resourcePath(path), { data })
 }
 
 export async function removeResource(path: string, id: string): Promise<void> {
-  await apiClient.delete(`${path}/${id}`)
+  await apiClient.delete(`${resourcePath(path)}/${id}`)
 }
 
 /** 调用资源上的批量动作（如 artifacts/update-version、webapps/upgrade）。 */
 export async function callResourceAction(path: string, action: string, ids: string[]): Promise<void> {
-  await apiClient.post(`${path}/${action}`, { ids })
+  await apiClient.post(`${resourcePath(path)}/${action}`, { ids })
 }
 
 /** 上传文件（multipart/form-data），用于菜单 XML 导入等。 */
 export async function uploadResourceFile<T>(path: string, formData: FormData): Promise<T> {
-  const document = await apiClient.upload<T>(path, formData)
+  const document = await apiClient.upload<T>(resourcePath(path), formData)
   return document as unknown as T
 }
 

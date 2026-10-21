@@ -69,30 +69,30 @@
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
-| `GET /configs` | ✅ | 登录前可读，下发 ems base / app name / logo |
-| `GET /sessions` | ✅ | 当前用户 |
-| `POST /sessions/logout` | ✅ | 本地会话清理与 CAS 登出地址 |
-| `GET /agents/status` | ✅ | 在线节点快照，按 profile 排序；断连即从登记册摘除 |
+| `GET /ems/configs` | ✅ | 登录前可读，下发 ems base / app name / logo |
+| `GET /ems/sessions` | ✅ | 当前用户 |
+| `POST /ems/sessions/logout` | ✅ | 本地会话清理与 CAS 登出地址 |
+| `GET /monitor/agents/status` | ✅ | 在线节点快照，按 profile 排序；断连即从登记册摘除 |
 
-### 2. 配置分发 `/api/bashub/{profile}`
+### 2. 配置分发 `/api/bashub/config/{profile}`
 
 部署配置直接输出文本，不再依赖模板运行时。
 
 | 功能 | 状态 | 关键行为 |
 |---|---|---|
-| Profile 解析与 IP 校验 | ✅ | `{profile}` 为 `org.name`；请求头 `ip` 必须命中 Profile 或 Host |
+| Profile 解析与令牌校验 | ✅ | `{profile}` 为 `org.name`；请求携带 Profile key，不再使用可伪造的 `ip` 头 |
 | `GET /config/server` | ✅ | farms / hosts / webapps / 被引用的 engines、servers、artifacts；不输出 setline 或通道凭证 |
 | `GET /config/proxy` | ✅ | 按 `proxyEngine` 输出 haproxy / nginx；用 Profile 令牌鉴权；haproxy 由 setline agent 生成 backend 与路由 map |
 | `GET /config/certificate` / `config/certificate-key` | ✅ | Profile 分别保存 PEM 公钥证书与私钥；机器端点用 Profile 令牌下载，管理台私钥脱敏；setline pull 落成 nginx 的 cert/key 与 haproxy 的 bundle |
 | `GET /config/setline-peers` | ✅ | 每个 Profile 都输出 sidecar peer 列表：web/Micdn 节点合并并按 URL 去重，没有节点时返回空数组；用 Profile 令牌鉴权 |
-| `GET /ems/menus/{appName}` | ✅ | 按 profile 与 artifact 找 App，再递归输出菜单和资源 XML |
-| `GET /micdn.xml` | ✅ | 按 Profile 输出完整 micdn 配置；用 `profile.key` 令牌鉴权；组件与绑定来自 `cdn_components` / `cfg_profile_micdn_components` |
+| `GET /api/bashub/ems/{profile}/menus/{appName}` | ✅ | 按 profile 与 artifact 找 App，再递归输出菜单和资源 XML |
+| `GET /api/bashub/micdn/{profile}/micdn.xml` | ✅ | 按 Profile 输出完整 micdn 配置；用 `profile.key` 令牌鉴权；组件与绑定来自 `cdn_components` / `cfg_profile_micdn_components` |
 | `GET /script/{host}` | ✅ | 找 Host，收集平台特性及依赖，按依赖优先级输出该平台脚本 |
 
 这一组是 basctl 部署闭环的第一优先级。`server` 配置还承担节点通道地址与 Profile key 的
 下发，必须先于 WebSocket 通道完成。
 
-### 3. 节点通道 `/api/bashub/{profile}/agents`
+### 3. 节点通道 `/api/bashub/monitor/agents/{profile}/channel`
 
 通道主体、`log:read` 与 `service:*` 已移植；启停动作由 basctl agent 执行，hub 等待 `result`。
 
@@ -104,10 +104,10 @@
 | `report:os`、`report:bas` | ✅ | 整份替换现状快照，保留各自 `at` |
 | `pong`、`result` | ✅ | `pong` 已接收；`result` 按请求号唤醒等待者，超时与断连都会收敛为错误 |
 | Hub 下发 `ping` | ✅ | 每条连接 30s 一次 app 层 ping |
-| Hub 下发 `report:now` | ✅ | `POST /api/bashub/agents/{profile}/report`；按 `hello.supports` 门禁 |
-| Hub 下发 `log:read` | ✅ | `GET /api/bashub/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
-| 浏览器日志跟随 | ✅ | `GET /api/bashub/agents/{profile}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
-| `service:start/stop/restart` | ✅ | `POST /api/bashub/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
+| Hub 下发 `report:now` | ✅ | `POST /api/bashub/monitor/agents/{profile}/report`；按 `hello.supports` 门禁 |
+| Hub 下发 `log:read` | ✅ | `GET /api/bashub/monitor/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
+| 浏览器日志跟随 | ✅ | `GET /api/bashub/monitor/agents/{profile}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
+| `service:start/stop/restart` | ✅ | `POST /api/bashub/monitor/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
 | 在线节点登记与摘除 | ✅ | 只摘自己那条，旧连接迟到的关闭不会挤掉新连接 |
 
 ### 4. 原生发行包仓库（已迁至 micdn）
@@ -130,7 +130,7 @@
 | ems PBE 密文解密 | ⏸ | 配了 `ENC(...)` 的部署目前需先提供明文 |
 | 远程 `EmsApi` 取配置/数据源 | ⏸ | 当前只读本地 ems 文件 |
 | 热加载 / SIGHUP | ⏸ | 配置启动时读取一次 |
-| 菜单 XML multipart 上传 | ✅ | `POST {prefix}/menus/import`（`app` + `menufile`） |
+| 菜单 XML multipart 上传 | ✅ | `POST /api/bashub/ems/menus/import`（`app` + `menufile`） |
 | 定时任务框架 | ✅ | 会话心跳 + 组件版本刷新；`<artifacts refresh-minutes>` 控制间隔，0 关闭 |
 
 ### 6. 数据库与 schema
@@ -220,7 +220,8 @@
 ## 迁移完成状态
 
 1. ✅ 管理台 SPA 的所有现有页面只连 D 后端。
-2. ✅ basctl 能通过 `/api/bashub/{profile}/config/server` 获取配置，通过 `/api/bashub/{profile}/agents` 建立通道。
+2. ✅ basctl 能通过 `/api/bashub/config/{profile}/server` 获取配置，通过
+   `/api/bashub/monitor/agents/{profile}/channel` 建立通道。
 3. ✅ 生产部署所需文本配置、菜单、静态资产和主机脚本均可由 D 输出。
 4. ✅ 登录、会话、权限和登出行为与迁移前基线一致。
 5. ✅ 原 JVM 后端已退役，代码与专用构建已删除。

@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { apiPath } from './prefix'
 
 export type MicdnComponentKind = 'static_bundle' | 'www_doc'
 export type MicdnSourceKind = 'jar' | 'npm' | 'dir' | 'zip'
@@ -126,7 +127,7 @@ export function defaultMicdnConfig(): MicdnConfig {
 }
 
 export function getMicdnProfile(profileId: string): Promise<MicdnProfileDocument> {
-  return apiClient.getPlain<MicdnProfileDocument>(`/profiles/${profileId}/micdn`)
+  return apiClient.getPlain<MicdnProfileDocument>(apiPath('micdn', `/profiles/${encodeURIComponent(profileId)}`))
 }
 
 export async function saveMicdnProfile(
@@ -134,31 +135,34 @@ export async function saveMicdnProfile(
   config: MicdnConfig,
   bindings: MicdnBindingInput[],
 ): Promise<MicdnProfileDocument> {
-  const document = await apiClient.patch<unknown>(`/profiles/${profileId}/micdn`, { config, bindings })
+  const document = await apiClient.patch<unknown>(
+    apiPath('micdn', `/profiles/${encodeURIComponent(profileId)}`),
+    { config, bindings },
+  )
   return document as unknown as MicdnProfileDocument
 }
 
 export async function listCdnComponents(): Promise<CdnComponent[]> {
-  const document = await apiClient.getPlain<{ data: CdnComponent[] }>('/cdn-components')
+  const document = await apiClient.getPlain<{ data: CdnComponent[] }>(apiPath('micdn', '/components'))
   return document.data || []
 }
 
 export async function createCdnComponent(input: CdnComponentInput): Promise<CdnComponent> {
-  const document = await apiClient.post<CdnComponent>('/cdn-components', input)
+  const document = await apiClient.post<CdnComponent>(apiPath('micdn', '/components'), input)
   if (!document.data) throw new Error('创建组件后未返回数据')
   return document.data
 }
 
 export async function updateCdnComponent(id: string, input: CdnComponentInput): Promise<CdnComponent> {
-  const document = await apiClient.patch<CdnComponent>(`/cdn-components/${id}`, input)
+  const document = await apiClient.patch<CdnComponent>(apiPath('micdn', `/components/${id}`), input)
   if (!document.data) throw new Error('更新组件后未返回数据')
   return document.data
 }
 
 export async function deleteCdnComponent(id: string): Promise<void> {
-  await apiClient.delete(`/cdn-components/${id}`)
+  await apiClient.delete(apiPath('micdn', `/components/${id}`))
 }
 
 export function micdnXmlUrl(profileId: string): string {
-  return apiClient.resolveUrl(`/profiles/${profileId}/micdn.xml`)
+  return apiClient.resolveUrl(apiPath('micdn', `/profiles/${encodeURIComponent(profileId)}/micdn.xml`))
 }

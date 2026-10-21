@@ -7,7 +7,7 @@
 - `asset-groups` 通过关联表挂到 `profiles`；
 - `assets` 只有 `name`、`base` 和 `bundleUris`；
 - `bundleUris` 只能表达 `jar` / `dir`，不能表达 static 的 `npm` provider；
-- `GET /api/bashub/{profile}/micdn/asset` 输出的是旧 `<asset><contexts>...` 清单，不是完整 `micdn.xml`。
+- 当时只有旧的资产清单接口，输出 `<asset><contexts>...`，并没有完整的 `micdn.xml` 入口。
 
 因此 `www`、`blob`、`maven`、`npm`、`native`、`auth` 和根配置都没有入口，也无法在页面上看到一个
 Profile 最终会下发给 micdn 的完整内容。
@@ -205,7 +205,7 @@ renderMicdnConfig(profileId) -> XML
 - `declared=false` 的 `maven` / `npm` / `native` 不输出；
 - `auth` 两个 key 都为空时不输出；
 - static / www 没有绑定任何组件时不输出对应段；
-- `remote` 不保存到 Profile：下载时按请求 origin + `/api/bashub/{profile}/micdn.xml` 自动生成，反代后的 `X-Forwarded-Proto/Host/Port` 参与计算；
+- `remote` 不保存到 Profile：下载时按请求 origin + `/api/bashub/micdn/{profile}/micdn.xml` 自动生成，反代后的 `X-Forwarded-Proto/Host/Port` 参与计算；
 - Profile `key` 非空时输出唯一 bucket，bucket 的 name/key 取 Profile 的 name/key；key 为空时不输出 Blob；
 - 各段的 base 留空时使用 `home + 默认子目录`；`home` 也为空时直接使用默认子目录（例如 `/blob`），与 micdn 的解析规则一致；
 - static bundle 按挂载名字母排序，bundle 内的 provider 固定按 `jar` → `npm` → `dir`、再按 `ref` / `inner` 排序；
@@ -218,7 +218,7 @@ renderMicdnConfig(profileId) -> XML
 示意输出：
 
 ```xml
-<micdn listen="0.0.0.0:8888" remote="https://hub.example.com/api/bashub/openurp.prod/micdn.xml" home="/var/lib/micdn">
+<micdn listen="0.0.0.0:8888" remote="https://hub.example.com/api/bashub/micdn/openurp.prod/micdn.xml" home="/var/lib/micdn">
   <maven base="/var/lib/micdn/maven">
     <remote url="https://repo1.maven.org/maven2"/>
   </maven>
@@ -245,10 +245,10 @@ renderMicdnConfig(profileId) -> XML
 ### 6.1 机器读取
 
 ```text
-GET /api/bashub/{profile}/micdn.xml
+GET /api/bashub/micdn/{profile}/micdn.xml
 ```
 
-返回 `application/xml`。沿用现有 `/api/bashub/{profile}` 的 Profile 解析和来源校验。XML 根节点的 `remote`
+返回 `application/xml`。沿用 `/api/bashub/micdn/{profile}` 的 Profile 解析和令牌校验。XML 根节点的 `remote`
 由本次请求的 origin 自动写成标准配置地址，不读取 Profile 配置；反代场景按 `X-Forwarded-*` 计算。
 
 `{profile}` 只用于定位 Profile，不再校验 `ip` 头。请求必须携带等于 `profile.key` 的令牌：
@@ -265,26 +265,18 @@ Authorization: Basic base64(<任意用户名>:<profile.key>)
 ```bash
 curl -f \
   -H "Authorization: Bearer $PROFILE_KEY" \
-  http://127.0.0.1:8082/api/bashub/openurp.prod/micdn.xml
+  http://127.0.0.1:8082/api/bashub/micdn/openurp.prod/micdn.xml
 ```
 
 如果部署侧用 micdn 的 `-f URL` 直接拉取，micdn 的配置下载必须把同一个令牌放进上述请求头；
 只给 URL 不能完成鉴权。
 
-旧入口已删除：
-
-```text
-GET /api/bashub/{profile}/micdn/asset
-GET /api/bashub/asset-groups
-GET /api/bashub/assets
-```
-
-不提供兼容层，避免同时维护两套静态资源模型。
+旧资产清单入口与旧资源路径已删除；不提供兼容层，避免同时维护两套静态资源模型。
 
 ### 6.2 管理台聚合读取
 
 ```text
-GET /api/bashub/profiles/{id}/micdn
+GET /api/bashub/micdn/profiles/{id}
 ```
 
 一次返回一个 Profile 的完整有效配置：
@@ -296,13 +288,13 @@ GET /api/bashub/profiles/{id}/micdn
 - 生成后的 XML（密钥默认脱敏）。
 
 ```text
-GET /api/bashub/profiles/{id}/micdn.xml
+GET /api/bashub/micdn/profiles/{id}/micdn.xml
 ```
 
 供页面“预览 / 下载”使用。真实密钥只在明确的下载动作中返回，并设置 `Cache-Control: no-store`。
 
 ```text
-PATCH /api/bashub/profiles/{id}/micdn
+PATCH /api/bashub/micdn/profiles/{id}
 ```
 
 一次事务保存整份配置。对 Profile 页面来说，比让前端逐个调用十几个子资源更可靠。
@@ -312,9 +304,9 @@ PATCH /api/bashub/profiles/{id}/micdn
 组件使用一个聚合资源：
 
 ```text
-GET   /api/bashub/cdn-components
-POST  /api/bashub/cdn-components
-PATCH /api/bashub/cdn-components/{id}
+GET   /api/bashub/micdn/components
+POST  /api/bashub/micdn/components
+PATCH /api/bashub/micdn/components/{id}
 ```
 
 请求体包含 `kind`、`name`、`mountName`、`remark`、`spec`。`name` 和 `mountName` 都必填，
@@ -400,7 +392,7 @@ PATCH /api/bashub/cdn-components/{id}
 ## 10. 已实现
 
 1. 三张表、组件/Profile 聚合服务、迁移脚本和 DDL 已落地；
-2. `renderMicdnXml` 与 `/api/bashub/{profile}/micdn.xml` 已实现，并用单元测试锁定空段、转义和非法来源；
+2. `renderMicdnXml` 与 `/api/bashub/micdn/{profile}/micdn.xml` 已实现，并用单元测试锁定空段、转义和非法来源；
 3. Profile 聚合读取/保存、密钥保留与显式清空已实现；
 4. 组件目录页已实现 static bundle / www doc 的 CRUD；Blob bucket 改为 Profile 级只读身份；
 5. Profile 的 Micdn 配置页、聚合预览、复制与真实 XML 下载已实现；

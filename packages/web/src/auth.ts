@@ -1,5 +1,5 @@
 import { createEmsAuth, createEmsRuntimeConfig, loadEmsRuntimeConfigs } from '@beangle/ems-app'
-import { API_PREFIX } from '@/api/prefix'
+import { apiPath, apiRootPath } from '@/api/prefix'
 
 /** SPA 部署前缀，须与独立 web 服务器的部署目录一致（构建时用 VITE_APP_BASE 覆盖）。 */
 export const APP_BASE_PATH = import.meta.env.VITE_APP_BASE || '/bashub/'
@@ -15,7 +15,7 @@ export const runtimeConfig = createEmsRuntimeConfig({
 
 export async function loadRuntimeConfig(): Promise<void> {
   const { appConfig } = await loadEmsRuntimeConfigs({
-    appConfigPath: `${API_PREFIX}/configs.json`,
+    appConfigPath: apiRootPath('ems', '/configs.json'),
     // 独立部署暂不拉取平台主题；接入门户后由宿主下发。
     themeConfigPath: null,
   })
@@ -28,7 +28,7 @@ export const auth = createEmsAuth({
   casAuthLoginUrl: () => runtimeConfig.getCasAuthLoginUrl(),
   casLoginUrl: () => runtimeConfig.getCasLoginUrl(),
   casLogoutUrl: () => runtimeConfig.getCasLogoutUrl(),
-  logoutUrl: () => runtimeConfig.getApiUrl(`${API_PREFIX}/sessions/logout`),
+  logoutUrl: () => runtimeConfig.getApiUrl(apiRootPath('ems', '/sessions/logout')),
 })
 
 export const sessionService = auth.sessionService

@@ -125,8 +125,8 @@ private HubConfig authConfig() {
 
 private AuthorityDomain testDomain() {
   return authorityDomain([
-    Authority("/api/bashub/profiles", Scope.private_, ["ROLE_ADMIN"]),
-    Authority("/api/bashub/hosts", Scope.protected_, []),
+    Authority("/api/bashub/config/profiles", Scope.private_, ["ROLE_ADMIN"]),
+    Authority("/api/bashub/config/hosts", Scope.protected_, []),
   ]);
 }
 
@@ -148,7 +148,7 @@ private HTTPServerRequestHandler securedRouter(HubConfig cfg, SessionRepo repo, 
 unittest {
   auto repo = new StaticSessionRepo();
   auto router = securedRouter(authConfig(), repo, testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search");
   assert(ex.status == 401);
   auto redirect = parseJson(ex.body)["errors"][0]["meta"]["redirectUrl"].get!string;
   assert(redirect.startsWith("https://sas.openurp.net/cas/login?service="));
@@ -158,7 +158,7 @@ unittest {
 unittest {
   auto repo = new StaticSessionRepo();
   auto router = securedRouter(authConfig(), repo, testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/1002/config/server");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/server");
   assert(ex.status == 401);
 }
 
@@ -167,7 +167,7 @@ unittest {
   auto repo = new StaticSessionRepo();
   repo.put(sessionOf("expired", ["ROLE_ADMIN"], nowSeconds() - 3600));
   auto router = securedRouter(authConfig(), repo, testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search", "EMS_SID=expired");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", "EMS_SID=expired");
   assert(ex.status == 401);
   assert(repo.get("expired") is null);
 }
@@ -177,9 +177,20 @@ unittest {
   auto repo = new StaticSessionRepo();
   repo.put(sessionOf("user", ["ROLE_USER"]));
   auto router = securedRouter(authConfig(), repo, testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search", "EMS_SID=user");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", "EMS_SID=user");
   assert(ex.status == 403);
   assert(parseJson(ex.body)["errors"][0]["status"].get!string == "403");
+}
+
+@("API 根前缀末尾的斜杠不影响授权资源名")
+unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("user", ["ROLE_USER"]));
+  auto cfg = authConfig();
+  cfg.apiPrefix = "/api/bashub/";
+  auto router = securedRouter(cfg, repo, testDomain());
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", "EMS_SID=user");
+  assert(ex.status == 403, ex.body);
 }
 
 @("合法用户与 superadmin 可访问 Private 资源")
@@ -187,13 +198,13 @@ unittest {
   auto repo = new StaticSessionRepo();
   repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
   auto router = securedRouter(authConfig(), repo, testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search", "EMS_SID=admin");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", "EMS_SID=admin");
   assert(ex.status == 200, ex.body);
 
   auto rootAccount = new DefaultAccount("root", "root");
   rootAccount.isRoot = true;
   repo.put(new Session("root", rootAccount, nowSeconds(), new Agent(), 1800));
-  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search", "EMS_SID=root").status == 200);
+  assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", "EMS_SID=root").status == 200);
 }
 
 @("CAS ticket 登录会把 authorities 映射进账户并访问 Private 资源")
@@ -202,7 +213,7 @@ unittest {
   auto port = cas.start();
   scope (exit) cas.stop();
 
-  auto service = "http%3A%2F%2Flocalhost%2Fapi%2Fbashub%2Fprofiles%2Fsearch";
+  auto service = "http%3A%2F%2Flocalhost%2Fapi%2Fbashub%2Fconfig%2Fprofiles%2Fsearch";
   cas.on("/serviceValidate?ticket=ST-1&service=" ~ service, 200,
       cast(ubyte[]) (`<cas:serviceResponse xmlns:cas="http://www.yale.edu/tp/cas">
   <cas:authenticationSuccess>
@@ -214,7 +225,7 @@ unittest {
   auto cfg = authConfig();
   cfg.casServer = "http://127.0.0.1:" ~ port.to!string;
   auto router = securedRouter(cfg, null, testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search?ticket=ST-1");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search?ticket=ST-1");
   assert(ex.status == 200, ex.body);
   assert(cas.requests.length == 1);
 }
@@ -222,7 +233,7 @@ unittest {
 @("configs 保持免登录")
 unittest {
   auto router = securedRouter(authConfig(), new StaticSessionRepo(), testDomain());
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/configs");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/configs");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["app_name"].get!string == "bas-hub");
 }
@@ -239,18 +250,18 @@ unittest {
   auto reg = hubRegistry();
   auto router = publicRouter(cfg, reg, demoDao(reg));
 
-  auto preflight = call(router, HTTPMethod.OPTIONS, "http://localhost/api/bashub/profiles/search", null,
+  auto preflight = call(router, HTTPMethod.OPTIONS, "http://localhost/api/bashub/config/profiles/search", null,
       ["Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET",
        "Access-Control-Request-Headers": "content-type"]);
   assert(preflight.status == 204);
   assert(preflight.allowOrigin == "http://localhost:5173");
   assert(preflight.allowCredentials == "true");
 
-  auto denied = call(router, HTTPMethod.OPTIONS, "http://localhost/api/bashub/profiles/search", null,
+  auto denied = call(router, HTTPMethod.OPTIONS, "http://localhost/api/bashub/config/profiles/search", null,
       ["Origin": "http://evil.example", "Access-Control-Request-Method": "GET"]);
   assert(denied.status == 403);
 
-  auto sameOrigin = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search", null,
+  auto sameOrigin = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", null,
       ["Origin": "http://localhost"]);
   assert(sameOrigin.status == 200);
   assert(sameOrigin.allowOrigin.length == 0);
@@ -263,7 +274,7 @@ unittest {
   cfg.emsBase = "https://sas.openurp.net";
   auto reg = hubRegistry();
   auto router = publicRouter(cfg, reg, demoDao(reg));
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/configs");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/configs");
   assert(ex.status == 200);
   assert(ex.contentTypeOptions == "nosniff");
   assert(ex.cacheControl == "no-store");
