@@ -45,6 +45,7 @@ Registry hubRegistry() {
         Column("bas_version", "basVersion", Kind.text),
         Column("ip", "ip", Kind.text),
         Column("hostname", "hostname", Kind.text),
+        Column("setline_port", "setlinePort", Kind.text),
         Column("http_port", "httpPort", Kind.number),
         Column("https_port", "httpsPort", Kind.number),
         Column("enable_https", "enableHttps", Kind.boolean),

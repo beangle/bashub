@@ -87,7 +87,7 @@ export const resourceSchemas: ResourceSchema[] = [
     type: 'profiles',
     title: '配置管理',
     group: '平台配置',
-    description: '部署配置：仓库、端口、HTTPS 与 Micdn',
+    description: '部署配置：仓库、端口、HTTPS、setline 与 Micdn',
     sort: 'name',
     filters: [{ key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
@@ -98,6 +98,10 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'key', label: 'Key', column: false, wide: true },
       { key: 'ip', label: 'IP', required: true, width: '13%' },
       { key: 'hostname', label: '域名', width: '16%' },
+      {
+        key: 'setlinePort', label: 'Setline 管理口端口', type: 'number', column: false, placeholder: '10080',
+        help: 'setline adminListen 的端口，如 10080；留空则生成的 server.xml 不含 <setline>。只写端口，basctl 固定连接 127.0.0.1:<port>；不要填对外 listen 的 8080',
+      },
       { key: 'proxyEngine', label: '代理类型', type: 'select', column: false, options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
       { key: 'httpPort', label: 'HTTP 端口', type: 'number', column: false },
       { key: 'maxconn', label: '最大连接数', type: 'number', column: false },

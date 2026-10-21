@@ -113,6 +113,7 @@ private Row[] profileRows() {
     row("1002", [
       "name": Json("prod"), "title": Json("生产配置"), "bas_version": Json("6.0.0"),
       "ip": Json("10.0.0.10"), "hostname": Json("prod.openurp.net"),
+      "setline_port": Json("10080"),
       "http_port": Json(80L), "https_port": Json(443L),
       "enable_https": Json(true), "force_https": Json(true), "maxconn": Json(60000L),
       "proxy_engine": Json("nginx"),

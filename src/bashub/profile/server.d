@@ -179,6 +179,12 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context,
     }
   }
   xml.put("  </webapps>\n");
+  auto setlinePort = setlinePortText(context.data);
+  if (setlinePort.length > 0) {
+    xml.put("  <setline port=\"");
+    xml.put(escapeXml(setlinePort));
+    xml.put("\"/>\n");
+  }
   xml.put("</bas>\n");
   return xml.data;
 }
@@ -193,6 +199,23 @@ private string numberText(Json resource, string attr) {
 
 private string boolText(bool value) {
   return value ? "true" : "false";
+}
+
+/// Profile.setlinePort 是 setline 管理口（adminListen）端口。留空表示不启用 setline；
+/// 非空时只输出端口，basctl 固定连接 127.0.0.1:<port>。
+private string setlinePortText(Json profile) {
+  auto text = attributeText(profile, "setlinePort").strip;
+  if (text.length == 0)
+    return "";
+  uint port;
+  try {
+    port = text.to!uint;
+  } catch (Exception) {
+    throw new Exception("Profile.setlinePort must be a port number (1-65535): " ~ text);
+  }
+  if (port == 0 || port > 65535)
+    throw new Exception("Profile.setlinePort must be a port number (1-65535): " ~ text);
+  return port.to!string;
 }
 
 private void putAttr(A)(ref A xml, string name, string value) {

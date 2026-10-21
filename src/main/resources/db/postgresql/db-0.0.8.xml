@@ -243,6 +243,7 @@
             <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="enableHttps?"/>
             <column name="force_https" type="boolean" nullable="false" defaultValue="true" comment="forceHttps?"/>
             <column name="hostname" type="varchar(255)" comment="hostname?"/>
+            <column name="setline_port" type="varchar(255)" comment="setlinePort?"/>
             <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="httpPort?"/>
             <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="httpsPort?"/>
             <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>

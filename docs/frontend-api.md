@@ -126,7 +126,7 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 |---|---|---|
 | `organizations` | Organization | 机构 |
 | `platforms` | Platform | 操作系统平台 |
-| `profiles` | Profile | 新建时填默认仓库；`sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥，编辑私钥时留空表示保持原值，管理台不回显私钥。Micdn 配置走专用聚合端点，不再是普通资源 |
+| `profiles` | Profile | 新建时填默认仓库；`setlinePort` 是 setline 管理口（`adminListen`）端口，留空即禁用并让生成的 `server.xml` 不含 `<setline>`；`sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥，编辑私钥时留空表示保持原值，管理台不回显私钥。Micdn 配置走专用聚合端点，不再是普通资源 |
 | `engines` | Engine | `type` 取 `tomcat-server`/`tomcat`/`undertow`/`jetty`/`any`（与 basctl 的 creator 同名）；`listeners`/`jars` 支持分隔符字符串；`jspSupport` 仅 `tomcat-server` 有效 |
 | `farms` | Farm | 群集 |
 | `servers` | Server | 群集实例 |
@@ -175,7 +175,7 @@ Freemarker 模板运行时，不属于 JSON:API。
 
 | URL | 说明 |
 |---|---|
-| `GET /api/bashub/config/{profile}/server` | 服务器/集群配置；`Authorization: Bearer <profile>:<profile.key>` 鉴权。不输出 `<setline>` 或通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
+| `GET /api/bashub/config/{profile}/server` | 服务器/集群配置；`Authorization: Bearer <profile>:<profile.key>` 鉴权。Profile 配置了 `setlinePort` 时输出 `<setline port="..."/>`，留空则不输出；setline 的 `listen` / `adminListen` 仍由节点自己的 setline 配置管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
 | `GET /api/bashub/config/{profile}/proxy` | 反向代理配置（haproxy/nginx，按 `profile.proxyEngine` 选择模板）；使用同样的 Profile 令牌。只输出所选引擎自身的合法配置，不混入 setline agent 配置；HAProxy 按请求 `path` 做 `map_beg` 路由，不再生成 Host 分组查找、path ACL 或 inline backend |
 | `GET /api/bashub/config/{profile}/certificate` | Profile 的 PEM 公钥证书（可含完整证书链）；使用同样的 Profile 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{profile}/certificate-key` | Profile 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |

@@ -163,6 +163,28 @@
             <article class="detail-card">
               <header class="detail-card__head">
                 <div>
+                  <h4>路由推送</h4>
+                  <p>basctl 从 server.xml 读取 setline 管理口，实例启停后同步路由。</p>
+                </div>
+                <t-tag :theme="setlinePort ? 'success' : 'default'" variant="light">
+                  {{ setlinePort ? '已启用' : '未启用' }}
+                </t-tag>
+              </header>
+              <div class="fact-grid">
+                <div class="fact">
+                  <span>管理口</span>
+                  <strong>{{ setlinePort ? `127.0.0.1:${setlinePort}` : '—' }}</strong>
+                </div>
+                <div class="fact">
+                  <span>server.xml</span>
+                  <strong>{{ setlinePort ? '已生成' : '未生成' }}</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="detail-card">
+              <header class="detail-card__head">
+                <div>
                   <h4>Setline Peers</h4>
                   <p>setline 从这里读取 web 节点与 micdn 节点的路由表。</p>
                 </div>
@@ -530,6 +552,7 @@ const profileTitle = computed(() => attrOf(profile.value, 'title'))
 const basVersion = computed(() => attrOf(profile.value, 'basVersion'))
 const ip = computed(() => attrOf(profile.value, 'ip'))
 const hostname = computed(() => attrOf(profile.value, 'hostname'))
+const setlinePort = computed(() => attrOf(profile.value, 'setlinePort'))
 const httpPort = computed(() => attrOf(profile.value, 'httpPort'))
 const httpsPort = computed(() => attrOf(profile.value, 'httpsPort'))
 const enableHttps = computed(() => boolOf(profile.value?.attributes.enableHttps))

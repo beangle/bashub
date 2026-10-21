@@ -81,7 +81,7 @@
 | 功能 | 状态 | 关键行为 |
 |---|---|---|
 | Profile 解析与令牌校验 | ✅ | `{profile}` 为 `org.name`；请求携带 Profile key，不再使用可伪造的 `ip` 头 |
-| `GET /config/server` | ✅ | farms / hosts / webapps / 被引用的 engines、servers、artifacts；不输出 setline 或通道凭证 |
+| `GET /config/server` | ✅ | farms / hosts / webapps / 被引用的 engines、servers、artifacts；Profile 配置 `setlinePort` 时输出 `<setline port>`，不输出通道凭证 |
 | `GET /config/proxy` | ✅ | 按 `proxyEngine` 输出 haproxy / nginx；用 Profile 令牌鉴权；haproxy 由 setline agent 生成 backend 与路由 map |
 | `GET /config/certificate` / `config/certificate-key` | ✅ | Profile 分别保存 PEM 公钥证书与私钥；机器端点用 Profile 令牌下载，管理台私钥脱敏；setline pull 落成 nginx 的 cert/key 与 haproxy 的 bundle |
 | `GET /config/setline-peers` | ✅ | 每个 Profile 都输出 sidecar peer 列表：web/Micdn 节点合并并按 URL 去重，没有节点时返回空数组；用 Profile 令牌鉴权 |
@@ -138,7 +138,7 @@
 | 功能 | 状态 | 说明 |
 |---|---|---|
 | 管理台 18 个资源的表映射 | ✅ | 与 `db-0.0.8.xml` 对齐 |
-| `0.0.8` 增量迁移 | ✅ | `cfg_webapps.urls` 已应用；废弃的 `cfg_profiles.setline_port` 已移除 |
+| `0.0.8` 增量迁移 | ✅ | `cfg_webapps.urls` 已应用；`0.0.8-11` 恢复 `cfg_profiles.setline_port`，用于生成 `<setline port>` |
 | D 侧 schema 漂移检查 | ✅ | 启动时告警；`--check-schema` 只检查并返回退出码 3 |
 | 约束冲突错误映射 | ✅ | 唯一键、外键转为 409，非空、检查约束转为 400 |
 

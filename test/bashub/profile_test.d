@@ -32,6 +32,7 @@ import vibe.data.json : Json, parseJsonString;
 
 import std.algorithm.searching : all, canFind;
 import std.ascii : isASCII;
+import std.exception : assertThrown;
 import std.string : indexOf;
 
 private Store newStore(out Registry reg) {
@@ -82,7 +83,7 @@ unittest {
   assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
   assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
   assert(!xml.canFind("<hub"));
-  assert(!xml.canFind("<setline"));
+  assert(xml.canFind(`<setline port="10080"/>`));
 
   assert(xml.canFind(`<engine name="tomcat" type="tomcat-server" version="10.1.42"`));
   assert(!xml.canFind("undertow"));
@@ -98,6 +99,23 @@ unittest {
   assert(xml.canFind(`uri="gav://org.beangle.bashub:bas-web:war:0.0.8"`));
   assert(xml.canFind(`path="/bas" run-at="prod-farm.app1,prod-farm.app2"`));
   assert(xml.canFind(`<url path="/bas"/>`));
+
+  ProfileContext demo;
+  assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", demo));
+  assert(!renderServerXml(store, reg, demo).canFind("<setline"));
+}
+
+@("server.xml rejects invalid setline ports") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  auto profiles = reg.find("profiles");
+  ProfileContext profile;
+
+  foreach (value; ["0", "70000", "not-a-port"]) {
+    assert(store.updateColumns(profiles, "1002", ["setline_port": Json(value)]));
+    assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+    assertThrown!Exception(renderServerXml(store, reg, profile));
+  }
 }
 
 @("peers contains web and micdn nodes")

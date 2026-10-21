@@ -81,6 +81,7 @@ comment on column bas.cfg_profiles."key" is 'key?';
 comment on column bas.cfg_profiles.enable_https is 'enableHttps?';
 comment on column bas.cfg_profiles.force_https is 'forceHttps?';
 comment on column bas.cfg_profiles.hostname is 'hostname?';
+comment on column bas.cfg_profiles.setline_port is 'setlinePort?';
 comment on column bas.cfg_profiles.http_port is 'httpPort?';
 comment on column bas.cfg_profiles.https_port is 'httpsPort?';
 comment on column bas.cfg_profiles.id is '非业务主键:datetime';
