@@ -8,7 +8,7 @@
 
 | 能力域 | 前缀 | 负责内容 |
 |---|---|---|
-| EMS | `/api/bashub/ems` | 菜单、channel、菜单关联资源，以及 EMS 运行时配置、会话和菜单 XML |
+| EMS | `/api/bashub/ems` | 应用、应用分组、菜单、channel、菜单关联资源，以及 EMS 运行时配置、会话和菜单 XML |
 | 平台配置 | `/api/bashub/config` | Profile、构件、群集、主机等平台配置资源，以及配置分发、代理、证书、setline 和主机脚本 |
 | Micdn | `/api/bashub/micdn` | Profile 的 Micdn 聚合配置、组件目录与 `micdn.xml` |
 | 监控 | `/api/bashub/monitor` | 在线节点、立即上报、日志、SSE 跟随、实例启停与 WebSocket 通道 |
@@ -31,14 +31,20 @@
 
 | 能力域 | 资源 |
 |---|---|
-| `/api/bashub/ems` | `channels`、`menus`、`resources` |
-| `/api/bashub/config` | `organizations`、`platforms`、`profiles`、`engines`、`farms`、`servers`、`hosts`、`artifacts`、`webapps`、`platform-features`、`platform-feature-scripts`、`apps`、`app-groups` |
+| `/api/bashub/ems` | `apps`、`app-groups`、`channels`、`menus`、`resources` |
+| `/api/bashub/config` | `organizations`、`platforms`、`profiles`、`engines`、`farms`、`servers`、`hosts`、`artifacts`、`webapps`、`platform-features`、`platform-feature-scripts` |
+
+管理台通用 CRUD 的 API 能力域与主表前缀一致：`bas.ems_*` → `ems`、`bas.cfg_*` → `config`、
+`bas.cdn_*` → `micdn` 专用端点。EMS 权限资源名使用不带 `/api/bashub` 根前缀的
+`/{能力域}/{资源}`，例如 `/ems/apps`、`/ems/app-groups`、`/config/profiles`。
+其中 `profile-micdn`、`profile-micdn-components` 虽是 `cfg_` 表，但不参与通用 CRUD，
+由 Profile 聚合的 `/api/bashub/micdn/profiles/{id}` 管理。
 
 所有接口在本文中都写完整路径，不再省略能力域前缀。API 路径必须带能力域；不存在
 `/api/bashub/{profile}`、`/api/bashub/{resource}` 这类无域兼容入口。
 
-SPA 页面路由与 API 能力域不强制一一对应：一个页面可以同时调用多个域的接口。旧前端路由只会由 Vue Router
-重定向到新页面，不是后端 API 别名。
+SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`、`/micdn/*`、`/monitor/*`。
+一个页面可以同时调用多个域的接口，但页面入口只注册当前域下的规范路径，不提供旧路径重定向。
 
 ## 启动期接口
 
@@ -56,24 +62,24 @@ SPA 页面路由与 API 能力域不强制一一对应：一个页面可以同�
 | 前端路由 | 页面/资源 | 资源基路径 | 额外接口或说明 |
 |---|---|---|---|
 | `/home` | 概览，`HomeView` | 无 | 只提供页面导航；启动期使用 `configs` / `sessions` |
-| `/org-config?tab=profiles` | 配置管理，`profiles` | `/api/bashub/config/profiles` | — |
-| `/org-config?tab=organizations` | 机构管理，`organizations` | `/api/bashub/config/organizations` | — |
-| `/engines` | 引擎管理，`engines` | `/api/bashub/config/engines` | — |
-| `/farm-hosts?tab=farms` | 群集管理，`farms` | `/api/bashub/config/farms` | 行内“维护”跳到 `/servers?farm={id}` |
-| `/farm-hosts?tab=hosts` | 主机管理，`hosts` | `/api/bashub/config/hosts` | 名称链接跳到 `/hosts/{id}` |
-| `/servers`（含 `/servers?farm={id}`） | 服务管理，`servers` | `/api/bashub/config/servers` | 从属页面，不单独占菜单 |
-| `/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 批量刷新版本：`POST /api/bashub/config/artifacts/update-version` |
-| `/webapps` | 应用部署，`webapps` | `/api/bashub/config/webapps` | 批量升级：`POST /api/bashub/config/webapps/upgrade` |
-| `/platform-ops?tab=platform-features` | 平台功能，`platform-features` | `/api/bashub/config/platform-features` | 名称链接跳到 `/platform-features/{id}` |
-| `/platform-ops?tab=platforms` | 平台管理，`platforms` | `/api/bashub/config/platforms` | — |
-| `/app-config?tab=apps` | 应用管理，`apps` | `/api/bashub/config/apps` | — |
-| `/app-config?tab=channels` | 应用端，`channels` | `/api/bashub/ems/channels` | — |
-| `/app-config?tab=app-groups` | 应用分组，`app-groups` | `/api/bashub/config/app-groups` | — |
-| `/menu-config?tab=menus` | 菜单管理，`menus` | `/api/bashub/ems/menus` | 导出、导入及支持 `indexno` 重排的新增/修改接口见下文 |
-| `/menu-config?tab=resources` | 资源管理，`resources` | `/api/bashub/ems/resources` | 列表 CSV 由前端生成，不调用后端 |
+| `/config/org-config?tab=profiles` | 配置管理，`profiles` | `/api/bashub/config/profiles` | 名称链接跳到 `/config/profiles/{id}` |
+| `/config/org-config?tab=organizations` | 机构管理，`organizations` | `/api/bashub/config/organizations` | — |
+| `/config/platform-ops?tab=platform-features` | 平台功能，`platform-features` | `/api/bashub/config/platform-features` | 卡片链接跳到 `/config/platform-features/{id}` |
+| `/config/platform-ops?tab=platforms` | 平台管理，`platforms` | `/api/bashub/config/platforms` | — |
+| `/config/farm-hosts?tab=farms` | 群集管理，`farms` | `/api/bashub/config/farms` | 行内“维护”跳到 `/config/servers?farm={id}` |
+| `/config/farm-hosts?tab=hosts` | 主机管理，`hosts` | `/api/bashub/config/hosts` | 名称链接跳到 `/config/hosts/{id}` |
+| `/config/servers`（含 `?farm={id}`） | 服务管理，`servers` | `/api/bashub/config/servers` | 从属页面，不单独占菜单 |
+| `/config/engines` | 引擎管理，`engines` | `/api/bashub/config/engines` | — |
+| `/config/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 批量刷新版本：`POST /api/bashub/config/artifacts/update-version` |
+| `/config/webapps` | 应用部署，`webapps` | `/api/bashub/config/webapps` | 批量升级：`POST /api/bashub/config/webapps/upgrade` |
+| `/ems/app-config?tab=apps` | 应用管理，`apps` | `/api/bashub/ems/apps` | — |
+| `/ems/app-config?tab=channels` | 应用端，`channels` | `/api/bashub/ems/channels` | — |
+| `/ems/app-config?tab=app-groups` | 应用分组，`app-groups` | `/api/bashub/ems/app-groups` | — |
+| `/ems/menu-config?tab=menus` | 菜单管理，`menus` | `/api/bashub/ems/menus` | 导出、导入及支持 `indexno` 重排的新增/修改接口见下文 |
+| `/ems/menu-config?tab=resources` | 资源管理，`resources` | `/api/bashub/ems/resources` | 列表 CSV 由前端生成，不调用后端 |
 
-`ResourceTabsView` 只是带页签的容器；实际请求由当前页签对应的 `ResourceListView` 按上表发出。
-前端 `resourceApiPath()` 按资源名选择 `ems` / `config`，因此同一个页签组可以调用两个域。
+页面保持原有页签组织方式，页签组路由带所属能力域前缀；组内资源仍分别调用自己的
+`ems` / `config` API。旧的无域页签组路径和资源独立页面入口都不再注册。
 表单和筛选器中的引用下拉会调用对应资源的搜索接口，例如
 `GET /api/bashub/config/profiles/search?page[size]=300&sort=name`。
 
@@ -81,15 +87,15 @@ SPA 页面路由与 API 能力域不强制一一对应：一个页面可以同�
 
 | 前端路由 | 页面 | 后端 API |
 |---|---|---|
-| `/profiles/:id` | 配置详情，`ProfileDetailView` | `GET /api/bashub/config/profiles/{id}?include=org`<br>`GET /api/bashub/config/farms/search?filter[farm.profile.id]={id}&include=engine`<br>`GET /api/bashub/config/hosts/search?filter[host.profile.id]={id}`<br>`GET /api/bashub/config/webapps/search?filter[webapp.profile.id]={id}&include=artifact`<br>`GET /api/bashub/config/servers/search?filter[server.farm.id]={farmIds}&include=farm,host`<br>`GET /api/bashub/monitor/agents/status`<br>`GET /api/bashub/config/profiles/{id}/proxy`<br>`GET /api/bashub/config/profiles/{id}/server`<br>`GET /api/bashub/config/profiles/{id}/setline-peers`<br>`GET /api/bashub/micdn/profiles/{id}` |
-| `/profiles/:id/micdn` | Micdn 配置，`MicdnProfileView` | `GET /api/bashub/micdn/profiles/{id}`<br>`PATCH /api/bashub/micdn/profiles/{id}`<br>`GET /api/bashub/micdn/profiles/{id}/micdn.xml` |
-| `/cdn-components` | Micdn 组件目录，`CdnComponentsView` | `GET /api/bashub/micdn/components`<br>`POST /api/bashub/micdn/components`<br>`PATCH /api/bashub/micdn/components/{id}`<br>`DELETE /api/bashub/micdn/components/{id}` |
-| `/platform-features/:id` | 平台功能详情，`PlatformFeatureDetailView` | `GET /api/bashub/config/platform-features/{id}`、`PATCH /api/bashub/config/platform-features/{id}`<br>`GET /api/bashub/config/platform-features/search`<br>`GET /api/bashub/config/platforms/search`<br>`GET /api/bashub/config/platform-feature-scripts/search?filter[platformFeatureScript.feature.id]={id}`<br>`POST /api/bashub/config/platform-feature-scripts`<br>`PATCH /api/bashub/config/platform-feature-scripts/{id}`、`DELETE /api/bashub/config/platform-feature-scripts/{id}` |
-| `/hosts/:id` | 主机详情，`HostDetailView` | `GET /api/bashub/config/hosts/{id}?include=profile,profile.org,platform,features`<br>`GET /api/bashub/config/servers/search?filter[server.host.id]={id}&include=farm`<br>`GET /api/bashub/config/hosts/{id}/webapps?include=artifact`<br>脚本下载：`GET /api/bashub/config/{profile}/script/{hostIp}.sh` |
-| `/agents` | 在线节点，`AgentView` | `GET /api/bashub/monitor/agents/status`<br>`POST /api/bashub/monitor/agents/{profile}/report`<br>`POST /api/bashub/monitor/agents/{profile}/service/{action}`，`action` 为 `start` / `stop` / `restart`<br>`GET /api/bashub/monitor/agents/{profile}/log?instance=...`<br>SSE：`GET /api/bashub/monitor/agents/{profile}/log/follow?instance=...&tail=...` |
+| `/config/profiles/:id` | 配置详情，`ProfileDetailView` | `GET /api/bashub/config/profiles/{id}?include=org`<br>`GET /api/bashub/config/farms/search?filter[farm.profile.id]={id}&include=engine`<br>`GET /api/bashub/config/hosts/search?filter[host.profile.id]={id}`<br>`GET /api/bashub/config/webapps/search?filter[webapp.profile.id]={id}&include=artifact`<br>`GET /api/bashub/config/servers/search?filter[server.farm.id]={farmIds}&include=farm,host`<br>`GET /api/bashub/monitor/agents/status`<br>`GET /api/bashub/config/profiles/{id}/proxy`<br>`GET /api/bashub/config/profiles/{id}/server`<br>`GET /api/bashub/config/profiles/{id}/setline-peers`<br>`GET /api/bashub/micdn/profiles/{id}` |
+| `/micdn/profiles/:id` | Micdn 配置，`MicdnProfileView` | `GET /api/bashub/micdn/profiles/{id}`<br>`PATCH /api/bashub/micdn/profiles/{id}`<br>`GET /api/bashub/micdn/profiles/{id}/micdn.xml` |
+| `/micdn/components` | Micdn 组件目录，`CdnComponentsView` | `GET /api/bashub/micdn/components`<br>`POST /api/bashub/micdn/components`<br>`PATCH /api/bashub/micdn/components/{id}`<br>`DELETE /api/bashub/micdn/components/{id}` |
+| `/config/platform-features/:id` | 平台功能详情，`PlatformFeatureDetailView` | `GET /api/bashub/config/platform-features/{id}`、`PATCH /api/bashub/config/platform-features/{id}`<br>`GET /api/bashub/config/platform-features/search`<br>`GET /api/bashub/config/platforms/search`<br>`GET /api/bashub/config/platform-feature-scripts/search?filter[platformFeatureScript.feature.id]={id}`<br>`POST /api/bashub/config/platform-feature-scripts`<br>`PATCH /api/bashub/config/platform-feature-scripts/{id}`、`DELETE /api/bashub/config/platform-feature-scripts/{id}` |
+| `/config/hosts/:id` | 主机详情，`HostDetailView` | `GET /api/bashub/config/hosts/{id}?include=profile,profile.org,platform,features`<br>`GET /api/bashub/config/servers/search?filter[server.host.id]={id}&include=farm`<br>`GET /api/bashub/config/hosts/{id}/webapps?include=artifact`<br>脚本下载：`GET /api/bashub/config/{profile}/script/{hostIp}.sh` |
+| `/monitor/agents` | 在线节点，`AgentView` | `GET /api/bashub/monitor/agents/status`<br>`POST /api/bashub/monitor/agents/{profile}/report`<br>`POST /api/bashub/monitor/agents/{profile}/service/{action}`，`action` 为 `start` / `stop` / `restart`<br>`GET /api/bashub/monitor/agents/{profile}/log?instance=...`<br>SSE：`GET /api/bashub/monitor/agents/{profile}/log/follow?instance=...&tail=...` |
 
-`/profiles/:id` 只有在存在群集时才请求 `servers/search`；`{farmIds}` 是这些群集 id 的逗号分隔值。
-主机详情页的脚本下载使用机器端点，不在 `/hosts` 资源下；这里的 `{profile}` 是配置的
+`/config/profiles/:id` 只有在存在群集时才请求 `servers/search`；`{farmIds}` 是这些群集 id 的逗号分隔值。
+主机详情页的脚本下载使用机器端点，不在 `/config/hosts` 资源下；这里的 `{profile}` 是配置的
 `qualifiedName`，`{hostIp}` 是该主机的 IP。
 
 ## 通用资源 CRUD
@@ -125,11 +131,11 @@ EMS 自身资源使用 `ems` 域：
 
 | API | 使用页面 | 说明 |
 |---|---|---|
-| `POST /api/bashub/config/artifacts/update-version` | `/artifacts` | Body 为 `{"ids":[...]}`，从 Maven Central 刷新所选组件的最新版本 |
-| `POST /api/bashub/config/webapps/upgrade` | `/webapps` | Body 为 `{"ids":[...]}`，把所选应用版本提升到组件的 `latestVersion` |
-| `GET /api/bashub/config/hosts/{id}/webapps?include=artifact` | `/hosts/:id` | 查询部署到该主机上的应用 |
-| `GET /api/bashub/ems/menus/export?app={appId}` | `/menu-config?tab=menus` | 返回 `{"xml":"..."}` |
-| `POST /api/bashub/ems/menus/import` | `/menu-config?tab=menus` | `multipart/form-data`，字段 `app` + `menufile` |
+| `POST /api/bashub/config/artifacts/update-version` | `/config/artifacts` | Body 为 `{"ids":[...]}`，从 Maven Central 刷新所选组件的最新版本 |
+| `POST /api/bashub/config/webapps/upgrade` | `/config/webapps` | Body 为 `{"ids":[...]}`，把所选应用版本提升到组件的 `latestVersion` |
+| `GET /api/bashub/config/hosts/{id}/webapps?include=artifact` | `/config/hosts/:id` | 查询部署到该主机上的应用 |
+| `GET /api/bashub/ems/menus/export?app={appId}` | `/ems/menu-config?tab=menus` | 返回 `{"xml":"..."}` |
+| `POST /api/bashub/ems/menus/import` | `/ems/menu-config?tab=menus` | `multipart/form-data`，字段 `app` + `menufile` |
 
 不能把 `POST /api/bashub/{group}/{resource}/{action}` 当作所有资源的通用约定；批量动作是逐项登记的。
 
@@ -160,29 +166,13 @@ EMS 自身资源使用 `ems` 域：
 
 机器端点的鉴权和配置分发细节见 [`frontend-api.md`](frontend-api.md)。
 
-## 旧 SPA 路由重定向
-
-资源被页签组合并后，旧列表路径仍可由前端访问，并会带上原有查询条件重定向到新页签。这里只涉及浏览器页面路由，
-不会在后端生成同名的无域 API：
-
-| 旧前端路由 | 新前端路由 |
-|---|---|
-| `/profiles`、`/organizations` | `/org-config?tab=profiles`、`/org-config?tab=organizations` |
-| `/platform-features`、`/platforms` | `/platform-ops?tab=platform-features`、`/platform-ops?tab=platforms` |
-| `/farms`、`/hosts` | `/farm-hosts?tab=farms`、`/farm-hosts?tab=hosts` |
-| `/apps`、`/channels`、`/app-groups` | `/app-config?tab=apps`、`/app-config?tab=channels`、`/app-config?tab=app-groups` |
-| `/menus`、`/resources` | `/menu-config?tab=menus`、`/menu-config?tab=resources` |
-
-`/profiles/:id`、`/hosts/:id`、`/platform-features/:id` 是详情页，不参与上述列表重定向。旧路径 `/profiles`
-只是 SPA 重定向，对应 API 是 `/api/bashub/config/profiles/...`，而不是 `/api/bashub/profiles/...`。
-
 ## 维护来源
 
 | 内容 | 来源 |
 |---|---|
 | API 能力域与 EMS 资源集合 | `src/bashub/api.d` |
 | 前端路由 | `packages/web/src/router/index.ts` |
-| 资源路径、页签组和表单元数据 | `packages/web/src/resources/index.ts` |
+| 资源路径和表单元数据 | `packages/web/src/resources/index.ts` |
 | 前端资源域选择 | `packages/web/src/api/prefix.ts` 的 `resourceApiPath()` |
 | 前端 API 封装 | `packages/web/src/api/` |
 | 后端路由注册 | `src/bashub/route.d` 的 `buildHubRouter` |

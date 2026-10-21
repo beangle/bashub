@@ -1,3 +1,4 @@
+import { apiPath, resourceApiPath } from '@/api/prefix'
 import type { ResourceRef, ResourceSchema, ResourceTabGroup } from './types'
 
 const organizationRef: ResourceRef = { path: '/organizations', type: 'organizations', labelFields: ['name', 'title'] }
@@ -55,7 +56,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '机构名称、简称与 Logo',
     sort: 'name',
-    menu: false,
     filters: [{ key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
       { key: 'name', label: '名称', required: true, width: 160 },
@@ -73,7 +73,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '操作系统平台及其主版本',
     sort: 'name',
-    menu: false,
     filters: [{ key: 'name', label: '名称' }, { key: 'majorVersion', label: '主版本' }],
     fields: [
       { key: 'name', label: '名称', required: true },
@@ -90,10 +89,9 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '部署配置：仓库、端口、HTTPS 与 Micdn',
     sort: 'name',
-    menu: false,
     filters: [{ key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
-      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: '/profiles/{id}', text: '{qualifiedName}', target: '_self' } },
+      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/profiles/{id}'), text: '{qualifiedName}', target: '_self' } },
       { key: 'title', label: '说明', required: true, cell: { type: 'join', fields: ['org.shortTitle', 'title'], separator: '' } },
       { key: 'org', label: '机构', type: 'ref', ref: organizationRef, column: false },
       { key: 'basVersion', label: '版本', required: true, width: '8%' },
@@ -125,8 +123,8 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'remoteRepo', label: '远程仓库', column: false, width: 260 },
     ],
     drawerLinks: [
-      { label: '配置详情', to: '/profiles/{id}' },
-      { label: 'Micdn 配置', to: '/profiles/{id}/micdn' },
+      { label: '配置详情', to: resourceApiPath('/profiles/{id}') },
+      { label: 'Micdn 配置', to: apiPath('micdn', '/profiles/{id}') },
     ],
   },
   {
@@ -163,7 +161,6 @@ export const resourceSchemas: ResourceSchema[] = [
     title: '群集管理',
     group: '平台配置',
     description: '同一配置下的引擎与进程参数',
-    menu: false,
     sort: 'name',
     filters: [{ key: 'name', label: '名称' }, { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true }],
     fields: [
@@ -184,12 +181,12 @@ export const resourceSchemas: ResourceSchema[] = [
       },
       {
         key: 'serverLink', label: '操作', form: false, sortable: false, width: '7%',
-        cell: { type: 'link', href: '/servers?farm={id}', text: '维护', target: '_self' },
+        cell: { type: 'link', href: `${resourceApiPath('/servers')}?farm={id}`, text: '维护', target: '_self' },
       },
       { key: 'proxyOptions', label: '代理配置', type: 'textarea', column: false },
     ],
     // 服务是群集的从属资源（原 farm/form.ftl 的「服务配置」页签、farm/list.ftl 的「维护」链接）。
-    drawerLinks: [{ label: '维护服务', to: '/servers?farm={id}' }],
+    drawerLinks: [{ label: '维护服务', to: `${resourceApiPath('/servers')}?farm={id}` }],
   },
   {
     key: 'servers',
@@ -220,12 +217,11 @@ export const resourceSchemas: ResourceSchema[] = [
     title: '主机管理',
     group: '平台配置',
     description: '主机规格与操作系统特性',
-    menu: false,
     sort: 'name',
     filters: [{ key: 'name', label: '名称' }, { key: 'ip', label: 'IP' }, { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true }],
     fields: [
       // 列标题与宽度对齐原 host/list.ftl：名称10% IP地址13% 操作系统12% 系统特性(auto) 内存8% 平台10% CPU核心8% CPU规格20%。
-      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: '/hosts/{id}', text: '{name}', target: '_self' } },
+      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/hosts/{id}'), text: '{name}', target: '_self' } },
       { key: 'ip', label: 'IP', columnTitle: 'IP地址', required: true, width: '13%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true, column: false },
@@ -327,7 +323,6 @@ export const resourceSchemas: ResourceSchema[] = [
     description: '操作系统功能检查与安装脚本集合',
     sort: 'name',
     layout: 'cards',
-    menu: false,
     filters: [{ key: 'name', label: '名称' }],
     fields: [
       { key: 'name', label: '名称', required: true },
@@ -337,7 +332,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'description', label: '描述', type: 'textarea', column: true },
     ],
     // 卡片点进详情页：功能自身与它的脚本就地维护（原 platformFeature/info.ftl，见 PlatformFeatureDetailView）。
-    cardLink: '/platform-features/{id}',
+    cardLink: resourceApiPath('/platform-features/{id}'),
   },
   {
     key: 'apps',
@@ -348,7 +343,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: 'EMS 应用登记与依赖',
     sort: 'name',
-    menu: false,
     filters: [{ key: 'group', label: '分组', type: 'ref', ref: { path: '/app-groups', type: 'appGroups', labelFields: ['title'] } }, { key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
       { key: 'name', label: '名称', required: true },
@@ -367,7 +361,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: '应用的部署上下文与嵌入方式',
     sort: 'base',
-    menu: false,
     filters: [
       { key: 'app', label: '应用', type: 'ref', ref: appRef, required: true },
       { key: 'channelType', label: '端类型', type: 'select', options: channelTypeOptions },
@@ -390,7 +383,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: 'EMS 应用分组',
     sort: 'name',
-    menu: false,
     filters: [{ key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
       { key: 'name', label: '名称', required: true },
@@ -406,7 +398,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: '应用的菜单树、入口与使用资源',
     sort: 'indexno',
-    menu: false,
     xmlTools: true,
     tree: true,
     filters: [
@@ -443,7 +434,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: '应用的权限资源',
     sort: 'name',
-    menu: false,
     exportable: true,
     filters: [{ key: 'app', label: '应用', type: 'ref', ref: appRef }, { key: 'name', label: '名称' }, { key: 'scope', label: '范围', type: 'select', options: scopeOptions }],
     fields: [
@@ -461,15 +451,13 @@ export const resourceSchemas: ResourceSchema[] = [
 ]
 
 /**
- * 页签合成页：这些资源不再单独占菜单项，而是收进一个菜单项、页面内用页签切换
- * （`ResourceListView` 收到 `tabs` 时会在页头下方渲染 `UnderlineTabs`）。
- * 页签第一个即默认页签；菜单项落在分组里**最先出现的成员**的位置上（与页签顺序无关），
- * 各页签资源的旧路径由路由重定向到本页。
+ * 页签合成页：资源仍按能力域提供独立 API，但页面保持原有页签组织方式。
+ * 组路径带能力域前缀，旧的无域路径不再注册。
  */
 export const resourceTabGroups: ResourceTabGroup[] = [
   {
     key: 'org-config',
-    path: '/org-config',
+    path: apiPath('config', '/org-config'),
     title: '配置与机构',
     group: '平台配置',
     description: '机构及其部署配置',
@@ -480,7 +468,7 @@ export const resourceTabGroups: ResourceTabGroup[] = [
   },
   {
     key: 'platform-ops',
-    path: '/platform-ops',
+    path: apiPath('config', '/platform-ops'),
     title: '平台与功能',
     group: '平台配置',
     description: '操作系统平台及其功能脚本',
@@ -491,11 +479,10 @@ export const resourceTabGroups: ResourceTabGroup[] = [
   },
   {
     key: 'farm-hosts',
-    path: '/farm-hosts',
+    path: apiPath('config', '/farm-hosts'),
     title: '群集与主机',
     group: '平台配置',
     description: '配置下的群集与运行主机',
-    // 群集在前、主机在后。
     tabs: [
       { key: 'farms', label: '群集管理' },
       { key: 'hosts', label: '主机管理' },
@@ -503,11 +490,10 @@ export const resourceTabGroups: ResourceTabGroup[] = [
   },
   {
     key: 'app-config',
-    path: '/app-config',
+    path: apiPath('ems', '/app-config'),
     title: '应用配置',
     group: '应用与菜单',
     description: 'EMS 应用、端与分组',
-    // 应用在前、分组在后；应用端挂在应用之下（每个应用可有 PC/移动等多端）。
     tabs: [
       { key: 'apps', label: '应用管理' },
       { key: 'channels', label: '应用端' },
@@ -516,11 +502,10 @@ export const resourceTabGroups: ResourceTabGroup[] = [
   },
   {
     key: 'menu-config',
-    path: '/menu-config',
+    path: apiPath('ems', '/menu-config'),
     title: '菜单与资源',
     group: '应用与菜单',
     description: '应用的菜单树与权限资源',
-    // 与旧菜单一致：菜单在前、资源在后。
     tabs: [
       { key: 'menus', label: '菜单管理' },
       { key: 'resources', label: '资源管理' },

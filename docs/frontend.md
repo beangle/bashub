@@ -150,32 +150,27 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   （键 `bashub.filter.<schema key>.<字段 key>`，本页即 `bashub.filter.menus.app`，对应旧 cookie `menu.app.id`），
   记忆值若已不在下拉选项里（应用被删）会被丢弃；只有唯一选项时直接选中它。
   导出/导入 XML 按钮同样以「应用已选」为前置条件。
-- 从属页面：`menu: false` 但**不被页签组收录**的资源保留独立路由、只是不进菜单，入口放在父资源页上。
+- 从属页面：`menu: false` 的资源保留独立路由、只是不进菜单，入口放在父资源页上。
   当前是 `servers`（服务管理）：对应原 `farm/form.ftl` 的「服务配置」页签 + `farm/list.ftl` 的「维护」链接，
-  入口在群集列表行的「维护」（`/servers?farm=<id>`）与群集编辑抽屉底部的「相关页面」（`schema.drawerLinks`，
+  入口在群集列表行的「维护」（`/config/servers?farm=<id>`）与群集编辑抽屉底部的「相关页面」（`schema.drawerLinks`，
   `{属性}` 按当前行取值填充，只在编辑已有记录时出现）。子页面靠 `ResourceListView` 的 URL 查询条件预填左侧查询面板，
   新建时同一 key 的单选 `ref` 字段也默认取该值（原 UI 用隐藏域锁定父对象，如 `server.farm.id`）。
-- 平台功能详情页 `/platform-features/:id`（`PlatformFeatureDetailView.vue`，对应原 `platformFeature/info.ftl`）：
+- 平台功能详情页 `/config/platform-features/:id`（`PlatformFeatureDetailView.vue`，对应原 `platformFeature/info.ftl`）：
   卡片墙由 `schema.cardLink` 指过来（卡片点击进详情，不再开抽屉），页面里功能自身「修改」就地编辑，
   每个平台一份脚本就地查看/修改、就地保存与删除，标题栏右侧「增加脚本」追加一行编辑态。
   脚本按 `filter[platformFeatureScript.feature.id]=<id>` 拉取（别名即实体简单名），平台下拉取
   `/api/bashub/config/platforms`；写入走 JSON:API 的
   `POST/PATCH/DELETE /api/bashub/config/platform-feature-scripts`。该资源因此**没有独立列表页**，
   SPA 里也不再有对应的 schema。
-- Profile 详情页 `/profiles/:id`（`ProfileDetailView.vue`）：从配置列表的名称列或编辑抽屉进入，
+- Profile 详情页 `/config/profiles/:id`（`ProfileDetailView.vue`）：从配置列表的名称列或编辑抽屉进入，
   左侧导航切换概览、Haproxy/Nginx、Setline、证书、BAS 服务与 Micdn，右侧以卡片展示配置和关联资源；
   `?section=setline` 等查询参数可直达对应分区。
-- 页签合成页：`resourceTabGroups` 把若干资源列表收进**一个菜单项**、页面内用页签切换。当前四组：
-  `配置与机构`（`/org-config`，收 `profiles` + `organizations`）、`平台与功能`（`/platform-ops`，
-  收 `platform-features` + `platforms`，页签顺序沿用原 `config/platform/nav.ftl` 的「系统特性→操作系统」）、
-  `应用配置`（`/app-config`，收 `apps` + `channels` + `app-groups`，应用端即 app 的部署上下文/嵌入方式）、
-  `菜单与资源`（`/menu-config`，收 `menus` + `resources`）。
-  第一个页签即默认页签，路由 `<组路径>?tab=<资源 key>`；组 key 与成员资源 key 不重名。
-  菜单项落在分组里**最先出现的成员**的位置上，与页签顺序无关。被收录的资源标 `menu: false`
-  不再单列菜单；`ResourceListView` 收到 `tabs` 时在页头下方渲染 `@beangle/bui-vue` 的 `UnderlineTabs`，
-  样式需在 `main.ts` 引 `@beangle/bui-vue/styles/underline-tabs.css`。页签状态只认 URL 的 `?tab=`，
-  刷新/收藏/前进后退一致；各页签资源自己的旧路径（`/organizations`、`/profiles`）由路由重定向到本页，
-  重定向会**带上原有查询条件**（如 `/menus?app=<id>` 落到菜单页签后仍按该应用过滤，导出按钮据此可用）。
+- 资源列表保持原有页签组织方式，页签组路由带能力域前缀：
+  `/config/org-config`、`/config/platform-ops`、`/config/farm-hosts`、`/ems/app-config`、
+  `/ems/menu-config`。组内每个页签仍调用对应资源的 `config` / `ems` API；独立资源只有未入组的
+  `engines`、`artifacts`、`webapps` 和从属页面 `servers`。Micdn 聚合页使用
+  `/micdn/profiles/:id`、`/micdn/components`，监控使用 `/monitor/agents`。
+  旧的无域页签组路径和资源独立页面入口都不注册，也没有重定向。
 
 ## 接口
 

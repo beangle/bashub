@@ -23,7 +23,7 @@ const defaultTab = group.tabs[0]?.key || ''
 const route = useRoute()
 const router = useRouter()
 
-/** URL 上的 ?tab= 是唯一状态源：刷新/收藏/前进后退都能落到同一个页签。 */
+/** URL 上的 ?tab= 是唯一状态源：刷新、收藏与前进后退都落到同一个页签。 */
 function tabFromRoute(): string | undefined {
   const value = route.query.tab
   const key = Array.isArray(value) ? value[0] : value

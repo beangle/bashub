@@ -134,8 +134,8 @@ const NEW_SCRIPT_ID = '__new__'
 
 const route = useRoute()
 const featureId = String(route.params.id || '')
-/** 返回列表：平台功能是 `平台与功能` 页签组里的第一个页签。 */
-const listPath = '/platform-ops?tab=platform-features'
+/** 返回平台功能列表。 */
+const listPath = '/config/platform-ops?tab=platform-features'
 
 const feature = ref<ResourceRow>()
 const features = ref<ResourceRow[]>([])

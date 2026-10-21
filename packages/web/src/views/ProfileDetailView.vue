@@ -9,7 +9,7 @@
             <code v-if="qualifiedName">{{ qualifiedName }}</code>
             <span v-if="basVersion"> · BAS {{ basVersion }}</span>
           </p>
-          <router-link class="detail-back" to="/org-config?tab=profiles">← 返回配置管理</router-link>
+          <router-link class="detail-back" to="/config/org-config?tab=profiles">← 返回配置管理</router-link>
         </div>
       </div>
     </div>
@@ -259,7 +259,7 @@
                   <h4>在线节点与实例</h4>
                   <p>只显示 profile 与当前配置一致的 basctl agent。</p>
                 </div>
-                <router-link class="card-link" to="/agents">在线节点</router-link>
+                <router-link class="card-link" to="/monitor/agents">在线节点</router-link>
               </header>
               <p v-if="warnings.agents" class="load-error">{{ warnings.agents }}</p>
               <table v-else-if="instanceRows.length > 0" class="detail-table">
@@ -592,7 +592,7 @@ watch(activeSection, (value) => {
 })
 
 function openMicdn() {
-  void router.push(`/profiles/${profileId}/micdn`)
+  void router.push(`/micdn/profiles/${profileId}`)
 }
 
 function attrOf(row: ResourceRow | undefined, key: string): string {

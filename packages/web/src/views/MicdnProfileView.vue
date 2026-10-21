@@ -2,12 +2,12 @@
   <section class="page-panel">
     <div class="page-head">
       <div>
-        <router-link class="detail-back" to="/org-config?tab=profiles">← 返回配置管理</router-link>
+        <router-link class="detail-back" to="/config/org-config?tab=profiles">← 返回配置管理</router-link>
         <h2 class="page-title">{{ profileTitle }}</h2>
         <p class="page-subtitle">{{ doc?.profile.title || 'Micdn 部署配置' }}</p>
       </div>
       <div class="page-actions">
-        <t-button variant="outline" @click="router.push('/cdn-components')">组件目录</t-button>
+        <t-button variant="outline" @click="router.push('/micdn/components')">组件目录</t-button>
         <t-button variant="outline" :disabled="!doc" @click="copyXml">复制 XML</t-button>
         <t-button variant="outline" tag="a" :href="downloadUrl" :disabled="!doc">下载 XML</t-button>
         <t-button theme="primary" :loading="saving" :disabled="!doc" @click="save">保存</t-button>

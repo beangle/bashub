@@ -125,8 +125,10 @@ private HubConfig authConfig() {
 
 private AuthorityDomain testDomain() {
   return authorityDomain([
-    Authority("/api/bashub/config/profiles", Scope.private_, ["ROLE_ADMIN"]),
-    Authority("/api/bashub/config/hosts", Scope.protected_, []),
+    Authority("/config/profiles", Scope.private_, ["ROLE_ADMIN"]),
+    Authority("/config/hosts", Scope.protected_, []),
+    Authority("/ems/apps", Scope.private_, ["ROLE_ADMIN"]),
+    Authority("/ems/app-groups", Scope.private_, ["ROLE_ADMIN"]),
   ]);
 }
 
@@ -205,6 +207,19 @@ unittest {
   rootAccount.isRoot = true;
   repo.put(new Session("root", rootAccount, nowSeconds(), new Agent(), 1800));
   assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search", "EMS_SID=root").status == 200);
+}
+
+@("EMS 权限资源名不带 /api/bashub 前缀")
+unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
+  auto router = securedRouter(authConfig(), repo, testDomain());
+
+  auto apps = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/apps/search", "EMS_SID=admin");
+  assert(apps.status == 200, apps.body);
+
+  auto groups = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/app-groups/search", "EMS_SID=admin");
+  assert(groups.status == 200, groups.body);
 }
 
 @("CAS ticket 登录会把 authorities 映射进账户并访问 Private 资源")

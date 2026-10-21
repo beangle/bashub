@@ -22,46 +22,46 @@ private Session sessionOf(string[] authorities, string[] permissions = null, boo
 
 private AuthorityDomain sampleDomain() {
   return authorityDomain([
-    Authority("/api/bashub/public", Scope.public_, []),
-    Authority("/api/bashub/protected", Scope.protected_, []),
-    Authority("/api/bashub/private", Scope.private_, ["ROLE_ADMIN"]),
+    Authority("/config/public", Scope.public_, []),
+    Authority("/config/protected", Scope.protected_, []),
+    Authority("/config/private", Scope.private_, ["ROLE_ADMIN"]),
   ]);
 }
 
 @("Public 匿名可访问，Protected/Private 匿名拒绝")
 unittest {
   auto domain = sampleDomain();
-  assert(domain.permits("/api/bashub/public", "get", null));
-  assert(!domain.permits("/api/bashub/protected", "get", null));
-  assert(!domain.permits("/api/bashub/private", "get", null));
+  assert(domain.permits("/config/public", "get", null));
+  assert(!domain.permits("/config/protected", "get", null));
+  assert(!domain.permits("/config/private", "get", null));
 }
 
 @("未登记资源按 unknownIsProtected 只要求登录")
 unittest {
   auto domain = sampleDomain();
-  assert(!domain.permits("/api/bashub/unknown", "get", null));
-  assert(domain.permits("/api/bashub/unknown", "get", sessionOf(["ROLE_USER"])));
+  assert(!domain.permits("/config/unknown", "get", null));
+  assert(domain.permits("/config/unknown", "get", sessionOf(["ROLE_USER"])));
 }
 
 @("Private 需要角色命中，root 直接放行")
 unittest {
   auto domain = sampleDomain();
-  assert(!domain.permits("/api/bashub/private", "get", sessionOf(["ROLE_USER"])));
-  assert(domain.permits("/api/bashub/private", "get", sessionOf(["ROLE_ADMIN"])));
-  assert(domain.permits("/api/bashub/private", "get", sessionOf([], null, true)));
+  assert(!domain.permits("/config/private", "get", sessionOf(["ROLE_USER"])));
+  assert(domain.permits("/config/private", "get", sessionOf(["ROLE_ADMIN"])));
+  assert(domain.permits("/config/private", "get", sessionOf([], null, true)));
 }
 
 @("permissions 支持 *、resource、resource:* 与 resource:action")
 unittest {
-  assert(permissionAllows(["*"], "/api/bashub/private", "get"));
-  assert(permissionAllows(["/api/bashub/private"], "/api/bashub/private", "get"));
-  assert(permissionAllows(["/api/bashub/private:*"], "/api/bashub/private", "post"));
-  assert(permissionAllows(["/api/bashub/private:get"], "/api/bashub/private", "GET"));
-  assert(!permissionAllows(["/api/bashub/private:post"], "/api/bashub/private", "get"));
-  assert(!permissionAllows(["private:get"], "/api/bashub/private", "get"));
+  assert(permissionAllows(["*"], "/config/private", "get"));
+  assert(permissionAllows(["/config/private"], "/config/private", "get"));
+  assert(permissionAllows(["/config/private:*"], "/config/private", "post"));
+  assert(permissionAllows(["/config/private:get"], "/config/private", "GET"));
+  assert(!permissionAllows(["/config/private:post"], "/config/private", "get"));
+  assert(!permissionAllows(["private:get"], "/config/private", "get"));
 
   auto domain = sampleDomain();
-  assert(domain.permits("/api/bashub/private", "get", sessionOf([], ["/api/bashub/private:get"])));
+  assert(domain.permits("/config/private", "get", sessionOf([], ["/config/private:get"])));
 }
 
 @("accountUsable 覆盖锁定、禁用、账号过期与凭据过期")

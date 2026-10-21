@@ -22,13 +22,14 @@ dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
 
 | 能力域 | 前缀 | 内容 |
 |---|---|---|
-| EMS | `/api/bashub/ems` | 菜单、channel、菜单关联资源、登录前配置、会话 |
+| EMS | `/api/bashub/ems` | 应用、应用分组、菜单、channel、菜单关联资源、登录前配置、会话 |
 | 平台配置与分发 | `/api/bashub/config` | 平台配置资源 CRUD、`server.xml`、代理、证书、setline peers/manifest、主机脚本 |
 | Micdn | `/api/bashub/micdn` | `micdn.xml`、Profile 聚合配置、组件目录 |
 | 监控 | `/api/bashub/monitor` | 在线节点、日志、上报、实例启停与 WebSocket 通道 |
 
-不再注册无能力域的 `/api/bashub/{profile}` 或 `/api/bashub/{resource}` 兼容入口。鉴权资源名也按
-`{根前缀}/{能力域}/{资源}` 收口，例如 `/api/bashub/ems/menus`、`/api/bashub/config/profiles`。
+不再注册无能力域的 `/api/bashub/{profile}` 或 `/api/bashub/{resource}` 兼容入口。EMS 鉴权资源名
+按应用内路径 `/{能力域}/{资源}` 收口，例如 `/ems/menus`、`/ems/apps`、`/config/profiles`，
+不包含可部署变化的 `/api/bashub` 根前缀。
 前端常量集中在 `packages/web/src/api/prefix.ts`，路由装配集中在 `src/bashub/api.d` 与
 `src/bashub/route.d`。basctl、setline 等机器客户端需要与本次路径变更同步升级。
 
@@ -148,10 +149,11 @@ src/bashub/                 业务：BAS 控制台这一份
   （`webapps.urls`）、`include=servers.host` 嵌套展开，以及 `qualifiedName` / `qualifiedTitle`
   这类 `{org.name}.{name}` 模板派生属性。前端查询串里的实体别名（`filter[profile.name]`）
   与引用主键（`filter[webapp.profile.id]`）也按 she 的口径解析。
-- **资源**：organizations、platforms、profiles、engines、farms、servers、hosts、artifacts、
-  webapps、platform-features、platform-feature-scripts、app-groups、apps 在 `config` 域；
-  channels、resources、menus 在 `ems` 域。两边都由 `resources.d` 的 `Resource` 登记，
-  在 `api.d` 里决定归属；Micdn 组件目录使用 `micdn/components` 的专用端点。
+- **资源**：通用 CRUD 的能力域按主表前缀自动确定——`bas.ems_*` 走 `ems`，`bas.cfg_*`
+  走 `config`。因此 apps、app-groups、channels、resources、menus 在 `ems` 域；
+  organizations、platforms、profiles、engines、farms、servers、hosts、artifacts、webapps、
+  platform-features、platform-feature-scripts 在 `config` 域。Micdn 组件目录使用
+  `micdn/components` 的专用端点。
 - **`configs` / `sessions`**：`GET /api/bashub/ems/configs`（免登录，前端据此知道 ems 地址）、
   `GET /api/bashub/ems/sessions`、`POST /api/bashub/ems/sessions/logout`。
 - **Profile 配置分发**：`GET /api/bashub/config/{profile}/server` 用
@@ -199,7 +201,8 @@ src/bashub/                 业务：BAS 控制台这一份
   `{cas}/serviceValidate`，把 CAS 的 `authorities`/`permissions` 映射进账户。JSON 请求未登录回
   401 + `errors[0].meta.redirectUrl`，浏览器导航回 302 到 `{cas}/login?service=...`；已登录但
   Private 资源角色不命中回 403，root 直接放行。资源名按能力域取
-  `/api/bashub/{group}/{resource}`，因此 ems `resources.json` 需要登记带域的资源名；未登记资源按
+  `/{group}/{resource}`，因此 ems `resources.json` 需要登记 `/ems/apps`、`/ems/menus` 这类
+  不带 API 根前缀的资源名；未登记资源按
   `unknownIsProtected` 只要求登录。`configs` 不挂 guard，保持登录前可读。
 - **CORS 与安全响应头**：同源不下发 CORS 头；允许来源的预检回 204，不允许的来源回 403；
   `<api cors-origins="https://hub.example.com,https://sas.openurp.net">` 可覆盖缺省的本机来源，
@@ -377,7 +380,7 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/monitor/agents/{profile}/report`
   要求节点立即刷新快照。`POST /api/bashub/monitor/agents/{profile}/service/{action}`（`start` / `stop` /
   `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。
-  SPA 的 `/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读日志、SSE 跟随，
+  SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读日志、SSE 跟随，
   以及实例的重启 / 停止（带二次确认）。
 - **`/api/bashub/config|ems|micdn/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。

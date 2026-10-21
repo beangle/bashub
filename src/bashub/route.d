@@ -27,7 +27,7 @@ import bashub.artifactversion : refreshArtifactVersions;
 import bashub.agent.channel : bearer;
 import bashub.agent.registry : AgentRegistry, RequestOutcome;
 import bashub.agent.socket : serveAgentSocket;
-import bashub.api : ApiPrefixes, hubApiPrefixes, isEmsResource;
+import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.profile.menus : renderEmsMenus;
@@ -1682,15 +1682,16 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.post(api.ems ~ "/menus", &hub.createMenu);
   router.patch(api.ems ~ "/menus/:id", &hub.updateMenu);
 
-  // 通用 CRUD 按能力域拆分：EMS 只暴露菜单、channel 与菜单关联资源，其余平台配置走 config。
+  // 通用 CRUD 按资源表前缀拆分：ems_ → ems、cfg_ → config；cdn_ 由 Micdn 专用端点处理。
   string[] configResources;
   string[] emsResources;
   foreach (item; reg.all) {
     if (item.path != "cdn-components" && item.path != "profile-micdn"
         && item.path != "profile-micdn-components") {
-      if (isEmsResource(item.path))
+      auto group = resourceApiGroup(item);
+      if (group == "ems")
         emsResources ~= item.path;
-      else
+      else if (group == "config")
         configResources ~= item.path;
     }
   }

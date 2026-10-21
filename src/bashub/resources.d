@@ -204,6 +204,7 @@ Registry hubRegistry() {
         Column("title", "title", Kind.text),
       ],
       [], [], "name"),
+    // 应用与应用分组使用 EMS 表前缀，因此通用 CRUD 也挂在 ems 能力域。
     Resource(
       "apps", "apps", "bas.ems_apps", "id",
       [

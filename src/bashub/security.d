@@ -122,10 +122,10 @@ class HubSecurity {
     }
   }
 
-  /** 授权资源名：能力域后的第一个资源段决定权限。
+  /** 授权资源名：不带 API 根的 `{能力域}/{资源}`，与 EMS 应用内权限命名一致。
    *
-   * `/api/bashub/config/profiles/...` → `/api/bashub/config/profiles`；
-   * `/api/bashub/ems/menus/...` → `/api/bashub/ems/menus`。
+   * `/api/bashub/ems/apps/...` → `/ems/apps`；
+   * `/api/bashub/ems/menus/...` → `/ems/menus`。
    * 与 scala 侧按 action 名登记资源的粒度不同，这里用 URL 资源段；ems 里没有同名资源时
    * 按 unknownIsProtected 只要求登录，因此既可逐步补齐资源定义，也不会误放开写接口。
    */
@@ -139,12 +139,12 @@ class HubSecurity {
     auto slash = rest.indexOf('/');
     auto first = slash < 0 ? rest : rest[0 .. slash];
     if (first.length == 0)
-      return prefix;
+      return "/";
     if (!isApiGroup(first))
-      return prefix ~ "/" ~ first;
+      return "/" ~ first;
     auto tail = slash < 0 ? "" : rest[slash + 1 .. $];
     auto nextSlash = tail.indexOf('/');
     auto second = nextSlash < 0 ? tail : tail[0 .. nextSlash];
-    return second.length == 0 ? prefix ~ "/" ~ first : prefix ~ "/" ~ first ~ "/" ~ second;
+    return second.length == 0 ? "/" ~ first : "/" ~ first ~ "/" ~ second;
   }
 }

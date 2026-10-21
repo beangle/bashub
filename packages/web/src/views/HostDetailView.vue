@@ -106,8 +106,7 @@ const SERVERS_PATH = '/servers'
 
 const route = useRoute()
 const hostId = String(route.params.id || '')
-/** 主机管理是「群集与主机」页签组里的第二个页签。 */
-const listPath = '/farm-hosts?tab=hosts'
+const listPath = '/config/farm-hosts?tab=hosts'
 
 const host = ref<ResourceRow>()
 const included = ref<Map<string, ResourceRow>>(new Map())

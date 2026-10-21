@@ -16,14 +16,13 @@ module bashub.api;
 ///
 /// 前缀只在装配路由时计算一次，处理器里不再手写 `/api/bashub/...`。
 
+import beangle.data.resource : Resource;
+
 import std.algorithm.searching : canFind;
-import std.string : strip;
+import std.string : startsWith, strip;
 
 /// 能力域段的登记顺序；新增能力域时同时扩展 `ApiPrefixes` 与路由装配。
 enum string[] hubApiGroupNames = ["ems", "config", "micdn", "monitor"];
-
-/// 只有 EMS 自身的数据放在 `/api/bashub/ems`；平台配置资源都放在 `/api/bashub/config`。
-enum string[] emsResourcePaths = ["channels", "menus", "resources"];
 
 struct ApiPrefixes {
   string root;
@@ -54,7 +53,13 @@ bool isApiGroup(string segment) {
   return hubApiGroupNames.canFind(segment);
 }
 
-/// 资源是否属于 EMS 能力域。菜单导入导出等专用端点也沿用同一判定。
-bool isEmsResource(string path) {
-  return emsResourcePaths.canFind(path);
+/// 资源的能力域与数据库表前缀保持一致：`ems_` → ems、`cfg_` → config、`cdn_` → micdn。
+string resourceApiGroup(const Resource res) {
+  if (res.table.startsWith("bas.ems_"))
+    return "ems";
+  if (res.table.startsWith("bas.cfg_"))
+    return "config";
+  if (res.table.startsWith("bas.cdn_"))
+    return "micdn";
+  return "";
 }

@@ -31,6 +31,7 @@ import {
   UserListIcon,
 } from 'tdesign-icons-vue-next'
 import type { Component } from 'vue'
+import { resourceApiPath } from '@/api/prefix'
 import { resourceGroups, resourceSchemas, resourceTabGroups } from '@/resources'
 
 const groupIcons: Record<string, Component> = {
@@ -39,19 +40,20 @@ const groupIcons: Record<string, Component> = {
   静态资源: UserListIcon,
 }
 
-/** 被合成页收录的资源：磁贴仍按资源列出，但点进去落到对应页签。 */
 const tabGroupBySchema = new Map(
   resourceTabGroups.flatMap((group) => group.tabs.map((tab) => [tab.key, group])),
 )
 
-/** 概览只列菜单项对应的资源：合成页按页签深链，从属页面（menu: false 且不在页签组里，如服务管理）不出磁贴。 */
+/** 概览按资源列磁贴，点击落到资源所属页签；从属页面（如服务管理）不出磁贴。 */
 const groups = resourceGroups
   .map((name) => ({
     name,
     items: resourceSchemas
       .filter((schema) => schema.group === name && (schema.menu !== false || tabGroupOf(schema.key)))
       .map((schema) => ({
-        to: tabGroupOf(schema.key) ? { path: tabGroupOf(schema.key)!.path, query: { tab: schema.key } } : schema.path,
+        to: tabGroupOf(schema.key)
+          ? { path: tabGroupOf(schema.key)!.path, query: { tab: schema.key } }
+          : resourceApiPath(schema.path),
         title: schema.title,
         description: schema.description || '',
         icon: groupIcons[name] || AppIcon,
@@ -67,7 +69,7 @@ groups.push({
   name: '运维工具',
   items: [
     {
-      to: '/agents',
+      to: '/monitor/agents',
       title: '在线节点',
       description: '查看 basctl 上报的系统与实例快照',
       icon: ServerIcon,

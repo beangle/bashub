@@ -4,7 +4,7 @@
 
 | 用途 | 前缀 | 实现包 | 风格 |
 |---|---|---|---|
-| EMS | `/api/bashub/ems` | `bashub.route` + `beangle.jsonapi` | 菜单/channel/资源 JSON:API、运行时配置与会话 |
+| EMS | `/api/bashub/ems` | `bashub.route` + `beangle.jsonapi` | 应用/分组/菜单/channel/资源 JSON:API、运行时配置与会话 |
 | 平台配置与分发 | `/api/bashub/config` | `bashub.route` + `bashub.profile.*` | 平台配置 JSON:API、文本/XML 配置下载 |
 | Micdn | `/api/bashub/micdn` | `bashub.profile.micdnconfig` | 聚合 JSON 与 XML |
 | 监控 | `/api/bashub/monitor` | `bashub.agent.*` | JSON、SSE 与 WebSocket |
@@ -23,6 +23,8 @@ URL 契约由 `test/bashub/route_test.d` 覆盖，路由变更以该测试为准
 - 已登录但无权访问返回 `403`，响应体是标准 JSON:API 错误文档。
 - `GET /api/bashub/ems/configs` 不校验登录；其余管理接口受 `<api auth="required">` 控制。
 - API 路径必须带能力域；不注册 `/api/bashub/{profile}`、`/api/bashub/{resource}` 这类无域别名。
+- EMS 权限资源名使用应用内路径 `/{能力域}/{资源}`，不包含可部署变化的 `/api/bashub` 根前缀，
+  例如 `/ems/apps`、`/ems/app-groups`、`/ems/menus`、`/config/profiles`。
 - 分页参数用 `page[number]` / `page[size]`；两者缺失时后端读 cookie `pageSize`，再缺省为 20。
 - 排序用 `sort`（`-` 前缀表示倒序）。过滤用 `filter[<属性>]`（如 `filter[profile.name]=demo`）；
   多值可用逗号或分号分隔，文本 2–3 个按 `or`，4 个以上及非文本列按 `in`。
@@ -46,8 +48,8 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 
 `packages/web/src/api/resource.ts` 在此基础上提供了通用资源的 `listResource` / `saveResource` /
 `removeResource` / `callResourceAction` / `uploadResourceFile`，各页面由 `src/resources/index.ts` 的元数据驱动。
-`resourceApiPath()` 按资源名选择 `ems` 或 `config` 域：`channels`、`menus`、`resources` 走
-`ems`，其余管理台资源走 `config`。
+`resourceApiPath()` 按主表前缀选择能力域：`bas.ems_*` 资源（`apps`、`app-groups`、
+`channels`、`menus`、`resources`）走 `ems`，`bas.cfg_*` 资源走 `config`。
 
 ## `/api/bashub/ems`
 
@@ -87,6 +89,8 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 
 | `{resource}` | 实体 | 说明 |
 |---|---|---|
+| `apps` | App | EMS 应用登记（`bas.ems_apps`），只登记应用本身（名称/标题/分组/artifactId/依赖项），部署上下文与嵌入方式在 `channels` |
+| `app-groups` | AppGroup | EMS 应用分组（`bas.ems_app_groups`） |
 | `channels` | Channel | 应用端；`base` 为部署上下文，`channelType` 取 `pc`/`mobile`，`embedMode` 取 `iframe`/`wujie`；同一应用下 `channelType` 唯一 |
 | `resources` | Resource | `scope` 为枚举名；新建默认 `Private`/启用；`GET /api/bashub/ems/resources/{id}/menus?include=entry,resources` 返回引用该资源的菜单 |
 | `menus` | Menu | 见下方专用端点；下发去掉空参数尾巴的 `entryUrl`；`indexno` 由 `move` 重排 |
@@ -131,8 +135,6 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 | `webapps` | Webapp | `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
 | `platform-features` | PlatformFeature | 菜单是 `平台与功能` 页签组里的「平台功能」页签 |
 | `platform-feature-scripts` | PlatformFeatureScript | 无独立列表页，在平台功能详情页维护；`scripts` 写入时去掉 `\r` |
-| `app-groups` | AppGroup | 应用分组 |
-| `apps` | App | 只登记应用本身（名称/标题/分组/artifactId/依赖项），部署上下文与嵌入方式在 `channels` |
 
 ### 配置凭证 `key`
 
@@ -144,6 +146,8 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 ## `/api/bashub/micdn`
 
 Micdn 资源不挂在通用 CRUD 下，统一在 `/api/bashub/micdn` 暴露。Micdn 配置是 Profile 的聚合资源：
+`profile-micdn`、`profile-micdn-components` 的存储表是 `bas.cfg_*`，但作为 Profile 的聚合配置，
+不进入 config 通用 CRUD。
 
 | 端点 | 说明 |
 |---|---|
@@ -209,7 +213,7 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   行为以同一份协议文档为准。
 - 读现状：`GET /api/bashub/monitor/agents/status` → `{"agents":[…]}`，每项是「这台机器此刻的样子」
   （profile / host / basctl / bas / basHome / supports / connectedAt / lastSeenAt / os / basReport）。
-  只在线的、只留最近一次；断连即摘除。控制台页面为 SPA 的 `/agents`。
+  只在线的、只留最近一次；断连即摘除。控制台页面为 SPA 的 `/monitor/agents`。
   `basReport.instances` 只含运行中实例；`basReport.declared` 是本机 `server.xml` 声明的实例，
   控制台按 `id` 合并两者，停止后仍保留实例行并提供启动入口。
 - 立即刷新：`POST /api/bashub/monitor/agents/{profile}/report` → 202 表示 `report:now` 已入队；节点离线 404，
@@ -232,5 +236,5 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   - 空闲时发送 `: keepalive` 注释；流内错误用 `event: failure`，不会与 EventSource 自己的
     连接错误事件同名。节点离线 404、agent 未申报 `log:read` 409。
   - agent 侧协议不变：仍是普通区间 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
-- SPA 页面：`/agents` 展示在线节点、操作系统指标、运行实例与 `hello.supports`，支持立即上报、
+- SPA 页面：`/monitor/agents` 展示在线节点、操作系统指标、运行实例与 `hello.supports`，支持立即上报、
   按区间读日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；节点列表每 10 秒刷新一次。

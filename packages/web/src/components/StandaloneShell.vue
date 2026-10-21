@@ -55,6 +55,7 @@ import {
   ViewListIcon,
 } from 'tdesign-icons-vue-next'
 import { auth, currentUser, runtimeConfig } from '@/auth'
+import { resourceApiPath } from '@/api/prefix'
 import { resourceSchemas, resourceTabGroups } from '@/resources'
 
 const { handleLogin, handleLogout } = auth.useAuth()
@@ -95,15 +96,11 @@ const itemIcons: Record<string, Component> = {
   apps: AppIcon,
   resources: FolderIcon,
   menus: ViewListIcon,
-  'cdn-components': CloudIcon,
-  agents: ServerIcon,
 }
 
-/** 概览单列；资源按 schema.group 归组缩进；运维页面并入对应分组。 */
+/** 概览单列；页签组只占一个菜单项，其余资源按 schema.group 归组缩进。 */
 function buildMenus(): AppShellMenuItem[] {
   const groups = new Map<string, AppShellMenuItem[]>()
-  // 页签合成页占用「分组里最先出现的成员」的位置（与页签顺序无关，调页签不会挪菜单），
-  // 其余页签资源不再单列（schema.menu === false）。
   const tabGroupBySchema = new Map(
     resourceTabGroups.flatMap((group) => group.tabs.map((tab) => [tab.key, group])),
   )
@@ -115,18 +112,22 @@ function buildMenus(): AppShellMenuItem[] {
       placedTabGroups.add(tabGroup.key)
       children.push({ path: tabGroup.path, title: tabGroup.title, icon: itemIcons[tabGroup.key] || AppIcon })
     }
+    if (tabGroup) {
+      groups.set(schema.group, children)
+      return
+    }
     if (schema.menu === false) {
       groups.set(schema.group, children)
       return
     }
-    children.push({ path: schema.path, title: schema.title, icon: itemIcons[schema.key] || AppIcon })
+    children.push({ path: resourceApiPath(schema.path), title: schema.title, icon: itemIcons[schema.key] || AppIcon })
     groups.set(schema.group, children)
   })
   groups.set('应用监控', [
-    { path: '/agents', title: '在线节点', icon: ServerIcon },
+    { path: '/monitor/agents', title: '在线节点', icon: ServerIcon },
   ])
   groups.set('Micdn', [
-    { path: '/cdn-components', title: '组件目录', icon: CloudIcon },
+    { path: '/micdn/components', title: '组件目录', icon: CloudIcon },
   ])
 
   const items: AppShellMenuItem[] = [{ path: '/home', title: '概览', icon: HomeIcon }]

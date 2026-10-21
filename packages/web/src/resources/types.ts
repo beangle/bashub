@@ -150,7 +150,7 @@ export interface ResourceSchema {
   key: string
   /** 后端实体别名（simpleEntityName，如 `webapp`），列表 filter 的查询前缀。 */
   alias: string
-  /** 前端路由与后端资源路径，如 `/profiles`。 */
+  /** 后端资源路径，如 `/profiles`；页面路由由所属能力域和页签组决定。 */
   path: string
   /** JSON:API 资源名（复数）。 */
   type: string
@@ -181,11 +181,7 @@ export interface ResourceSchema {
   xmlTools?: boolean
   /** 提供列表 CSV 导出（原 `action.exportData` 的对等能力）。 */
   exportable?: boolean
-  /**
-   * 是否作为独立菜单项出现；缺省 true。设为 false 的两种情形：
-   * 1. 被 `resourceTabGroups` 合成页收录（路由由 `?tab=` 重定向接管）；
-   * 2. 从属其它页面的子页面（如群集 → 服务管理），保留独立路由，只是不进菜单。
-   */
+  /** 是否作为独立菜单项出现；缺省 true。设为 false 用于从属页面（如服务管理）。 */
   menu?: boolean
   /** 编辑抽屉底部的关联页入口，只在编辑已有记录时出现。 */
   drawerLinks?: DrawerLinkSchema[]
@@ -193,9 +189,9 @@ export interface ResourceSchema {
 
 /** 页签合成页：把若干资源列表收进一个菜单项，页面内用页签切换。 */
 export interface ResourceTabGroup {
-  /** 稳定标识，路由 props 用。 */
+  /** 稳定标识，路由 props 与菜单图标使用。 */
   key: string
-  /** 前端路由路径，如 `/org-config`。 */
+  /** 含能力域前缀的前端路由，如 `/config/org-config`。 */
   path: string
   /** 菜单标题。 */
   title: string

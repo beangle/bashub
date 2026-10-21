@@ -851,7 +851,7 @@ function resetForm(row?: ResourceRow) {
         form[field.key] = currentProfileId.value
         return
       }
-      // 从属页面（如 /servers?farm=1）：新建时父对象取查询条件里的值
+      // 从属页面（如 /config/servers?farm=1）：新建时父对象取查询条件里的值
       // （原 UI 用隐藏域把父对象锁在 URL 传来的 id 上，如 server.farm.id）。
       const seeded = seedFromFilter(field)
       if (seeded !== undefined) {
@@ -909,7 +909,7 @@ function openEdit(row: ResourceRow) {
   void openForm()
 }
 
-/** 抽屉里的关联页入口：关掉抽屉再跳到目标页（如群集 → /servers?farm=<id>）。 */
+/** 抽屉里的关联页入口：关掉抽屉再跳到目标页（如群集 → /config/servers?farm=<id>）。 */
 function openDrawerLink(link: DrawerLinkSchema) {
   if (!editingRow.value) return
   const to = fillTemplate(link.to, editingRow.value)

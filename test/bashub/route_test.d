@@ -15,6 +15,7 @@ import bashub.demo;
 import bashub.resources;
 import bashub.route;
 import bashub.store;
+import bashub.api : resourceApiGroup;
 import bashub.agent.channel : Envelope, parse;
 import bashub.agent.registry : AgentRegistry;
 
@@ -159,9 +160,17 @@ unittest {
   assert(ex.status == 200, ex.body);
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/resources/search");
   assert(ex.status == 200, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/apps/search");
+  assert(ex.status == 200, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/app-groups/search");
+  assert(ex.status == 200, ex.body);
 
   // 平台配置资源不再挂在 ems 下。
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/profiles/search");
+  assert(ex.status == 404, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/apps/search");
+  assert(ex.status == 404, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/app-groups/search");
   assert(ex.status == 404, ex.body);
 
   // micdn 资源既不在 ems，也不在 config 的通用 CRUD 里。
@@ -173,6 +182,21 @@ unittest {
   // 旧的无域前缀不再兜底
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search");
   assert(ex.body.length == 0, ex.body);
+}
+
+@("generic resource API group follows database table prefix")
+unittest {
+  foreach (item; hubRegistry().all) {
+    auto group = resourceApiGroup(item);
+    if (item.table.startsWith("bas.ems_"))
+      assert(group == "ems", item.path ~ ": " ~ item.table);
+    else if (item.table.startsWith("bas.cfg_"))
+      assert(group == "config", item.path ~ ": " ~ item.table);
+    else if (item.table.startsWith("bas.cdn_"))
+      assert(group == "micdn", item.path ~ ": " ~ item.table);
+    else
+      assert(false, "unclassified resource table: " ~ item.table);
+  }
 }
 
 @("agent handshake rejects a missing or wrong key before upgrade")

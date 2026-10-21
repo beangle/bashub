@@ -30,7 +30,7 @@ function toRow(resource: JsonApiResource): ResourceRow {
   }
 }
 
-/** 管理台资源按资源名选择 `ems` / `config` 域；页面仍只传 `/profiles` 这类资源路径。 */
+/** 管理台资源按主表前缀选择 `ems` / `config` 域；页面仍只传 `/profiles` 这类资源路径。 */
 function resourcePath(path: string): string {
   return resourceApiPath(path)
 }
