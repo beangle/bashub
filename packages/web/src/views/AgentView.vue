@@ -5,7 +5,7 @@
         <h2 class="page-title">在线节点</h2>
         <p class="page-subtitle">
           basctl 主动连到 <code>/api/bashub/monitor/agents/{profile}/channel</code>。
-          列表每 30 秒刷新实例摘要；完整系统信息在点击“刷新详情”时按需拉取。
+          列表每 30 秒刷新实例摘要；点节点的“刷新”会先让 agent 重报，再拉取完整系统信息。
         </p>
       </div>
       <div class="page-actions">
@@ -33,9 +33,9 @@
                   size="small"
                   variant="outline"
                   :loading="detailLoading[agent.profile] === true"
-                  @click="refreshDetail(agent)"
+                  @click="refreshAgent(agent)"
                 >
-                  刷新详情
+                  刷新
                 </t-button>
                 <t-button size="small" variant="outline" @click="openHistory(agent)">运行历史</t-button>
                 <t-button
@@ -45,14 +45,6 @@
                   @click="openAgentLog(agent)"
                 >
                   Agent 日志
-                </t-button>
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :loading="reporting[agent.profile] === true"
-                  @click="requestReport(agent)"
-                >
-                  立即上报
                 </t-button>
               </div>
             </div>
@@ -366,7 +358,6 @@ const agents = ref<AgentSummary[]>([])
 const details = ref<Record<string, AgentStatus>>({})
 const loading = ref(false)
 const error = ref('')
-const reporting = ref<Record<string, boolean>>({})
 const detailLoading = ref<Record<string, boolean>>({})
 const serviceLoading = ref<Record<string, boolean>>({})
 const serviceErrorVisible = ref(false)
@@ -427,18 +418,18 @@ async function load(quiet = false) {
   }
 }
 
-async function requestReport(agent: AgentSummary) {
-  reporting.value = { ...reporting.value, [agent.profile]: true }
+/** 节点卡片上的“刷新”：先让 agent 重报一次现状，再取摘要与完整详情。 */
+async function refreshAgent(agent: AgentSummary) {
+  detailLoading.value = { ...detailLoading.value, [agent.profile]: true }
   try {
     await requestAgentReport(agent.profile)
-    MessagePlugin.success(`已请求 ${agent.profile} 立即上报`)
-    await delay(800)
-    await load(true)
-    if (details.value[agent.profile]) await loadDetail(agent.profile)
+    await delay(900)
+    await Promise.all([load(true), loadDetail(agent.profile)])
+    MessagePlugin.success(`已刷新 ${agent.profile}`)
   } catch (reason) {
     MessagePlugin.error(errorText(reason))
   } finally {
-    reporting.value = { ...reporting.value, [agent.profile]: false }
+    detailLoading.value = { ...detailLoading.value, [agent.profile]: false }
   }
 }
 
@@ -450,20 +441,6 @@ async function loadDetail(profile: string) {
   const all = await listAgents()
   const found = all.find((item) => item.profile === profile)
   if (found) details.value = { ...details.value, [profile]: found }
-}
-
-async function refreshDetail(agent: AgentSummary) {
-  detailLoading.value = { ...detailLoading.value, [agent.profile]: true }
-  try {
-    await requestAgentReport(agent.profile)
-    await delay(900)
-    await Promise.all([load(true), loadDetail(agent.profile)])
-    MessagePlugin.success(`已刷新 ${agent.profile} 的详情`)
-  } catch (reason) {
-    MessagePlugin.error(errorText(reason))
-  } finally {
-    detailLoading.value = { ...detailLoading.value, [agent.profile]: false }
-  }
 }
 
 function canService(agent: AgentSummary, action: AgentServiceAction): boolean {
@@ -484,9 +461,11 @@ function confirmService(agent: AgentSummary, instance: AgentInstance, action: Ag
       : action === 'start'
         ? `确定启动 ${name}？`
         : `确定${label} ${name}？实例会短暂中断。`,
-    onConfirm: async () => {
-      await runService(agent, instance, action)
+    onConfirm: () => {
+      // 启停要等 agent 回执（后端最多等 120 秒），确认框先关，进度交给
+      // 实例按钮的 loading 与结果消息，避免用户以为点击没生效而重复点击。
       dialog.destroy()
+      void runService(agent, instance, action)
     },
   })
 }
@@ -494,6 +473,8 @@ function confirmService(agent: AgentSummary, instance: AgentInstance, action: Ag
 async function runService(agent: AgentSummary, instance: AgentInstance, action: AgentServiceAction) {
   if (!instance.id) return
   const key = serviceKey(agent, instance)
+  // 同一实例已有启停请求在途时不再下发，挡住确认框淡出期间的二次点击。
+  if (serviceLoading.value[key]) return
   serviceLoading.value = { ...serviceLoading.value, [key]: true }
   try {
     const result = await serviceAgentInstance(agent.profile, instance.id, action)
@@ -782,7 +763,7 @@ function webappText(instance: AgentInstance): string {
 
 function systemText(agent: AgentSummary): string {
   const os = detailFor(agent)?.os?.os
-  if (!os) return '点击“刷新详情”加载'
+  if (!os) return '点击“刷新”加载'
   return [os.name, os.kernel, os.arch].filter(Boolean).join(' · ') || '不可用'
 }
 

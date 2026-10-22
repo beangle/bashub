@@ -221,7 +221,7 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   提供启动入口。
 - 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，只含
   profile / host / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health 以及
-  `running` / `stopped` 计数，不携带 OS 与 webapps。SPA 在线列表每 30 秒轮询此接口，点击“刷新详情”
+  `running` / `stopped` 计数，不携带 OS 与 webapps。SPA 在线列表每 30 秒轮询此接口，点节点的“刷新”
   时才读取完整 `/agents/status`。
 - 读运行历史：`GET /api/bashub/monitor/agents/{profile}/history?days=180`。`days` 取 1–180，
   缺省调用方传 180。返回 `{profile, from, to, days, samples:[{at, servers:{id:state}}]}`，
@@ -262,5 +262,5 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
     连接错误事件同名。节点离线 404、agent 未申报 `log:read` 409。
   - agent 侧协议不变：仍是普通区间 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
 - SPA 页面：`/monitor/agents` 展示在线节点、实例状态、运行历史与 `hello.supports`；操作系统指标与
-  webapps 明细按需加载。支持立即上报、按区间读实例或 agent 日志、SSE 跟随与实例重启 / 停止。
-  跟随断线由 `EventSource` 自动重连；轻量摘要每 30 秒刷新一次。
+  webapps 明细按需加载。支持刷新节点快照（先下发 `report:now`，再读 `/agents/status`）、按区间读实例
+  或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；轻量摘要每 30 秒刷新一次。

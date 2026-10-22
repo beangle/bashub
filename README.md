@@ -398,11 +398,11 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/monitor/agents/{profile}/report`
   要求节点立即刷新快照。`POST /api/bashub/monitor/agents/{profile}/service/{action}`（`start` / `stop` /
   `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。
-  SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读实例或
+  SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持刷新节点快照、区间读实例或
   agent 日志、SSE 跟随，以及实例的重启 / 停止（带二次确认）。启停失败时错误文档的
   `errors[0].meta` 会带上 agent 返回的限长 `detail` / `logTail` / `truncated`。
 - **在线摘要与运行历史**：`GET /api/bashub/monitor/agents/summary` 只返回在线节点的轻量实例状态，
-  供 SPA 每 30 秒轮询；完整 OS/webapps 快照仍由 `/agents/status` 和页面上的“刷新详情”按需读取。
+  供 SPA 每 30 秒轮询；完整 OS/webapps 快照仍由 `/agents/status` 和页面上的节点“刷新”按需读取。
   `GET /api/bashub/monitor/agents/{profile}/history?days=180` 一次返回该 profile 的原始采样
   `samples:[{at, servers:{id:state}}]`，按 server/天聚合、可用率与单 server 视图都由 SPA 本地计算。
   `bas.mon_server_samples` 每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`）；
