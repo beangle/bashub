@@ -45,7 +45,7 @@ Registry hubRegistry() {
         Column("bas_version", "basVersion", Kind.text),
         Column("ip", "ip", Kind.text),
         Column("hostname", "hostname", Kind.text),
-        Column("setline_port", "setlinePort", Kind.text),
+        Column("proxy_by_hostname", "proxyByHostname", Kind.boolean),
         Column("http_port", "httpPort", Kind.number),
         Column("https_port", "httpsPort", Kind.number),
         Column("enable_https", "enableHttps", Kind.boolean),
@@ -128,6 +128,8 @@ Registry hubRegistry() {
         Column("cpu", "cpu", Kind.text),
         Column("platform_version", "platformVersion", Kind.text),
         Column("arch", "arch", Kind.number),
+        Column("setline_listen_port", "setlineListenPort", Kind.number),
+        Column("setline_admin_port", "setlineAdminPort", Kind.number),
       ],
       [
         Relation("profile", "profile_id", "profiles"),

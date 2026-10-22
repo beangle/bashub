@@ -124,6 +124,8 @@
             <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
             <column name="platform_version" type="varchar(255)" nullable="false" comment="platformVersion?"/>
             <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="setline_listen_port" type="integer" comment="setlineListenPort?"/>
+            <column name="setline_admin_port" type="integer" comment="setlineAdminPort?"/>
           </columns>
           <constraints>
             <primary-key name="pk_pxfg014nyayvye1gd3xih526i" columns="id"/>
@@ -243,7 +245,7 @@
             <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="enableHttps?"/>
             <column name="force_https" type="boolean" nullable="false" defaultValue="true" comment="forceHttps?"/>
             <column name="hostname" type="varchar(255)" comment="hostname?"/>
-            <column name="setline_port" type="varchar(255)" comment="setlinePort?"/>
+            <column name="proxy_by_hostname" type="boolean" nullable="false" defaultValue="false" comment="proxyByHostname?"/>
             <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="httpPort?"/>
             <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="httpsPort?"/>
             <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>

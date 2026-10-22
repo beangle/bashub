@@ -144,6 +144,8 @@
             v-else-if="inputType(field) === 'number'"
             v-model="form[field.key]"
             :placeholder="field.placeholder || `请输入${field.label}`"
+            :min="field.min"
+            :max="field.max"
             theme="normal"
             style="width: 100%"
           />
@@ -160,6 +162,15 @@
             :autosize="{ minRows: 4 }"
           />
           <t-switch v-else-if="inputType(field) === 'boolean'" v-model="form[field.key]" />
+          <t-radio-group
+            v-else-if="inputType(field) === 'radio'"
+            v-model="form[field.key]"
+            @change="onFieldChange(field, $event)"
+          >
+            <t-radio v-for="option in field.options || []" :key="String(option.value)" :value="option.value">
+              {{ option.label }}
+            </t-radio>
+          </t-radio-group>
           <t-select
             v-else-if="inputType(field) === 'select'"
             v-model="form[field.key]"
@@ -696,7 +707,25 @@ const cardHint = schema.readOnly ? '' : schema.cardLink ? `查看${schema.title}
 const rules = computed<Record<string, FormRule[]>>(() => {
   const result: Record<string, FormRule[]> = {}
   formFields.forEach((field) => {
-    if (isRequiredField(field)) result[field.key] = [{ required: true, message: `请填写${field.label}` }]
+    const fieldRules: FormRule[] = []
+    if (isRequiredField(field))
+      fieldRules.push({ required: true, message: `请填写${field.label}` })
+    if (field.type === 'number' && (field.min !== undefined || field.max !== undefined)) {
+      fieldRules.push({
+        validator: (value) => {
+          if (value === '' || value === undefined || value === null) return true
+          const number = Number(value)
+          if (!Number.isFinite(number)) return { result: false, message: `${field.label}必须是数字` }
+          if (!Number.isInteger(number)) return { result: false, message: `${field.label}必须是整数` }
+          if (field.min !== undefined && number < field.min)
+            return { result: false, message: `${field.label}不能小于${field.min}` }
+          if (field.max !== undefined && number > field.max)
+            return { result: false, message: `${field.label}不能大于${field.max}` }
+          return true
+        },
+      })
+    }
+    if (fieldRules.length > 0) result[field.key] = fieldRules
   })
   return result
 })
@@ -704,7 +733,13 @@ const rules = computed<Record<string, FormRule[]>>(() => {
 /** 静态必填，或 `requiredWhen` 指向的布尔字段为真时必填。 */
 function isRequiredField(field: FieldSchema): boolean {
   if (field.required) return true
-  if (!field.requiredWhen || !Boolean(form[field.requiredWhen])) return false
+  if (!field.requiredWhen) return false
+  const trigger = form[field.requiredWhen]
+  if (field.requiredWhenValue !== undefined) {
+    if (trigger !== field.requiredWhenValue) return false
+  } else if (!Boolean(trigger)) {
+    return false
+  }
   if (!field.preserveWhenSet) return true
   const existing = editingRow.value
     ? valueAt(editingRow.value.attributes, [field.preserveWhenSet])
@@ -865,6 +900,8 @@ function resetForm(row?: ResourceRow) {
       form[field.key] = relationshipIds(row, field.key)[0] || ''
     } else if (field.type === 'refs') {
       form[field.key] = relationshipIds(row, field.key)
+    } else if (field.deriveValue) {
+      form[field.key] = field.deriveValue(row.attributes)
     } else if (field.type === 'boolean') {
       form[field.key] = Boolean(valueAt(row.attributes, field.path || [field.key]))
     } else if (field.type === 'lines') {
@@ -877,6 +914,10 @@ function resetForm(row?: ResourceRow) {
       form[field.key] = value === null || value === undefined ? '' : value
     }
   })
+}
+
+function onFieldChange(field: FieldSchema, value: unknown) {
+  field.onChange?.(value, form)
 }
 
 async function openForm() {
@@ -995,6 +1036,7 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
   const relationships: Record<string, unknown> = {}
 
   formFields.forEach((field) => {
+    if (field.virtual) return
     const path = field.path || [field.key]
     const raw = form[field.key]
 
@@ -1022,6 +1064,7 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
     if (field.type === 'number') {
       if (raw === '' || raw === undefined || raw === null) {
         if (field.required) setAt(attributes, path, 0)
+        else if (field.nullable) setAt(attributes, path, null)
         return
       }
       setAt(attributes, path, Number(raw))

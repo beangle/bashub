@@ -457,7 +457,7 @@ unittest {
   assert(config["agent"].type == Json.Type.undefined);
   assert(config["peers"][0]["name"].get!string == "host01");
   assert(config["peers"][0]["url"].get!string == "http://10.0.0.11:8080");
-  assert(config["peers"][1]["url"].get!string == "http://10.0.0.12:8080");
+  assert(config["peers"][1]["url"].get!string == "http://10.0.0.12:8082");
   assert(!ex.body.canFind("adminListen"));
 
   auto basic = cast(string) Base64.encode(cast(const(ubyte)[])

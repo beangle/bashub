@@ -186,6 +186,78 @@ unittest {
       parseJsonString(`{"data":{"type":"channels","attributes":{"enabled":false}}}`), doc));
 }
 
+@("host setline ports must be valid and set together")
+unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  Json updated;
+  foreach (value; ["0", "65536", "-1"]) {
+    assertThrown!StoreException(store.update(reg.find("hosts"), "2001",
+        parseJsonString(`{"data":{"type":"hosts","attributes":{"setlineAdminPort":` ~
+            value ~ `}}}`), updated));
+  }
+
+  assertThrown!StoreException(store.update(reg.find("hosts"), "2001",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{"setlineListenPort":null}}}`), updated));
+
+  assert(store.update(reg.find("hosts"), "2001",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{
+        "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
+  assert(updated["data"]["attributes"]["setlineListenPort"].get!long == 18080);
+  assert(updated["data"]["attributes"]["setlineAdminPort"].get!long == 18081);
+}
+
+@("enabling setline requires the profile hostname only for hostname groups")
+unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  Json updated;
+
+  assert(store.updateColumns(reg.find("profiles"), "1002",
+      ["hostname": Json(""), "proxy_by_hostname": Json(false)]));
+  assert(store.update(reg.find("hosts"), "2001",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{
+        "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
+
+  assert(store.updateColumns(reg.find("profiles"), "1002",
+      ["proxy_by_hostname": Json(true)]));
+  assertThrown!StoreException(store.update(reg.find("hosts"), "2001",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{
+        "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
+}
+
+@("webapp targets and host setline ports keep run-at valid")
+unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  Json updated;
+
+  // host02 上的 app2 已经是运行目标，不能直接清空端口。
+  assertThrown!StoreException(store.update(reg.find("hosts"), "2002",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{
+        "setlineListenPort":null,"setlineAdminPort":null}}}`), updated));
+
+  // 先把运行目标缩到 host01，之后 host02 可以改为不部署 setline。
+  assert(store.update(reg.find("webapps"), "7001",
+      parseJsonString(`{"data":{"type":"webapps","relationships":{"targets":{"data":[
+        {"type":"servers","id":"5001"}]}}}}`), updated));
+  assert(store.update(reg.find("hosts"), "2002",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{
+        "setlineListenPort":null,"setlineAdminPort":null}}}`), updated));
+  assert(updated["data"]["attributes"]["setlineListenPort"].type == Json.Type.null_);
+  assert(updated["data"]["attributes"]["setlineAdminPort"].type == Json.Type.null_);
+
+  // 没有 setline 的 host02 上的 app2 不能再被选作运行目标。
+  assertThrown!StoreException(store.update(reg.find("webapps"), "7001",
+      parseJsonString(`{"data":{"type":"webapps","relationships":{"targets":{"data":[
+        {"type":"servers","id":"5001"},{"type":"servers","id":"5002"}]}}}}`), updated));
+
+  // 已被运行的 server 也不能迁到没有 setline 的主机。
+  assertThrown!StoreException(store.update(reg.find("servers"), "5001",
+      parseJsonString(`{"data":{"type":"servers","relationships":{"host":{"data":
+        {"type":"hosts","id":"2002"}}}}}`), updated));
+}
+
 @("platform feature scripts drop carriage returns on create and update")
 unittest {
   Registry reg;

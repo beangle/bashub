@@ -83,7 +83,7 @@ unittest {
   assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
   assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
   assert(!xml.canFind("<hub"));
-  assert(xml.canFind(`<setline port="10080"/>`));
+  assert(xml.canFind(`setline-hostname="prod.openurp.net"`));
 
   assert(xml.canFind(`<engine name="tomcat" type="tomcat-server" version="10.1.42"`));
   assert(!xml.canFind("undertow"));
@@ -91,8 +91,8 @@ unittest {
   assert(xml.canFind(`<listener class-name="org.beangle.bas.listener.StartupListener"/>`));
   assert(xml.canFind(`<jar uri="org.beangle:beangle-webmvc:4.6.0"/>`));
 
-  assert(xml.canFind(`<host name="host01" ip="10.0.0.11"/>`));
-  assert(xml.canFind(`<host name="host02" ip="10.0.0.12"/>`));
+  assert(xml.canFind(`<host name="host01" ip="10.0.0.11" setline-listen-port="8080" setline-admin-port="10080"/>`));
+  assert(xml.canFind(`<host name="host02" ip="10.0.0.12" setline-listen-port="8082" setline-admin-port="10081"/>`));
   assert(xml.canFind(`<farm name="prod-farm" engine="tomcat" max-heap-size="2048M">`));
   assert(xml.canFind(`<server name="app1" host="host01" http="8080" proxy-http-port="9080"`));
 
@@ -102,20 +102,38 @@ unittest {
 
   ProfileContext demo;
   assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", demo));
-  assert(!renderServerXml(store, reg, demo).canFind("<setline"));
+  assert(!renderServerXml(store, reg, demo).canFind("setline-"));
 }
 
-@("server.xml rejects invalid setline ports") unittest {
+@("server.xml rejects invalid host setline ports") unittest {
   Registry reg;
   auto store = newStore(reg);
-  auto profiles = reg.find("profiles");
+  auto hosts = reg.find("hosts");
   ProfileContext profile;
 
   foreach (value; ["0", "70000", "not-a-port"]) {
-    assert(store.updateColumns(profiles, "1002", ["setline_port": Json(value)]));
+    assert(store.updateColumns(hosts, "2001", ["setline_admin_port": Json(value)]));
     assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
     assertThrown!Exception(renderServerXml(store, reg, profile));
   }
+}
+
+@("server.xml requires the profile hostname only when proxyByHostname is enabled") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  ProfileContext profile;
+
+  assert(store.updateColumns(reg.find("profiles"), "1002",
+      ["hostname": Json(""), "proxy_by_hostname": Json(false)]));
+  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  auto xml = renderServerXml(store, reg, profile);
+  assert(!xml.canFind("setline-hostname"));
+  assert(xml.canFind(`setline-listen-port="8080"`));
+
+  assert(store.updateColumns(reg.find("profiles"), "1002",
+      ["proxy_by_hostname": Json(true)]));
+  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  assertThrown!Exception(renderServerXml(store, reg, profile));
 }
 
 @("peers contains web and micdn nodes")
@@ -141,6 +159,8 @@ unittest {
   assert(config["peers"].length == 2);
   assert(config["peers"][0]["name"].get!string == "host01");
   assert(config["peers"][0]["url"].get!string == "http://10.0.0.11:8080");
+  assert(config["peers"][1]["name"].get!string == "host02");
+  assert(config["peers"][1]["url"].get!string == "http://10.0.0.12:8082");
   assert(config["agent"].type == Json.Type.undefined);
   assert(!text.canFind("adminListen"));
   assert(!text.canFind(`"listen"`));
@@ -161,6 +181,37 @@ unittest {
   assert(config["peers"][0]["url"].get!string == "http://10.0.0.31:8081");
   assert(config["peers"][1]["name"].get!string == "cdn02");
   assert(config["peers"][1]["url"].get!string == "http://10.0.0.32:8081");
+}
+
+@("peers reject invalid host setline listen ports") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  ProfileContext profile;
+
+  foreach (value; [0L, 65536L]) {
+    assert(store.updateColumns(reg.find("hosts"), "2001", ["setline_listen_port": Json(value)]));
+    assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+    assertThrown!Exception(renderPeers(store, reg, profile));
+  }
+}
+
+@("peers skip hosts without setline listen ports") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  ProfileContext profile;
+  Json updated;
+
+  assert(store.update(reg.find("webapps"), "7001",
+      parseJsonString(`{"data":{"type":"webapps","relationships":{"targets":{"data":[
+        {"type":"servers","id":"5001"}]}}}}`), updated));
+  assert(store.update(reg.find("hosts"), "2002",
+      parseJsonString(`{"data":{"type":"hosts","attributes":{
+        "setlineListenPort":null,"setlineAdminPort":null}}}`), updated));
+  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+
+  auto config = parseJsonString(renderPeers(store, reg, profile));
+  assert(config["peers"].length == 1);
+  assert(config["peers"][0]["name"].get!string == "host01");
 }
 
 @("micdn server registrations normalize adminListen and stay out of micdn.xml")

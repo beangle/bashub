@@ -126,13 +126,13 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 |---|---|---|
 | `organizations` | Organization | 机构 |
 | `platforms` | Platform | 操作系统平台 |
-| `profiles` | Profile | 新建时填默认仓库；`setlinePort` 是 setline 管理口（`adminListen`）端口，留空即禁用并让生成的 `server.xml` 不含 `<setline>`；`sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥，编辑私钥时留空表示保持原值，管理台不回显私钥。Micdn 配置走专用聚合端点，不再是普通资源 |
+| `profiles` | Profile | 新建时填默认仓库；`hostname` 是域名，`proxyByHostname` 默认 `false`，为 `true` 时才把它输出为 server.xml 的 `setline-hostname`；`sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥，编辑私钥时留空表示保持原值，管理台不回显私钥。Micdn 配置走专用聚合端点，不再是普通资源 |
 | `engines` | Engine | `type` 取 `tomcat-server`/`tomcat`/`undertow`/`jetty`/`any`（与 basctl 的 creator 同名）；`listeners`/`jars` 支持分隔符字符串；`jspSupport` 仅 `tomcat-server` 有效 |
 | `farms` | Farm | 群集 |
 | `servers` | Server | 群集实例 |
-| `hosts` | Host | `arch` 以 1 起的序号或枚举名提交；列表下发按 `platform` 过滤后的 `featureLogos`；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
+| `hosts` | Host | `arch` 以 1 起的序号或枚举名提交；`setlineListenPort` / `setlineAdminPort` 是成对的主机级 setline 端口（1-65535），都为空表示该主机不部署 setline；listen 供 peer agent 读取 `/_setline/routes`，admin 供 basctl 在本机推路由；两个端口下发到 server.xml 的 `<host>`，不生成 `<setline>`；列表下发按 `platform` 过滤后的 `featureLogos`；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
 | `artifacts` | Artifact | 下发计算属性 `gav`；`GET /api/bashub/config/artifacts/{id}/webapps?include=artifact` 返回使用该组件的部署；`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[..]}`）从 Maven Central 的 `maven-metadata.xml` 刷新 `latestVersion` |
-| `webapps` | Webapp | `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
+| `webapps` | Webapp | `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 只能选择位于同时配置了 `Host.setlineListenPort` 与 `Host.setlineAdminPort` 的主机上的 server，否则无法生成有效的 `run-at`；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
 | `platform-features` | PlatformFeature | 菜单是 `平台与功能` 页签组里的「平台功能」页签 |
 | `platform-feature-scripts` | PlatformFeatureScript | 无独立列表页，在平台功能详情页维护；`scripts` 写入时去掉 `\r` |
 
@@ -175,11 +175,11 @@ Freemarker 模板运行时，不属于 JSON:API。
 
 | URL | 说明 |
 |---|---|
-| `GET /api/bashub/config/{profile}/server` | 服务器/集群配置；`Authorization: Bearer <profile>:<profile.key>` 鉴权。Profile 配置了 `setlinePort` 时输出 `<setline port="..."/>`，留空则不输出；setline 的 `listen` / `adminListen` 仍由节点自己的 setline 配置管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
+| `GET /api/bashub/config/{profile}/server` | 服务器/集群配置；`Authorization: Bearer <profile>:<profile.key>` 鉴权。存在已启用 setline 的 Host 时，在对应 `<host>` 上输出 `setline-listen-port` / `setline-admin-port`；`proxyByHostname=true` 时还要求 `profile.hostname` 非空并输出 `setline-hostname="<profile.hostname>"`，否则省略该属性，由 basctl 使用 `*` 默认组。不再生成 `<setline>`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
 | `GET /api/bashub/config/{profile}/proxy` | 反向代理配置（haproxy/nginx，按 `profile.proxyEngine` 选择模板）；使用同样的 Profile 令牌。只输出所选引擎自身的合法配置，不混入 setline agent 配置；HAProxy 按请求 `path` 做 `map_beg` 路由，不再生成 Host 分组查找、path ACL 或 inline backend |
 | `GET /api/bashub/config/{profile}/certificate` | Profile 的 PEM 公钥证书（可含完整证书链）；使用同样的 Profile 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{profile}/certificate-key` | Profile 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
-| `GET /api/bashub/config/{profile}/setline-peers` | haproxy/nginx sidecar 的 peer 列表（JSON）；使用同样的 Profile 令牌。任何存在的 Profile 都有响应：`peers` 由 Profile 下带 server 的 host（URL `http://<host.ip>:8080`）与 Micdn 配置 `servers[]`（URL `http://<adminListen>`）合并生成，并按 URL 去重；没有 peer 时返回空数组。`setline pull` 把这组 peers 写回节点自己的 `setline.conf [agent] peers`。peer 指向的 `adminListen` 必须能被 sidecar 访问，且 sidecar 来源 IP 要写进对应 setline 的 `peerReaders` |
+| `GET /api/bashub/config/{profile}/setline-peers` | haproxy/nginx sidecar 的 peer 列表（JSON）；使用同样的 Profile 令牌。任何存在的 Profile 都有响应：`peers` 由 Profile 下带 server 且配置了 `setlineListenPort` 的 host（URL `http://<host.ip>:<host.setlineListenPort>`）与 Micdn 配置 `servers[]`（URL `http://<adminListen>`）合并生成，并按 URL 去重；没有 peer 时返回空数组。`setline pull` 把这组 peers 写回节点自己的 `setline.conf [agent] peers`。web 节点的端口来自 Host 的 setline `listen`；该 listen 地址必须能被 sidecar 访问，且 sidecar 来源 IP 要写进对应 setline 的 `peerReaders` |
 | `GET /api/bashub/config/{profile}/setline-manifest` | setline 的资源配置摘要（SHA-256）；使用同样的 Profile 令牌 |
 | `GET /api/bashub/ems/{profile}/menus/{appName}` | 应用菜单 |
 | `GET /api/bashub/micdn/{profile}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；`X-Micdn-Token` 或 `Authorization: Bearer <profile.key>` 鉴权 |

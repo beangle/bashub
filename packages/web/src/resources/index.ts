@@ -46,6 +46,15 @@ const archOptions = [
   { label: 'AArch64', value: 3 },
 ]
 
+const setlineEnabledOptions = [
+  { label: '启用', value: 'yes' },
+  { label: '不启用', value: 'no' },
+]
+
+function hasPortValue(value: unknown): boolean {
+  return value !== null && value !== undefined && String(value).trim().length > 0
+}
+
 export const resourceSchemas: ResourceSchema[] = [
   {
     key: 'organizations',
@@ -99,8 +108,8 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'ip', label: 'IP', required: true, width: '13%' },
       { key: 'hostname', label: '域名', width: '16%' },
       {
-        key: 'setlinePort', label: 'Setline 管理口端口', type: 'number', column: false, placeholder: '10080',
-        help: 'setline adminListen 的端口，如 10080；留空则生成的 server.xml 不含 <setline>。只写端口，basctl 固定连接 127.0.0.1:<port>；不要填对外 listen 的 8080',
+        key: 'proxyByHostname', label: 'Setline 按域名分组', type: 'boolean', column: false,
+        help: '启用时把 Profile 域名生成为 setline-hostname；关闭时省略该属性，由 basctl 使用 * 默认组',
       },
       { key: 'proxyEngine', label: '代理类型', type: 'select', column: false, options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
       { key: 'httpPort', label: 'HTTP 端口', type: 'number', column: false },
@@ -242,6 +251,32 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'arch', label: '体系结构', columnTitle: '平台', type: 'select', options: archOptions, required: true, width: '10%' },
       { key: 'cores', label: 'CPU 核心数', columnTitle: 'CPU核心', type: 'number', required: true, width: '8%' },
       { key: 'cpu', label: 'CPU 规格', columnTitle: 'CPU规格', required: true, width: '20%', cell: { type: 'text', style: 'font-size:0.8em' } },
+      {
+        key: 'setlineEnabled', label: '启用 Setline', type: 'radio', column: false,
+        options: setlineEnabledOptions, defaultValue: 'no', virtual: true,
+        deriveValue: (attributes) =>
+          hasPortValue(attributes.setlineListenPort) && hasPortValue(attributes.setlineAdminPort) ? 'yes' : 'no',
+        onChange: (value, form) => {
+          if (value === 'yes') {
+            form.setlineListenPort = 8080
+            form.setlineAdminPort = 10080
+          } else {
+            form.setlineListenPort = null
+            form.setlineAdminPort = null
+          }
+        },
+        help: '启用前须为所属配置填写域名，路由组直接使用该域名；关闭会清空两个端口。已有 Webapp 把该主机上的服务作为运行目标时不能关闭',
+      },
+      {
+        key: 'setlineListenPort', label: 'Setline 监听端口', type: 'number', column: false, nullable: true,
+        min: 1, max: 65535, placeholder: '8080', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
+        help: 'setline 数据面 listen 端口；agent 从 http://<IP>:<端口>/_setline/routes 拉取路由。它和 admin 端口必须同时配置',
+      },
+      {
+        key: 'setlineAdminPort', label: 'Setline 管理口端口', type: 'number', column: false, nullable: true,
+        min: 1, max: 65535, placeholder: '10080', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
+        help: 'setline adminListen 端口；basctl 在本机连接 127.0.0.1:<端口> 推路由，不写入 server.xml',
+      },
       { key: 'features', label: '系统特性', type: 'refs', ref: featureRef, column: false },
     ],
   },
@@ -313,7 +348,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'contextPath', label: '上下文', required: true },
       { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，反代与 setline 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
       { key: 'unpack', label: '解压执行', type: 'boolean' },
-      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef },
+      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, help: '只能选择配置了 Setline 监听端口的主机上的服务' },
       { key: 'libs', label: '扩展库', column: false, help: 'gav 形式，分号或逗号分割' },
     ],
   },

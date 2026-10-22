@@ -8,6 +8,7 @@ export type FieldType =
   /** 一行一项的文本，提交为字符串数组（后端会拆分）。 */
   | 'lines'
   | 'boolean'
+  | 'radio'
   | 'select'
   | 'ref'
   | 'refs'
@@ -96,6 +97,12 @@ export interface FieldSchema {
   columnTitle?: string
   type?: FieldType
   required?: boolean
+  /** number：允许的最小值。 */
+  min?: number
+  /** number：允许的最大值。 */
+  max?: number
+  /** number：留空时提交 null（用于可清空的数据库可空列）。 */
+  nullable?: boolean
   placeholder?: string
   help?: string
   /** 敏感值：编辑时不由服务端回填，留空表示保持原值。 */
@@ -116,8 +123,16 @@ export interface FieldSchema {
   form?: boolean
   /** 条件必填：指定布尔字段为真时，本字段必填。 */
   requiredWhen?: string
+  /** 条件必填：`requiredWhen` 字段取该值时必填（缺省按布尔真值判断）。 */
+  requiredWhenValue?: unknown
   /** 条件必填时，编辑已有记录且此属性为真，留空视为保留原值。 */
   preserveWhenSet?: string
+  /** 表单虚拟字段：不写入 JSON:API 请求，仅用于驱动其它字段。 */
+  virtual?: boolean
+  /** 虚拟字段编辑已有记录时的取值。 */
+  deriveValue?: (attributes: Record<string, unknown>) => unknown
+  /** 表单字段变化后的联动；直接修改表单对象，不提交本字段。 */
+  onChange?: (value: unknown, form: Record<string, unknown>) => void
   /** 作为查询条件时后端 filter 的属性路径；缺省：普通字段用 key，引用字段用 `key.id`。 */
   filterKey?: string
   /** 在抽屉表单中独占一行；缺省由控件类型决定（textarea/lines 独占）。 */

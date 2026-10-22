@@ -46,12 +46,24 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context,
   auto engineIds = data.enginesById.keys;
   sort!((a, b) => attributeText(data.enginesById[a], "name") <
       attributeText(data.enginesById[b], "name"))(engineIds);
+  bool setlineEnabled;
+  foreach (host; hosts)
+    if (hostSetlinePortText(host, "setlineListenPort", "Host.setlineListenPort").length > 0
+        && hostSetlinePortText(host, "setlineAdminPort", "Host.setlineAdminPort").length > 0)
+      setlineEnabled = true;
 
   auto xml = appender!string;
   xml.put("<bas xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ");
   xml.put("xsi:noNamespaceSchemaLocation=\"http://beangle.github.io/schema/bas-1.0.0.xsd\" version=\"");
   xml.put(escapeXml(attributeText(context.data, "basVersion")));
-  xml.put("\">\n");
+  xml.put("\"");
+  if (setlineEnabled && attributeBool(context.data, "proxyByHostname")) {
+    auto hostname = attributeText(context.data, "hostname").strip;
+    if (hostname.length == 0)
+      throw new Exception("Profile.hostname is required when proxyByHostname is enabled");
+    putAttr(xml, "setline-hostname", hostname);
+  }
+  xml.put(">\n");
   xml.put("  <repository remote=\"");
   xml.put(escapeXml(attributeText(context.data, "remoteRepo")));
   xml.put("\"/>\n");
@@ -94,6 +106,14 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context,
     xml.put("    <host");
     putAttr(xml, "name", attributeText(host, "name"));
     putAttr(xml, "ip", attributeText(host, "ip"));
+    auto listenPort = hostSetlinePortText(host, "setlineListenPort", "Host.setlineListenPort");
+    auto adminPort = hostSetlinePortText(host, "setlineAdminPort", "Host.setlineAdminPort");
+    if (listenPort.length > 0 && adminPort.length > 0) {
+      putAttr(xml, "setline-listen-port", listenPort);
+      putAttr(xml, "setline-admin-port", adminPort);
+    } else if (listenPort.length > 0 || adminPort.length > 0) {
+      throw new Exception("Host.setlineListenPort and Host.setlineAdminPort must be set together");
+    }
     xml.put("/>\n");
   }
   xml.put("  </hosts>\n\n");
@@ -179,12 +199,6 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context,
     }
   }
   xml.put("  </webapps>\n");
-  auto setlinePort = setlinePortText(context.data);
-  if (setlinePort.length > 0) {
-    xml.put("  <setline port=\"");
-    xml.put(escapeXml(setlinePort));
-    xml.put("\"/>\n");
-  }
   xml.put("</bas>\n");
   return xml.data;
 }
@@ -201,20 +215,19 @@ private string boolText(bool value) {
   return value ? "true" : "false";
 }
 
-/// Profile.setlinePort 是 setline 管理口（adminListen）端口。留空表示不启用 setline；
-/// 非空时只输出端口，basctl 固定连接 127.0.0.1:<port>。
-private string setlinePortText(Json profile) {
-  auto text = attributeText(profile, "setlinePort").strip;
+/// Host 的 setline 端口；留空返回空串，非空时校验为 1-65535 并输出规范数字。
+private string hostSetlinePortText(Json host, string attribute, string label) {
+  auto text = attributeText(host, attribute).strip;
   if (text.length == 0)
     return "";
   uint port;
   try {
     port = text.to!uint;
   } catch (Exception) {
-    throw new Exception("Profile.setlinePort must be a port number (1-65535): " ~ text);
+    throw new Exception(label ~ " must be a port number (1-65535): " ~ text);
   }
   if (port == 0 || port > 65535)
-    throw new Exception("Profile.setlinePort must be a port number (1-65535): " ~ text);
+    throw new Exception(label ~ " must be a port number (1-65535): " ~ text);
   return port.to!string;
 }
 

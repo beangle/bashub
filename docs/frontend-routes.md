@@ -133,7 +133,7 @@ EMS 自身资源使用 `ems` 域：
 |---|---|---|
 | `POST /api/bashub/config/artifacts/update-version` | `/config/artifacts` | Body 为 `{"ids":[...]}`，从 Maven Central 刷新所选组件的最新版本 |
 | `POST /api/bashub/config/webapps/upgrade` | `/config/webapps` | Body 为 `{"ids":[...]}`，把所选应用版本提升到组件的 `latestVersion` |
-| `GET /api/bashub/config/hosts/{id}/webapps?include=artifact` | `/config/hosts/:id` | 查询部署到该主机上的应用 |
+| `GET /api/bashub/config/hosts/{id}/webapps?include=artifact` | `/config/hosts/:id` | 查询部署到该主机上的应用；主机详情同时展示该主机的 setline listen 与 admin 端口 |
 | `GET /api/bashub/ems/menus/export?app={appId}` | `/ems/menu-config?tab=menus` | 返回 `{"xml":"..."}` |
 | `POST /api/bashub/ems/menus/import` | `/ems/menu-config?tab=menus` | `multipart/form-data`，字段 `app` + `menufile` |
 

@@ -44,6 +44,12 @@
                 <td class="info-table__value">{{ coresText || '—' }}</td>
               </tr>
               <tr>
+                <td class="info-table__label">Setline 监听端口</td>
+                <td class="info-table__value">{{ setlineListenPort || '—' }}</td>
+                <td class="info-table__label">Setline 管理口端口</td>
+                <td class="info-table__value">{{ setlineAdminPort || '—' }}</td>
+              </tr>
+              <tr>
                 <td class="info-table__label">系统特性</td>
                 <td class="info-table__value" colspan="3">
                   <span v-if="features.length === 0" class="info-table__muted">—</span>
@@ -118,6 +124,8 @@ const hostName = computed(() => attributeText(host.value?.attributes.name))
 const hostIp = computed(() => attributeText(host.value?.attributes.ip))
 const cpuText = computed(() => attributeText(host.value?.attributes.cpu))
 const coresText = computed(() => attributeText(host.value?.attributes.cores))
+const setlineListenPort = computed(() => attributeText(host.value?.attributes.setlineListenPort))
+const setlineAdminPort = computed(() => attributeText(host.value?.attributes.setlineAdminPort))
 const memoryGb = computed(() => Number(host.value?.attributes.memory ?? 0))
 const memoryText = computed(() => (host.value ? `${memoryGb.value}GB` : '—'))
 

@@ -103,6 +103,7 @@ private Row[] profileRows() {
     row("1001", [
       "name": Json("demo"), "title": Json("演示配置"), "bas_version": Json("6.0.0"),
       "ip": Json("127.0.0.1"), "hostname": Json("demo.openurp.net"),
+      "proxy_by_hostname": Json(false),
       "http_port": Json(80L), "https_port": Json(443L),
       "enable_https": Json(true), "force_https": Json(false), "maxconn": Json(30000L),
       "proxy_engine": Json("haproxy"),
@@ -113,7 +114,7 @@ private Row[] profileRows() {
     row("1002", [
       "name": Json("prod"), "title": Json("生产配置"), "bas_version": Json("6.0.0"),
       "ip": Json("10.0.0.10"), "hostname": Json("prod.openurp.net"),
-      "setline_port": Json("10080"),
+      "proxy_by_hostname": Json(true),
       "http_port": Json(80L), "https_port": Json(443L),
       "enable_https": Json(true), "force_https": Json(true), "maxconn": Json(60000L),
       "proxy_engine": Json("nginx"),
@@ -129,11 +130,13 @@ private Row[] hostRows() {
     row("2001", [
       "name": Json("host01"), "ip": Json("10.0.0.11"), "memory": Json(32L), "cores": Json(8L),
       "cpu": Json("Xeon Gold 6248"), "platform_version": Json("9.2"), "arch": Json(2L),
+      "setline_listen_port": Json(8080L), "setline_admin_port": Json(10080L),
       "profile": Json("1002"), "platform": Json("1"),
     ]),
     row("2002", [
       "name": Json("host02"), "ip": Json("10.0.0.12"), "memory": Json(16L), "cores": Json(4L),
       "cpu": Json("Xeon E5-2680"), "platform_version": Json("2022"), "arch": Json(2L),
+      "setline_listen_port": Json(8082L), "setline_admin_port": Json(10081L),
       "profile": Json("1002"), "platform": Json("2"),
     ]),
   ];

@@ -164,20 +164,28 @@
               <header class="detail-card__head">
                 <div>
                   <h4>路由推送</h4>
-                  <p>basctl 从 server.xml 读取 setline 管理口，实例启停后同步路由。</p>
+                  <p>setline 端口属于主机；basctl 按本机 Host 读取管理口，实例启停后同步路由。</p>
                 </div>
-                <t-tag :theme="setlinePort ? 'success' : 'default'" variant="light">
-                  {{ setlinePort ? '已启用' : '未启用' }}
+                <t-tag :theme="setlineEnabled ? 'success' : 'default'" variant="light">
+                  {{ setlineEnabled ? '已启用' : '未启用' }}
                 </t-tag>
               </header>
               <div class="fact-grid">
                 <div class="fact">
-                  <span>管理口</span>
-                  <strong>{{ setlinePort ? `127.0.0.1:${setlinePort}` : '—' }}</strong>
+                  <span>启用主机</span>
+                  <strong>{{ setlineEnabled ? `${setlineHosts.length} 台` : '—' }}</strong>
+                </div>
+                <div class="fact">
+                  <span>listen / admin</span>
+                  <strong>{{ setlineHostsText }}</strong>
+                </div>
+                <div class="fact">
+                  <span>路由组</span>
+                  <strong>{{ setlineGroup }}</strong>
                 </div>
                 <div class="fact">
                   <span>server.xml</span>
-                  <strong>{{ setlinePort ? '已生成' : '未生成' }}</strong>
+                  <strong>{{ setlineEnabled ? '已生成主机端口' : '未生成' }}</strong>
                 </div>
               </div>
             </article>
@@ -552,7 +560,7 @@ const profileTitle = computed(() => attrOf(profile.value, 'title'))
 const basVersion = computed(() => attrOf(profile.value, 'basVersion'))
 const ip = computed(() => attrOf(profile.value, 'ip'))
 const hostname = computed(() => attrOf(profile.value, 'hostname'))
-const setlinePort = computed(() => attrOf(profile.value, 'setlinePort'))
+const proxyByHostname = computed(() => boolOf(profile.value?.attributes.proxyByHostname))
 const httpPort = computed(() => attrOf(profile.value, 'httpPort'))
 const httpsPort = computed(() => attrOf(profile.value, 'httpsPort'))
 const enableHttps = computed(() => boolOf(profile.value?.attributes.enableHttps))
@@ -569,6 +577,23 @@ const sslCiphers = computed(() => attrOf(profile.value, 'sslCiphers'))
 const certificateText = computed(() => attrOf(profile.value, 'sslCertificate'))
 const privateKeySet = computed(() => boolOf(profile.value?.attributes.sslCertificateKeySet))
 const keyConfigured = computed(() => Boolean(attrOf(profile.value, 'key')) || micdn.value?.profile.keySet === true)
+const setlineHosts = computed(() =>
+  hosts.value
+    .map((host) => ({
+      name: attributeText(host.attributes.name) || attributeText(host.attributes.ip),
+      listen: attributeText(host.attributes.setlineListenPort),
+      admin: attributeText(host.attributes.setlineAdminPort),
+    }))
+    .filter((host) => host.listen.length > 0 && host.admin.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name)),
+)
+const setlineEnabled = computed(() => setlineHosts.value.length > 0)
+const setlineGroup = computed(() =>
+  proxyByHostname.value ? hostname.value || '（域名未填写）' : '*',
+)
+const setlineHostsText = computed(() =>
+  setlineHosts.value.map((host) => `${host.name}:${host.listen}/${host.admin}`).join('；') || '—',
+)
 const organizationText = computed(() => {
   const orgTitle = attrOf(organization.value, 'title')
   return [organizationName.value, orgTitle].filter(Boolean).join(' · ')

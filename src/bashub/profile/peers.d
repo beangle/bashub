@@ -23,11 +23,8 @@ import vibe.data.json : Json;
 
 import std.algorithm : sort;
 import std.array : appender;
-import std.conv : to;
+import std.conv : ConvException, to;
 import std.string : indexOf, strip;
-
-/// web 节点 setline 对 peer 暴露的 `listen` 端口。setline 与 basctl 容器都用这个缺省值。
-private enum ushort SetlinePeerPort = 8080;
 
 private struct SetlinePeer {
   string name;
@@ -52,8 +49,11 @@ string renderPeers(Store store, Registry reg, const ProfileContext context) {
     peer.name = attributeText(host, "name").strip;
     if (peer.name.length == 0)
       peer.name = ip;
+    ushort port;
+    if (!hostSetlineListenPort(host, port))
+      continue;
     peer.url = "http://" ~ (ip.indexOf(':') >= 0 ? "[" ~ ip ~ "]" : ip)
-        ~ ":" ~ SetlinePeerPort.to!string;
+        ~ ":" ~ port.to!string;
     addPeer(peers, urls, peer);
   }
 
@@ -81,6 +81,23 @@ string renderPeers(Store store, Registry reg, const ProfileContext context) {
   }
   line(out_, "}");
   return out_.data;
+}
+
+/// Host.setlineListenPort 是 setline 数据面 `listen` 的端口；agent 从
+/// `http://host:port/_setline/routes` 拉路由，不能拿 Host.setlineAdminPort
+/// （本机 adminListen）代替。
+private bool hostSetlineListenPort(Json host, out ushort port) {
+  auto text = attributeText(host, "setlineListenPort").strip;
+  if (text.length == 0)
+    return false;
+  try {
+    port = text.to!ushort;
+  } catch (ConvException e) {
+    throw new Exception("Host.setlineListenPort must be a port number (1-65535): " ~ text);
+  }
+  if (port == 0)
+    throw new Exception("Host.setlineListenPort must be a port number (1-65535): " ~ text);
+  return true;
 }
 
 /// Web 节点和 micdn 节点可能落在同一台机器上；按 peer URL 去重，名称只作展示。
