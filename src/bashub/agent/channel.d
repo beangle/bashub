@@ -23,11 +23,12 @@ import std.format : format;
 import std.string : strip, toLower;
 
 /// agent → hub 的原语。
-enum AgentPrimitives = ["hello", "report:os", "report:bas", "result", "pong"];
+enum AgentPrimitives = ["hello", "report:os", "report:bas", "report:health", "result", "pong"];
 
 /// hub → agent 的原语。
 enum HubPrimitives = [
-  "ping", "report:now", "log:read", "agent:log", "service:start", "service:stop", "service:restart"
+  "ping", "report:now", "report:health", "log:read", "agent:log", "service:start", "service:stop",
+  "service:restart"
 ];
 
 /// 请求号上限；与 basctl 的 `bas.channel.maxRequestIdLength` 保持一致。
@@ -117,6 +118,11 @@ string ping() {
 /// 请 agent 立刻报一次；报告本身就是回执，因此不带 `id`。
 string reportNow() {
   return render("report:now", "", Json.emptyObject);
+}
+
+/// 请 agent 立刻报一次轻量实例状态；报告本身就是回执，因此不带 `id`。
+string reportHealth() {
+  return render("report:health", "", Json.emptyObject);
 }
 
 /// 读实例日志的一段，带 `id`，agent 用 `result` 应答。`tail` 大于 0 时用于首次定位尾部。

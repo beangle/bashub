@@ -22,6 +22,7 @@ import beangle.security.cas : CasConfig, CasSessionRepo;
 import beangle.security.session : SessionRepo;
 
 import bashub.agent.registry : AgentRegistry;
+import bashub.agent.history : PostgresAgentHistoryStore;
 import bashub.artifactversion : refreshAllArtifactVersions;
 import bashub.config;
 import bashub.logging;
@@ -169,8 +170,9 @@ int main(string[] args) {
       if (cfg.authRequired)
         security.warmup();
     }
+    auto agentHistory = new PostgresAgentHistoryStore(cfg.dbUrl);
     listener = listenHTTP(settings,
-        buildHubRouter(cfg, reg, store, sessions, new AgentRegistry(), security));
+        buildHubRouter(cfg, reg, store, sessions, new AgentRegistry(agentHistory), security));
     logInfo("bashub listening on %s, api prefix %s", addr.toString, cfg.apiPrefix);
     scheduleArtifactRefresh(cfg, reg, store);
   } catch (Exception e) {

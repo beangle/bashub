@@ -37,6 +37,9 @@ unittest {
   assert(cfg.apiPrefix == "/api/bashub");
   assert(cfg.authRequired);
   assert(cfg.artifactRefreshMinutes == 360);
+  assert(cfg.agentHealthIntervalSeconds == 300);
+  assert(cfg.agentHealthStartMinute == 7 * 60);
+  assert(cfg.agentHealthEndMinute == 22 * 60);
   assert(cfg.emsBase == "https://sas.openurp.net");
   assert(cfg.emsInnerApi == "http://10.0.0.8/api");
   assert(cfg.authorityUrl.endsWith("/platform/security/func/bas-hub/resources.json"));
@@ -81,6 +84,30 @@ unittest {
 
   auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
   assert(loadBashub(ems).listen == "0.0.0.0:8899");
+}
+
+@("loadBashub reads the agent health schedule from the application file") unittest {
+  auto home = uniqueTempDir("bashub-ems-health-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"),
+      `<app agent-health-interval="600" agent-health-start="22:00" agent-health-end="07:30"/>`);
+
+  auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
+  auto cfg = loadBashub(ems);
+  assert(cfg.agentHealthIntervalSeconds == 600);
+  assert(cfg.agentHealthStartMinute == 22 * 60);
+  assert(cfg.agentHealthEndMinute == 7 * 60 + 30);
+  validateBashubConfig(cfg);
+
+  cfg.agentHealthIntervalSeconds = 0;
+  validateBashubConfig(cfg);
+  cfg.agentHealthIntervalSeconds = 59;
+  assertThrown!Exception(validateBashubConfig(cfg));
+  cfg.agentHealthIntervalSeconds = 300;
+  cfg.agentHealthStartMinute = 22 * 60;
+  cfg.agentHealthEndMinute = 22 * 60;
+  assertThrown!Exception(validateBashubConfig(cfg));
 }
 
 @("auth defaults to required and only an explicit none disables it") unittest {

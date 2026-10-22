@@ -12,7 +12,7 @@ module bashub.agent.socket;
 /// `scope WebSocket` 只活在这个回调里：登记册保存快照与出站队列，循环负责把队列发给
 /// socket，并抄下 agent 发来的现状。外部请求（如 `report:now`）因此不必持有 socket。
 
-import bashub.agent.channel : Envelope, parse, ping, reportNow;
+import bashub.agent.channel : Envelope, parse, ping, reportHealth, reportNow;
 import bashub.agent.registry : AgentRegistry, AgentSession;
 
 import vibe.core.log : logInfo, logWarn;
@@ -20,6 +20,7 @@ import vibe.http.server : HTTPServerRequest, HTTPServerResponse;
 import vibe.http.websockets : WebSocket, handleWebSockets;
 
 import core.time : Duration, MonoTime, msecs, seconds;
+import std.datetime : Clock, SysTime;
 
 /// 保活节拍：agent 沉默 90s 就重连，30s 一次 `ping` 留足余量。
 enum HeartbeatInterval = 30.seconds;
@@ -27,18 +28,46 @@ enum HeartbeatInterval = 30.seconds;
 /// 出站队列与 supersede 标记的检查间隔；命令延迟上限也就是这个值。
 private enum PollInterval = 250.msecs;
 
+/** bashub 对单条连接的轻量健康采样计划；0 秒表示关闭。 */
+struct HealthSchedule {
+  uint intervalSeconds;
+  ushort startMinute = 7 * 60;
+  ushort endMinute = 22 * 60;
+
+  bool enabled() const {
+    return intervalSeconds > 0;
+  }
+
+  /** bashub 主机时区的采样窗口；start 含、end 不含，支持跨午夜。 */
+  bool windowContains(SysTime now) const {
+    auto local = now.toLocalTime;
+    auto minute = cast(uint) local.hour * 60 + local.minute;
+    if (startMinute < endMinute)
+      return minute >= startMinute && minute < endMinute;
+    return minute >= startMinute || minute < endMinute;
+  }
+
+  /** 是否已到下一次下发时间；到达窗口边界时立即补一次，不等待一个完整周期。 */
+  bool due(SysTime now, Duration sinceLast) const {
+    return enabled && windowContains(now) && sinceLast >= seconds(cast(long) intervalSeconds);
+  }
+}
+
 /// 完成 HTTP → WebSocket 升级并跑连接循环。调用方必须已经验证过 Bearer。
-void serveAgentSocket(AgentRegistry registry, string profile, HTTPServerRequest req,
-    HTTPServerResponse res, Duration heartbeatInterval = HeartbeatInterval) {
+void serveAgentSocket(AgentRegistry registry, string profile, string profileId, HTTPServerRequest req,
+    HTTPServerResponse res, HealthSchedule health = HealthSchedule.init,
+    Duration heartbeatInterval = HeartbeatInterval) {
   auto name = profile.idup;
+  auto id = profileId.idup;
   auto handler = handleWebSockets((scope WebSocket socket) nothrow {
-      runAgentLoop(registry, name, socket, heartbeatInterval);
+      runAgentLoop(registry, name, id, socket, health, heartbeatInterval);
   });
   handler(req, res);
 }
 
 /// 一条连接的生命周期：登记、读消息、发队列、按期 ping、离开时摘除。
-void runAgentLoop(AgentRegistry registry, string profile, scope WebSocket socket,
+void runAgentLoop(AgentRegistry registry, string profile, string profileId, scope WebSocket socket,
+    HealthSchedule health = HealthSchedule.init,
     Duration heartbeatInterval = HeartbeatInterval) nothrow {
   AgentSession session;
   scope (exit) {
@@ -48,10 +77,11 @@ void runAgentLoop(AgentRegistry registry, string profile, scope WebSocket socket
   }
 
   try {
-    session = registry.attach(profile);
+    session = registry.attach(profile, profileId);
     logInfo("%s: agent connected", profile);
 
     auto lastPing = MonoTime.currTime;
+    auto lastHealth = lastPing;
     while (socket.connected) {
       if (session.superseded) {
         socket.close(session.closeCode, session.closeReason);
@@ -69,14 +99,21 @@ void runAgentLoop(AgentRegistry registry, string profile, scope WebSocket socket
         session.offer(ping());
         lastPing = current;
       }
+      if (health.due(Clock.currTime, current - lastHealth)) {
+        if (session.supportsPrimitive("report:health"))
+          session.offer(reportHealth());
+        lastHealth = current;
+      }
 
       if (!socket.waitForData(PollInterval))
         continue;
 
       Envelope message;
-      if (parse(socket.receiveText(), message))
+      if (parse(socket.receiveText(), message)) {
         session.accept(message);
-      else
+        if (message.typ == "report:health" && session.healthKnown)
+          registry.recordHealth(session.profileId, session.health);
+      } else
         logWarn("%s: unreadable message dropped", profile);
     }
   } catch (Exception e) {

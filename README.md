@@ -273,12 +273,18 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 提供数据库连接；没有 `default` 数据源时再找 `~/.ems/bas/resources.xml`。根元素还可以配置监听地址：
 
 ```xml
-<app listen="0.0.0.0:8888">
+<app listen="0.0.0.0:8888"
+     agent-health-interval="300"
+     agent-health-start="07:00"
+     agent-health-end="22:00">
   ...
 </app>
 ```
 
 监听地址优先级为：命令行 `--listen` > `hub.xml` 的 `<app listen>` > 内置 `127.0.0.1:8080`。
+节点运行历史由 bashub 主动下发 `report:health` 采样：`agent-health-interval` 是秒数，0 表示关闭；
+`agent-health-start/end` 是 bashub 主机时区的窗口（含 start、不含 end，可跨午夜）。这三项只改 bashub，
+生产机上的 basagent 不需要采样间隔或时间窗口配置。
 
 数据库结构检查可以独立执行，不启动 HTTP：
 
@@ -286,6 +292,10 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 ./target/d/bashub --ems.profile=bas --check-schema
 # 全部存在 → "schema ok"；漂移 → 逐条列出并以退出码 3 结束
 ```
+
+已有 0.0.8 数据库升级时，先停旧后端，再执行
+`src/main/resources/db/postgresql/migrate/0.0.8-15-agent-status-history.sql`。该脚本可重复执行，
+创建节点运行历史表 `bas.mon_server_samples`；全新安装直接执行 `init/*.sql` 即可。
 
 systemd 服务默认不传 `--listen`，因此读取应用文件的 `listen`，再没有才使用内置
 `127.0.0.1:8080`。如果要在 systemd 层覆盖应用文件，用 drop-in 重写 `ExecStart`：
@@ -385,6 +395,12 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读实例或
   agent 日志、SSE 跟随，以及实例的重启 / 停止（带二次确认）。启停失败时错误文档的
   `errors[0].meta` 会带上 agent 返回的限长 `detail` / `logTail` / `truncated`。
+- **在线摘要与运行历史**：`GET /api/bashub/monitor/agents/summary` 只返回在线节点的轻量实例状态，
+  供 SPA 每 30 秒轮询；完整 OS/webapps 快照仍由 `/agents/status` 和页面上的“刷新详情”按需读取。
+  `GET /api/bashub/monitor/agents/{profile}/history?days=180` 一次返回该 profile 的原始采样
+  `samples:[{at, servers:{id:state}}]`，按 server/天聚合、可用率与单 server 视图都由 SPA 本地计算。
+  `bas.mon_server_samples` 每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`）；
+  采样由 hub 在 `agent-health-*` 窗口内主动触发，数据保留 180 天。
 - **`/api/bashub/config|ems|micdn/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。
 - **其余定制动作**：`profiles/{id}/reset-key`、`webapps/upgrade`、`hosts/{id}/webapps`、

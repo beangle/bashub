@@ -28,3 +28,6 @@ alter table bas.ems_channels add constraint pk_1yi5whvx5ialppx8bcmejakj5 primary
 alter table bas.ems_menus add constraint pk_njtud98p8314fiicyo0xe2mkh primary key (id);
 alter table bas.ems_menus_resources add constraint pk_gdv0xbg06sy84ur7hxrfo8fch primary key (menu_id,resource_id);
 alter table bas.ems_resources add constraint pk_nr89evw3ueq159rpu4dp2k1gc primary key (id);
+alter table bas.mon_server_samples add constraint pk_mon_server_samples primary key (id);
+alter table bas.mon_server_samples add constraint uq_mon_server_samples_point unique (profile_id,sampled_at);
+alter table bas.mon_server_samples add constraint fk_mon_server_samples_profile foreign key (profile_id) references bas.cfg_profiles (id);

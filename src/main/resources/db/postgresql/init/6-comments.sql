@@ -177,3 +177,8 @@ comment on table bas.ems_channels is '应用端';
 comment on table bas.ems_menus is '菜单';
 comment on table bas.ems_menus_resources is 'resources?';
 comment on table bas.ems_resources is '资源';
+comment on column bas.mon_server_samples.id is '非业务主键:auto_increment';
+comment on column bas.mon_server_samples.profile_id is 'Profile ID';
+comment on column bas.mon_server_samples.sampled_at is '采样时刻';
+comment on column bas.mon_server_samples.servers is 'server 状态: id -> running/stopped/error';
+comment on table bas.mon_server_samples is '节点运行状态采样';

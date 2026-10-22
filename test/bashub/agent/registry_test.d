@@ -10,6 +10,7 @@ module test.bashub.agent.registry_test;
 /// 登记册与现状快照：整份替换、能力排序、重复登录踢旧、断连只摘自己。
 
 import bashub.agent.channel : Envelope, parse, result;
+import bashub.agent.history : AgentHistoryStore, AgentSample;
 import bashub.agent.registry : AgentRegistry, AgentSession, RequestOutcome;
 
 import core.time : seconds;
@@ -76,6 +77,75 @@ unittest {
 
   assert(session.osReport["os"]["name"].get!string == "Rocky");
   assert(session.osReport["cpu"].type == Json.Type.undefined);
+}
+
+@("health reports are bounded and drive the lightweight summary") unittest {
+  auto session = new AgentSession("demo");
+  session.accept(envelope("hello", "2026-10-16T10:00:01+08:00",
+      `{"host":"app1","basctl":"0.0.4","bas":"0.14.0","supports":["hello","report:health"]}`));
+  session.accept(envelope("report:health", "2026-10-16T10:00:02+08:00",
+      `{"servers":[{"id":"platform.server1","state":"running"},
+        {"id":"portal.server1","state":"stopped"},
+        {"id":"bad","state":"shell"},{"id":"","state":"running"}]}`));
+
+  assert(session.healthKnown);
+  assert(session.health.length == 2);
+  assert(session.health[0].id == "platform.server1");
+  assert(session.health[0].state == "running");
+  assert(session.health[1].id == "portal.server1");
+
+  auto summary = session.summary;
+  assert(summary["running"].get!long == 1);
+  assert(summary["stopped"].get!long == 1);
+  assert(summary["health"].get!(Json[]).length == 2);
+  assert(summary["os"].type == Json.Type.undefined);
+}
+
+@("health state is derived from basReport for older agents") unittest {
+  auto session = new AgentSession("demo");
+  session.accept(envelope("report:bas", "2026-10-16T10:00:03+08:00",
+      `{"instances":[{"id":"platform.server1"}],"declared":[{"id":"platform.server1"},{"id":"portal.server1"}]}`));
+  auto health = session.effectiveHealth;
+  assert(health.length == 2);
+  assert(health[0].id == "platform.server1");
+  assert(health[0].state == "running");
+  assert(health[1].id == "portal.server1");
+  assert(health[1].state == "stopped");
+}
+
+private final class RecordingHistory : AgentHistoryStore {
+  string profileId;
+  string profile;
+  AgentSample[] samples;
+
+  void record(string profileId, const(AgentSample)[] samples) {
+    this.profileId = profileId;
+    this.samples = samples.dup;
+  }
+
+  Json query(string profileId, string profile, int daysCount) {
+    this.profileId = profileId;
+    this.profile = profile;
+    return Json(["profile": Json(profile), "days": Json(cast(long) daysCount)]);
+  }
+}
+
+@("registry records health and exposes history") unittest {
+  auto history = new RecordingHistory();
+  auto registry = new AgentRegistry(history);
+  auto session = registry.attach("demo", "1001");
+  session.accept(envelope("report:health", "2026-10-16T10:00:02+08:00",
+      `{"servers":[{"id":"platform.server1","state":"running"}]}`));
+
+  assert(registry.hasHistory);
+  registry.recordHealth(session.profileId, session.health);
+  assert(history.profileId == "1001");
+  assert(history.samples.length == 1);
+  assert(history.samples[0].state == "running");
+  auto doc = registry.history("1001", "demo", 180);
+  assert(history.profileId == "1001");
+  assert(history.profile == "demo");
+  assert(doc["days"].get!long == 180);
 }
 
 @("a new login supersedes the old connection")

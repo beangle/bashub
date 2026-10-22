@@ -47,7 +47,7 @@ export interface AgentInstance {
   started?: string
   webapps?: AgentWebapp[]
   /** 前端合并 `instances` / `declared` 后得到的状态；接口本身只对运行实例给出 `running`。 */
-  state?: 'running' | 'stopped'
+  state?: 'running' | 'stopped' | 'error'
 }
 
 export interface AgentBasSnapshot {
@@ -71,6 +71,42 @@ export interface AgentStatus {
   os?: AgentOsSnapshot
   basAt?: string
   basReport?: AgentBasSnapshot
+  healthAt?: string
+  health?: AgentHealth[]
+}
+
+export interface AgentHealth {
+  id: string
+  state: 'running' | 'stopped' | 'error'
+}
+
+/** `GET /api/bashub/monitor/agents/summary`：在线列表轮询用的轻量摘要。 */
+export interface AgentSummary {
+  profile: string
+  host?: string
+  basctl?: string
+  bas?: string
+  supports?: string[]
+  connectedAt?: string
+  lastSeenAt?: string
+  healthAt?: string
+  running?: number
+  stopped?: number
+  health?: AgentHealth[]
+}
+
+/** 一个采样点：同一时刻整个 profile 的 server 状态。 */
+export interface AgentHistorySample {
+  at: string
+  servers: Record<string, AgentHealth['state']>
+}
+
+export interface AgentHistory {
+  profile: string
+  from: string
+  to: string
+  days: number
+  samples: AgentHistorySample[]
 }
 
 export interface AgentLogWindow {
@@ -95,6 +131,24 @@ export interface AgentServiceResult {
 export async function listAgents(): Promise<AgentStatus[]> {
   const result = await apiClient.getPlain<{ agents?: AgentStatus[] }>(apiPath('monitor', '/agents/status'))
   return result.agents ?? []
+}
+
+/** 在线页高频轮询只取摘要，完整 OS/webapps 由 `listAgents()` 按需读取。 */
+export async function listAgentSummaries(): Promise<AgentSummary[]> {
+  const result = await apiClient.getPlain<{ agents?: AgentSummary[] }>(apiPath('monitor', '/agents/summary'))
+  return result.agents ?? []
+}
+
+/** 读取节点的半年运行历史：一次取回 profile 的原始采样，按 server 聚合由页面完成。 */
+export async function readAgentHistory(
+  profile: string,
+  options: { days?: number } = {},
+): Promise<AgentHistory> {
+  const query: Record<string, string> = { days: String(options.days ?? 180) }
+  return apiClient.getPlain<AgentHistory>(
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/history`),
+    { query },
+  )
 }
 
 /** 要求在线节点立刻上报一次；202 只表示指令已入队，快照随后到达。 */

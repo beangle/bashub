@@ -14,6 +14,7 @@ module bashub.agent.registry;
 /// 文本去发。`AgentSession` 因此可以脱离 WebSocket 单测。
 
 import channel = bashub.agent.channel;
+import bashub.agent.history : AgentHistoryStore, AgentSample;
 
 import core.time : Duration, MonoTime, seconds;
 import std.uuid : randomUUID;
@@ -38,6 +39,8 @@ private enum size_t MaxHelloHostBytes = 255;
 private enum size_t MaxHelloVersionBytes = 128;
 private enum size_t MaxHelloHomeBytes = 4096;
 private enum size_t MaxCapabilityBytes = 64;
+private enum size_t MaxServerIdBytes = 255;
+private enum size_t MaxHealthServers = 512;
 
 /// `result` 解开后的应答；`failed` 保留 agent 给出的错误串。
 struct AgentReply {
@@ -64,6 +67,7 @@ private final class PendingRequest {
 /// 一条 agent 通道的现状快照。
 final class AgentSession {
   immutable string profile;
+  immutable string profileId;
   immutable string connectedAt;
 
   string host;
@@ -77,6 +81,10 @@ final class AgentSession {
   string osAt;
   Json basReport = Json(null);
   string basAt;
+
+  AgentSample[] health;
+  bool healthKnown;
+  string healthAt;
 
   /// 出站队列：保活、立即上报与未来的请求都从这里交给 socket 循环。
   private string[] outbound;
@@ -92,8 +100,9 @@ final class AgentSession {
   short closeCode;
   string closeReason;
 
-  this(string profile) {
+  this(string profile, string profileId = "") {
     this.profile = profile;
+    this.profileId = profileId;
     this.connectedAt = channel.now();
     this.lastSeenAt = connectedAt;
     pendingLock = new TaskMutex();
@@ -114,6 +123,11 @@ final class AgentSession {
     case "report:bas":
       basReport = message.body;
       basAt = message.at;
+      break;
+    case "report:health":
+      health = parseHealth(message.body, healthKnown);
+      if (healthKnown)
+        healthAt = channel.now();
       break;
     case "pong":
       break;
@@ -242,7 +256,77 @@ final class AgentSession {
     item["os"] = osReport;
     item["basAt"] = Json(basAt);
     item["basReport"] = basReport;
+    item["healthAt"] = Json(healthAt);
+    item["health"] = healthJson(effectiveHealth);
     return item;
+  }
+
+  /// 轻量在线列表用的摘要：不携带 OS 与 webapps，避免每 30 秒重复搬运大对象。
+  Json summary() {
+    auto item = Json.emptyObject;
+    item["profile"] = Json(profile);
+    item["host"] = Json(host);
+    item["basctl"] = Json(basctlVersion);
+    item["bas"] = Json(basVersion);
+    auto caps = appender!(Json[])();
+    foreach (capability; supports)
+      caps.put(Json(capability));
+    item["supports"] = Json(caps.data);
+    item["connectedAt"] = Json(connectedAt);
+    item["lastSeenAt"] = Json(lastSeenAt);
+    item["healthAt"] = Json(healthAt);
+
+    auto servers = effectiveHealth;
+    long running;
+    long stopped;
+    foreach (sample; servers) {
+      if (sample.state == "running")
+        running++;
+      else
+        stopped++;
+    }
+    item["running"] = Json(running);
+    item["stopped"] = Json(stopped);
+    item["health"] = healthJson(servers);
+    return item;
+  }
+
+  /// 新 agent 用 `report:health`；老 agent 没有该原语时从 `report:bas` 推导，保持向后兼容。
+  AgentSample[] effectiveHealth() {
+    if (healthKnown)
+      return health;
+    AgentSample[] result;
+    if (basReport.type != Json.Type.object)
+      return result;
+    bool[string] runningById;
+    string[] ids;
+    auto running = basReport["instances"];
+    if (running.type == Json.Type.array) {
+      foreach (ref item; running) {
+        auto id = channel.textOf(item, "id");
+        if (id.length == 0 || id.length > MaxServerIdBytes)
+          continue;
+        if ((id in runningById) is null)
+          ids ~= id;
+        runningById[id] = true;
+      }
+    }
+    auto declared = basReport["declared"];
+    if (declared.type == Json.Type.array) {
+      foreach (ref item; declared) {
+        auto id = channel.textOf(item, "id");
+        if (id.length == 0 || id.length > MaxServerIdBytes)
+          continue;
+        if ((id in runningById) is null) {
+          ids ~= id;
+          runningById[id] = false;
+        }
+      }
+    }
+    ids.sort;
+    foreach (id; ids)
+      result ~= AgentSample(id, runningById[id] ? "running" : "stopped");
+    return result;
   }
 
   private void hello(Json body) {
@@ -268,6 +352,44 @@ final class AgentSession {
       }
     }
     supports = declared.sort.release;
+  }
+
+  /// 只接受有限数量、有限长度的 server id 与三种状态；坏数组清空旧快照，不保留半份数据。
+  private AgentSample[] parseHealth(Json body, out bool known) {
+    known = false;
+    if (body.type != Json.Type.object)
+      return null;
+    auto value = body["servers"];
+    if (value.type != Json.Type.array)
+      return null;
+    known = true;
+    AgentSample[] result;
+    bool[string] seen;
+    foreach (ref item; value) {
+      if (result.length >= MaxHealthServers)
+        break;
+      if (item.type != Json.Type.object)
+        continue;
+      auto id = channel.textOf(item, "id").strip;
+      auto state = channel.textOf(item, "state").strip;
+      if (id.length == 0 || id.length > MaxServerIdBytes)
+        continue;
+      if (state != "running" && state != "stopped" && state != "error")
+        continue;
+      if ((id in seen) !is null)
+        continue;
+      seen[id] = true;
+      result ~= AgentSample(id, state);
+    }
+    result.sort!((left, right) => left.id < right.id);
+    return result;
+  }
+
+  private static Json healthJson(const(AgentSample)[] samples) {
+    Json[] items;
+    foreach (sample; samples)
+      items ~= Json(["id": Json(sample.id), "state": Json(sample.state)]);
+    return Json(items);
   }
 
   private string boundedText(Json body, string key, size_t maxBytes) {
@@ -315,10 +437,15 @@ final class AgentSession {
 /// 每个 profile 一条在线连接。
 final class AgentRegistry {
   private AgentSession[string] sessions;
+  private AgentHistoryStore historyStore;
+
+  this(AgentHistoryStore historyStore = null) {
+    this.historyStore = historyStore;
+  }
 
   /// 登记新连接；同一 profile 的旧连接被标记为 `superseded`。
-  AgentSession attach(string profile) {
-    auto session = new AgentSession(profile);
+  AgentSession attach(string profile, string profileId = "") {
+    auto session = new AgentSession(profile, profileId);
     if (auto previous = profile in sessions)
       (*previous).supersede();
     sessions[profile] = session;
@@ -361,6 +488,36 @@ final class AgentRegistry {
     foreach (session; online())
       items ~= session.status;
     return Json(items);
+  }
+
+  /// `GET /api/bashub/monitor/agents/summary` 的数组；只含在线状态与实例摘要。
+  Json summary() {
+    Json[] items;
+    foreach (session; online())
+      items ~= session.summary;
+    return Json(items);
+  }
+
+  /// 写入一条轻量健康快照；数据库故障不能影响 agent 通道本身。
+  void recordHealth(string profileId, const(AgentSample)[] samples) nothrow {
+    if (historyStore is null || profileId.length == 0 || samples.length == 0)
+      return;
+    try
+      historyStore.record(profileId, samples);
+    catch (Exception e)
+      logWarn("%s: record health history failed: %s", profileId, e.msg);
+  }
+
+  /// 是否有可用的历史存储；路由据此区分「没有历史」与「查询失败」。
+  bool hasHistory() const {
+    return historyStore !is null;
+  }
+
+  /// 查询历史；调用方负责把异常转换成 HTTP 错误。
+  Json history(string profileId, string profileName, int daysCount) {
+    if (historyStore is null)
+      throw new Exception("agent history is not configured");
+    return historyStore.query(profileId, profileName, daysCount);
   }
 
   /// 请某个在线 agent 立即上报；不在线返回 false。

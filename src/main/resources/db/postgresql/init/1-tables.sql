@@ -24,3 +24,4 @@ create table bas.ems_channels (id integer not null, app_id integer not null, bas
 create table bas.ems_menus (id integer not null, app_id integer not null, en_name varchar(255) not null, enabled boolean default false not null, entry_id integer, fonticon varchar(255), indexno varchar(255) not null, name varchar(255) not null, params varchar(255), parent_id integer, remark varchar(255));
 create table bas.ems_menus_resources (menu_id integer not null, resource_id integer not null);
 create table bas.ems_resources (id integer not null, actions varchar(255), app_id integer not null, enabled boolean default false not null, name varchar(255) not null, remark varchar(255), "scope" integer not null, title varchar(255) not null);
+create table bas.mon_server_samples (id bigint not null, profile_id bigint not null, sampled_at timestamp with time zone not null, servers jsonb not null);

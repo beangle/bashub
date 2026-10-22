@@ -213,11 +213,23 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   （[docs/channel-protocol.md](https://github.com/beangle/basctl/blob/main/docs/channel-protocol.md)），
   本仓库 D 侧的 `bashub.agent.*` 是服务端实现（信封编解码 + 现状快照 + 内存登记册 + 握手鉴权），
   行为以同一份协议文档为准。
-- 读现状：`GET /api/bashub/monitor/agents/status` → `{"agents":[…]}`，每项是「这台机器此刻的样子」
-  （profile / host / basctl / bas / basHome / supports / connectedAt / lastSeenAt / os / basReport）。
-  只在线的、只留最近一次；断连即摘除。控制台页面为 SPA 的 `/monitor/agents`。
-  `basReport.instances` 只含运行中实例；`basReport.declared` 是本机 `server.xml` 声明的实例，
-  控制台按 `id` 合并两者，停止后仍保留实例行并提供启动入口。
+- 读完整现状：`GET /api/bashub/monitor/agents/status` → `{"agents":[…]}`，每项是「这台机器此刻的样子」
+  （profile / host / basctl / bas / basHome / supports / connectedAt / lastSeenAt / os / basReport /
+  health）。只在线的、只留最近一次；断连即摘除。`basReport.instances` 只含运行中实例；
+  `basReport.declared` 是本机 `server.xml` 声明的实例，控制台按 `id` 合并两者，停止后仍保留实例行并
+  提供启动入口。
+- 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，只含
+  profile / host / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health 以及
+  `running` / `stopped` 计数，不携带 OS 与 webapps。SPA 在线列表每 30 秒轮询此接口，点击“刷新详情”
+  时才读取完整 `/agents/status`。
+- 读运行历史：`GET /api/bashub/monitor/agents/{profile}/history?days=180`。`days` 取 1–180，
+  缺省调用方传 180。返回 `{profile, from, to, days, samples:[{at, servers:{id:state}}]}`，
+  `samples` 按时间升序；页面一次取回整个 profile 的所有 server 状态，再在 SPA 本地计算
+  每个 server 的每日运行/停止/异常计数、可用率、最近状态和状态变化。单 server 视图直接复用
+  这份数据，不再按 `instance` 单独请求。
+  历史来自 `bas.mon_server_samples`，每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`），
+  只在 hub 的 `agent-health-*` 采样窗口内由 `report:health` 触发写入，保留 180 天；历史存储未启用时
+  返回 503，profile 不存在返回 404，表未迁移或其他数据库查询失败返回 500。
 - 授权：`/api/bashub/monitor/agents/*` 的读日志、立即上报与启停实例属于管理动作，除登录外还要求
   `ROLE_ADMIN`（或 root）；不能只依赖 EMS 是否登记了 `/monitor/agents` 资源。
 - 立即刷新：`POST /api/bashub/monitor/agents/{profile}/report` → 202 表示 `report:now` 已入队；节点离线 404，
@@ -244,6 +256,6 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   - 空闲时发送 `: keepalive` 注释；流内错误用 `event: failure`，不会与 EventSource 自己的
     连接错误事件同名。节点离线 404、agent 未申报 `log:read` 409。
   - agent 侧协议不变：仍是普通区间 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
-- SPA 页面：`/monitor/agents` 展示在线节点、操作系统指标、运行实例与 `hello.supports`，支持立即上报、
-  按区间读实例或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；
-  节点列表每 10 秒刷新一次。
+- SPA 页面：`/monitor/agents` 展示在线节点、实例状态、运行历史与 `hello.supports`；操作系统指标与
+  webapps 明细按需加载。支持立即上报、按区间读实例或 agent 日志、SSE 跟随与实例重启 / 停止。
+  跟随断线由 `EventSource` 自动重连；轻量摘要每 30 秒刷新一次。

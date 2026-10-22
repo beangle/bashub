@@ -17,6 +17,7 @@ import bashub.route;
 import bashub.store;
 import bashub.api : resourceApiGroup;
 import bashub.agent.channel : Envelope, parse;
+import bashub.agent.history : AgentHistoryStore, AgentSample;
 import bashub.agent.registry : AgentRegistry;
 
 import beangle.jsonapi.router : RouteOptions;
@@ -42,6 +43,31 @@ private struct Exchange {
   int status;
   string body;
   string contentType;
+}
+
+private final class FakeAgentHistory : AgentHistoryStore {
+  string profileId;
+  string profile;
+  int daysCount;
+
+  void record(string profileId, const(AgentSample)[] samples) {
+  }
+
+  Json query(string profileId, string profile, int daysCount) {
+    this.profileId = profileId;
+    this.profile = profile;
+    this.daysCount = daysCount;
+    return Json([
+      "profile": Json(profile),
+      "from": Json("2026-04-25T00:00:00+08:00"),
+      "to": Json("2026-10-22T00:00:00+08:00"),
+      "days": Json(cast(long) daysCount),
+      "samples": Json([Json([
+        "at": Json("2026-10-22T08:00:00+08:00"),
+        "servers": Json(["platform.server1": Json("running")])
+      ])])
+    ]);
+  }
 }
 
 private Exchange call(HTTPServerRequestHandler router, HTTPMethod method, string url, string body = null) {
@@ -235,6 +261,62 @@ unittest {
   assert(list.length == 2);
   assert(list[0]["profile"].get!string == "openurp.demo");
   assert(list[1]["host"].get!string == "app1");
+}
+
+@("agents/summary returns health counts without full snapshots") unittest {
+  auto agents = new AgentRegistry();
+  auto router = newRouter(false, agents);
+  auto session = agents.attach("openurp.prod");
+  session.host = "app1";
+  Envelope hello;
+  assert(parse(`{"type":"hello","at":"2026-10-16T10:00:00+08:00",
+      "body":{"host":"app1","supports":["hello","report:health","agent:log"]}}`, hello));
+  session.accept(hello);
+  Envelope health;
+  assert(parse(`{"type":"report:health","at":"2026-10-16T10:00:01+08:00",
+      "body":{"servers":[{"id":"platform.server1","state":"running"},
+        {"id":"portal.server1","state":"stopped"}]}}`, health));
+  session.accept(health);
+
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/summary");
+  assert(ex.status == 200, ex.body);
+  auto item = parseJson(ex.body)["agents"].get!(Json[])[0];
+  assert(item["running"].get!long == 1);
+  assert(item["stopped"].get!long == 1);
+  assert(item["health"].get!(Json[]).length == 2);
+  assert(item["os"].type == Json.Type.undefined);
+  assert(item["basReport"].type == Json.Type.undefined);
+}
+
+@("agents/history validates and forwards the query") unittest {
+  auto history = new FakeAgentHistory();
+  auto router = newRouter(false, new AgentRegistry(history));
+
+  auto noHistory = newRouter(false, new AgentRegistry());
+  auto ex = call(noHistory, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/history?days=180");
+  assert(ex.status == 503, ex.body);
+
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/history?days=0");
+  assert(ex.status == 400, ex.body);
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/history?days=181");
+  assert(ex.status == 400, ex.body);
+
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/missing.prod/history?days=180");
+  assert(ex.status == 404, ex.body);
+
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/history?days=180");
+  assert(ex.status == 200, ex.body);
+  assert(history.profileId == "1002");
+  assert(history.profile == "openurp.prod");
+  assert(history.daysCount == 180);
+  auto samples = parseJson(ex.body)["samples"].get!(Json[]);
+  assert(samples.length == 1);
+  assert(samples[0]["servers"]["platform.server1"].get!string == "running");
 }
 
 @("agents/log validates the instance and reports an offline node")

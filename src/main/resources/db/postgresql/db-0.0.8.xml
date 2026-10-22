@@ -18,6 +18,22 @@
             <unique-key name="uq_cdn_components_kind_mount_name" columns="kind,mount_name"/>
           </constraints>
         </table>
+        <table name="mon_server_samples" comment="节点运行状态采样">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="sampled_at" type="timestamp with time zone" nullable="false" comment="采样时刻"/>
+            <column name="servers" type="jsonb" nullable="false" comment="server 状态: id -> running/stopped/error"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_mon_server_samples" columns="id"/>
+            <unique-key name="uq_mon_server_samples_point" columns="profile_id,sampled_at"/>
+            <foreign-key name="fk_mon_server_samples_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_mon_server_samples_profile_time" columns="profile_id,sampled_at"/>
+          </indexes>
+        </table>
         <table name="cfg_artifacts" comment="Artifact?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>

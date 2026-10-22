@@ -26,7 +26,7 @@ import beangle.security.session : Session, SessionRepo, nowSeconds;
 import bashub.artifactversion : refreshArtifactVersions;
 import bashub.agent.channel : bearer;
 import bashub.agent.registry : AgentRegistry, RequestOutcome;
-import bashub.agent.socket : serveAgentSocket;
+import bashub.agent.socket : HealthSchedule, serveAgentSocket;
 import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
@@ -769,7 +769,9 @@ class HubService {
       res.writeBody("", HTTPStatus.unauthorized);
       return;
     }
-    serveAgentSocket(agents, name, req, res);
+    auto health = HealthSchedule(cfg.agentHealthIntervalSeconds, cfg.agentHealthStartMinute,
+        cfg.agentHealthEndMinute);
+    serveAgentSocket(agents, name, profile.id, req, res, health);
   }
 
   /// `GET /api/bashub/monitor/agents/status`：在线节点现状，只在线的、只留最近一次。
@@ -779,6 +781,47 @@ class HubService {
     auto doc = Json.emptyObject;
     doc["agents"] = agents.status;
     writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// `GET /api/bashub/monitor/agents/summary`：在线列表轻量摘要，不返回 OS 与 webapps。
+  void agentSummary(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto doc = Json.emptyObject;
+    doc["agents"] = agents.summary;
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// `GET /api/bashub/monitor/agents/{profile}/history?days=180`
+  /// 一次返回 profile 的原始运行采样；按 server/天聚合与单 server 视图都在 SPA 本地完成。
+  void agentHistory(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+
+    long daysCount;
+    if (!queryLong(req, "days", daysCount) || daysCount < 1 || daysCount > 180) {
+      writeJsonApi(res, errorDocument(400, "请求参数非法", "days must be between 1 and 180", "days"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    auto profileName = req.params.get("profile", "");
+    ProfileContext profile;
+    if (!findProfile(reg, store, profileName, profile)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no profile with name " ~ profileName),
+          HTTPStatus.notFound);
+      return;
+    }
+    if (!agents.hasHistory) {
+      writeJsonApi(res, errorDocument(503, "运行历史不可用", "agent history is not configured"),
+          HTTPStatus.serviceUnavailable);
+      return;
+    }
+    try {
+      writeJsonApi(res, agents.history(profile.id, profileName, cast(int) daysCount), HTTPStatus.ok);
+    } catch (Exception e) {
+      logError("Query agent history failed: %s", e.msg);
+      writeJsonApi(res, errorDocument(500, "运行历史查询失败", e.msg), HTTPStatus.internalServerError);
+    }
   }
 
   /// `POST /api/bashub/monitor/agents/{profile}/report`：要求在线 agent 立即上报一次。
@@ -1725,7 +1768,9 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.delete_(api.micdn ~ "/components/:id", &hub.deleteCdnComponent);
 
   // monitor：在线节点、日志与实例启停
+  router.get(api.monitor ~ "/agents/summary", &hub.agentSummary);
   router.get(api.monitor ~ "/agents/status", &hub.agentStatus);
+  router.get(api.monitor ~ "/agents/:profile/history", &hub.agentHistory);
   router.get(api.monitor ~ "/agents/:profile/agent-log", &hub.agentOwnLog);
   router.get(api.monitor ~ "/agents/:profile/log/follow", &hub.agentLogFollow);
   router.get(api.monitor ~ "/agents/:profile/log", &hub.agentLog);
