@@ -55,70 +55,83 @@
               <span class="agent-muted">{{ instancesOf(agent).length }} 个</span>
             </div>
             <div v-if="instancesOf(agent).length === 0" class="agent-muted">暂无已声明实例</div>
-            <div
-              v-for="instance in instancesOf(agent)"
-              :key="instance.id || instance.pid"
-              class="instance-row"
-            >
-              <div class="instance-row-head">
-                <div class="instance-main">
-                  <strong>{{ instance.id || '-' }}</strong>
-                  <t-tag
-                    size="small"
-                    variant="light"
-                    :theme="isRunning(instance) ? 'success' : 'warning'"
-                  >
-                    {{ isRunning(instance) ? '运行中' : '已停止' }}
-                  </t-tag>
-                  <span v-if="isRunning(instance)">PID {{ instance.pid ?? '-' }}</span>
-                  <span>端口 {{ instance.httpPort ?? '-' }}</span>
-                  <span>{{ instance.engine || '-' }}</span>
-                  <span
-                    v-if="webappText(instance)"
-                    class="instance-apps-text"
-                    :title="webappText(instance)"
-                  >
-                    {{ webappText(instance) }}
-                  </span>
-                </div>
-                <div v-if="instance.id" class="instance-actions">
-                  <t-button
-                    size="small"
-                    variant="text"
-                    @click="openLog(agent, instance)"
-                  >
-                    查看日志
-                  </t-button>
-                  <t-button
-                    v-if="!isRunning(instance) && canService(agent, 'start')"
-                    size="small"
-                    theme="primary"
-                    :loading="serviceLoading[serviceKey(agent, instance)] === true"
-                    @click="confirmService(agent, instance, 'start')"
-                  >
-                    启动
-                  </t-button>
-                  <t-button
-                    v-if="isRunning(instance) && canService(agent, 'restart')"
-                    size="small"
-                    variant="outline"
-                    :loading="serviceLoading[serviceKey(agent, instance)] === true"
-                    @click="confirmService(agent, instance, 'restart')"
-                  >
-                    重启
-                  </t-button>
-                  <t-button
-                    v-if="isRunning(instance) && canService(agent, 'stop')"
-                    size="small"
-                    theme="danger"
-                    variant="outline"
-                    :loading="serviceLoading[serviceKey(agent, instance)] === true"
-                    @click="confirmService(agent, instance, 'stop')"
-                  >
-                    停止
-                  </t-button>
-                </div>
-              </div>
+            <div v-else class="instance-table-wrap">
+              <table class="instance-table">
+                <thead>
+                  <tr>
+                    <th class="instance-col-index">序号</th>
+                    <th>Server</th>
+                    <th>状态</th>
+                    <th class="instance-col-port">端口</th>
+                    <th>应用</th>
+                    <th class="instance-col-actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(instance, index) in instancesOf(agent)" :key="instance.id || instance.pid">
+                    <td class="instance-index">{{ index + 1 }}</td>
+                    <td class="instance-name" :title="instance.id || '-'">{{ instance.id || '-' }}</td>
+                    <td>
+                      <div class="instance-status">
+                        <t-tag
+                          size="small"
+                          variant="light"
+                          :theme="isRunning(instance) ? 'success' : 'warning'"
+                        >
+                          {{ isRunning(instance) ? '运行中' : '已停止' }}
+                        </t-tag>
+                        <span v-if="isRunning(instance)" class="instance-pid">
+                          PID {{ instance.pid ?? '-' }}
+                        </span>
+                      </div>
+                    </td>
+                    <td>{{ instance.httpPort ?? '-' }}</td>
+                    <td class="instance-apps" :title="webappText(instance)">
+                      {{ webappText(instance) || '—' }}
+                    </td>
+                    <td class="instance-actions">
+                      <template v-if="instance.id">
+                        <t-button
+                          size="small"
+                          variant="text"
+                          @click="openLog(agent, instance)"
+                        >
+                          查看日志
+                        </t-button>
+                        <t-button
+                          v-if="!isRunning(instance) && canService(agent, 'start')"
+                          size="small"
+                          theme="primary"
+                          :loading="serviceLoading[serviceKey(agent, instance)] === true"
+                          @click="confirmService(agent, instance, 'start')"
+                        >
+                          启动
+                        </t-button>
+                        <t-button
+                          v-if="isRunning(instance) && canService(agent, 'restart')"
+                          size="small"
+                          variant="outline"
+                          :loading="serviceLoading[serviceKey(agent, instance)] === true"
+                          @click="confirmService(agent, instance, 'restart')"
+                        >
+                          重启
+                        </t-button>
+                        <t-button
+                          v-if="isRunning(instance) && canService(agent, 'stop')"
+                          size="small"
+                          theme="danger"
+                          variant="outline"
+                          :loading="serviceLoading[serviceKey(agent, instance)] === true"
+                          @click="confirmService(agent, instance, 'stop')"
+                        >
+                          停止
+                        </t-button>
+                      </template>
+                      <span v-else class="agent-muted">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -505,7 +518,11 @@ function instancesOf(agent: AgentStatus): AgentInstance[] {
       merged.push({ ...instance, state: 'running' })
     }
   }
-  return merged
+  return merged.sort(
+    (left, right) =>
+      (left.id || '').localeCompare(right.id || '', 'zh-CN', { numeric: true, sensitivity: 'base' }) ||
+      (left.pid ?? 0) - (right.pid ?? 0),
+  )
 }
 
 function isRunning(instance: AgentInstance): boolean {
@@ -607,7 +624,6 @@ onBeforeUnmount(() => {
 .agent-section-title,
 .agent-title-row,
 .agent-name,
-.instance-main,
 .log-toolbar {
   display: flex;
   align-items: center;
@@ -724,44 +740,89 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.instance-row {
-  padding: 8px 0;
-  border-top: 1px solid var(--td-component-stroke);
+.instance-table-wrap {
+  margin-top: 8px;
+  overflow-x: auto;
 }
 
-.instance-row-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.instance-main {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+.instance-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
   font-size: 13px;
+}
+
+.instance-table th,
+.instance-table td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--td-component-stroke);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.instance-table th {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.instance-main > strong,
-.instance-main > span {
-  flex-shrink: 0;
+.instance-col-index {
+  width: 44px;
 }
 
-.instance-main > .instance-apps-text {
-  flex-shrink: 1;
-  min-width: 60px;
-  overflow: hidden;
+.instance-col-port {
+  width: 64px;
+}
+
+.instance-col-actions {
+  width: 1%;
+  text-align: right !important;
+}
+
+.instance-index {
   color: var(--td-text-color-placeholder);
+  font-variant-numeric: tabular-nums;
+  text-align: right !important;
+}
+
+.instance-name {
+  max-width: 220px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instance-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.instance-pid {
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.instance-apps {
+  max-width: 240px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--td-text-color-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .instance-actions {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-shrink: 0;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .log-toolbar {
@@ -811,7 +872,6 @@ onBeforeUnmount(() => {
   }
 
   .agent-card-head,
-  .instance-row-head,
   .log-toolbar {
     align-items: flex-start;
     flex-direction: column;
