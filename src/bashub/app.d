@@ -126,6 +126,7 @@ int main(string[] args) {
   try {
     cfg = loadBashub(ems);
     applyListenOverride(cfg, parsedArgs.listen);
+    validateBashubConfig(cfg);
     applyBashubLogging(cfg.logFile, cfg.logLevel);
   } catch (Exception e) {
     stderr.writeln("bashub: " ~ e.msg);
@@ -160,6 +161,7 @@ int main(string[] args) {
     settings.bindAddresses = [addr.host];
     settings.port = addr.port;
     settings.serverString = null;
+    settings.webSocketPayloadMaxLength = 256 * 1024;
     auto sessions = createSessionRepo(cfg);
     HubSecurity security;
     if (cfg.authRequired || sessions !is null) {

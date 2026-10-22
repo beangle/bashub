@@ -35,7 +35,7 @@ unittest {
   auto cfg = loadBashub(ems);
   assert(cfg.listen == "127.0.0.1:8080");
   assert(cfg.apiPrefix == "/api/bashub");
-  assert(!cfg.authRequired);
+  assert(cfg.authRequired);
   assert(cfg.artifactRefreshMinutes == 360);
   assert(cfg.emsBase == "https://sas.openurp.net");
   assert(cfg.emsInnerApi == "http://10.0.0.8/api");
@@ -81,4 +81,21 @@ unittest {
 
   auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
   assert(loadBashub(ems).listen == "0.0.0.0:8899");
+}
+
+@("auth defaults to required and only an explicit none disables it") unittest {
+  auto home = uniqueTempDir("bashub-ems-auth-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"), `<app auth="required"/>`);
+  auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
+  assert(loadBashub(ems).authRequired);
+
+  write(buildPath(home, "bas/hub.xml"), `<app auth="none"/>`);
+  auto cfg = loadBashub(ems);
+  assert(!cfg.authRequired);
+  validateBashubConfig(cfg);
+
+  cfg.listen = "0.0.0.0:8080";
+  assertThrown!Exception(validateBashubConfig(cfg));
 }

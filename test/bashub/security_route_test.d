@@ -222,6 +222,20 @@ unittest {
   assert(groups.status == 200, groups.body);
 }
 
+@("agent 监控与控制端点只允许管理员") unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("user", ["ROLE_USER"]));
+  auto router = securedRouter(authConfig(), repo, testDomain());
+  auto denied = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/status", "EMS_SID=user");
+  assert(denied.status == 403, denied.body);
+
+  repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
+  auto allowed = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/status", "EMS_SID=admin");
+  assert(allowed.status == 200, allowed.body);
+}
+
 @("CAS ticket 登录会把 authorities 映射进账户并访问 Private 资源")
 unittest {
   auto cas = new FakeCas();
@@ -262,6 +276,7 @@ unittest {
   HubConfig cfg;
   cfg.apiPrefix = "/api/bashub";
   cfg.emsBase = "https://sas.openurp.net";
+  cfg.authRequired = false;
   auto reg = hubRegistry();
   auto router = publicRouter(cfg, reg, demoDao(reg));
 

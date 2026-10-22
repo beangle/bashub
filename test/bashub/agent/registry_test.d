@@ -50,6 +50,21 @@ unittest {
   assert(status["osAt"].get!string == "2026-10-16T10:00:02+08:00");
 }
 
+@("hello only retains known capabilities and bounded fields") unittest {
+  auto registry = new AgentRegistry();
+  auto session = registry.attach("demo");
+  session.accept(envelope("hello", "2026-10-16T10:00:01+08:00",
+      `{"host":"app1","supports":["hello","shell","service:restart","report:os"]}`));
+  assert(session.supports == ["hello", "report:os", "service:restart"]);
+
+  string longHost;
+  foreach (i; 0 .. 256)
+    longHost ~= 'x';
+  session.accept(envelope("hello", "2026-10-16T10:00:02+08:00",
+      `{"host":"` ~ longHost ~ `","supports":[]}`));
+  assert(session.host == "");
+}
+
 @("a later report replaces the whole previous one")
 unittest {
   auto registry = new AgentRegistry();

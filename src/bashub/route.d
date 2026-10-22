@@ -69,6 +69,10 @@ private enum long LogFollowMaxTail = 2000;
 private enum int LogReadTimeoutSeconds = 5;
 /// service:* 可能包含一次 stop（默认等 15s）再加启动与依赖解析，给足两分钟。
 private enum int ServiceTimeoutSeconds = 120;
+/// 来自 agent 的日志窗口上限；不能信任对端会遵守 basctl 侧的限制。
+private enum long MaxAgentLogLines = 2000;
+private enum size_t MaxAgentLogLineBytes = 4096;
+private enum size_t MaxAgentLogBytes = 256 * 1024;
 
 /// `log:read` 的解包结果；只保留跟随需要的那几个字段。
 private struct AgentLogWindow {
@@ -96,10 +100,19 @@ private bool decodeLogWindow(Json data, out AgentLogWindow window) {
   parsed.to = to.get!long;
   if (parsed.total < 0 || parsed.from < 0 || parsed.to < 0)
     return false;
+  if (lines.length > MaxAgentLogLines)
+    return false;
+  size_t usedBytes;
   foreach (ref item; lines) {
     if (item.type != Json.Type.string)
       return false;
-    parsed.lines ~= item.get!string;
+    auto line = item.get!string;
+    if (line.length > MaxAgentLogLineBytes)
+      return false;
+    usedBytes += line.length + 1;
+    if (usedBytes > MaxAgentLogBytes)
+      return false;
+    parsed.lines ~= line;
   }
   window = parsed;
   return true;
@@ -1172,6 +1185,9 @@ class HubService {
       writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
       return;
     }
+    ProfileContext profile;
+    if (findProfileById(reg, store, id, profile))
+      agents.supersede(attributeText(profile.data, "qualifiedName"));
     // 与 Scala 侧同形：扁平的 `{id, key}`，不是 JSON:API 文档
     auto doc = Json.emptyObject;
     doc["id"] = Json(id);

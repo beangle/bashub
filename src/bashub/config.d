@@ -15,7 +15,7 @@ import beangle.ems : Ems;
 import beangle.ems.app : appFileAttribute;
 import beangle.ems.datasource : findDatasource, postgresConnInfo;
 import std.conv : to;
-import std.string : lastIndexOf, strip;
+import std.string : lastIndexOf, strip, toLower;
 
 import vibe.core.log : logInfo;
 
@@ -33,8 +33,8 @@ struct HubConfig {
   /// libpq 连接串（如 `host=127.0.0.1 port=5432 user=bashub dbname=bas`）；留空则不可用数据库
   string dbUrl;
   string apiPrefix = "/api/bashub";
-  /// 是否要求登录（预演阶段只判有无会话头，不做 CAS）
-  bool authRequired = false;
+  /// 是否要求登录；缺省必须登录，只有显式 `auth="none"` 才关闭。
+  bool authRequired = true;
   string logLevel = "info";
   string logFile = "console";
   /// 前端运行时配置下发的 ems 地址与名称
@@ -74,6 +74,15 @@ HubConfig loadBashub(Ems ems) {
   auto listen = appFileAttribute(ems.env.home, cfg.appName, "listen");
   if (listen.length > 0)
     cfg.listen = parseListen(listen).toString;
+  auto auth = appFileAttribute(ems.env.home, cfg.appName, "auth").strip.toLower;
+  if (auth.length > 0) {
+    if (auth == "required" || auth == "true" || auth == "1")
+      cfg.authRequired = true;
+    else if (auth == "none" || auth == "false" || auth == "0")
+      cfg.authRequired = false;
+    else
+      throw new Exception("unknown auth value in " ~ cfg.appName ~ ".xml: " ~ auth);
+  }
   if (cfg.authorityUrl.length == 0 && cfg.emsInnerApi.length > 0)
     cfg.authorityUrl = cfg.emsInnerApi ~ "/platform/security/func/" ~ cfg.appName ~ "/resources.json";
   return cfg;
@@ -84,6 +93,16 @@ void applyListenOverride(ref HubConfig cfg, string listen) {
   if (listen.length == 0)
     return;
   cfg.listen = parseListen(listen).toString;
+}
+
+/** `auth="none"` 只允许本机调试；非回环监听必须登录，避免误把管理面暴露到网络。 */
+void validateBashubConfig(HubConfig cfg) {
+  if (cfg.authRequired)
+    return;
+  auto addr = parseListen(cfg.listen);
+  auto host = addr.host.strip.toLower;
+  if (host != "127.0.0.1" && host != "localhost" && host != "::1" && host != "[::1]")
+    throw new Exception("auth=\"none\" is only allowed on a loopback listen address; got " ~ cfg.listen);
 }
 
 /** 从 ems 部署里取库连接串；空串 = 没有可用的（调用方按缺少数据库拒绝启动）。

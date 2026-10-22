@@ -21,7 +21,9 @@ URL 契约由 `test/bashub/route_test.d` 覆盖，路由变更以该测试为准
 - JSON/XHR 请求未登录返回 `401`，响应体为
   `{"errors":[{"status":401,"meta":{"redirectUrl":"<CAS 登录地址>"}}]}`；浏览器导航请求直接 302。
 - 已登录但无权访问返回 `403`，响应体是标准 JSON:API 错误文档。
-- `GET /api/bashub/ems/configs` 不校验登录；其余管理接口受 `<api auth="required">` 控制。
+- `GET /api/bashub/ems/configs` 不校验登录；其余管理接口默认要求登录。应用文件的
+  `<app auth="required">` 是缺省值；只有本机开发才可显式写 `<app auth="none">`，且监听地址必须是
+  `localhost` / `127.0.0.1` / `[::1]`，否则 bashub 拒绝启动。
 - API 路径必须带能力域；不注册 `/api/bashub/{profile}`、`/api/bashub/{resource}` 这类无域别名。
 - EMS 权限资源名使用应用内路径 `/{能力域}/{资源}`，不包含可部署变化的 `/api/bashub` 根前缀，
   例如 `/ems/apps`、`/ems/app-groups`、`/ems/menus`、`/config/profiles`。
@@ -216,6 +218,8 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   只在线的、只留最近一次；断连即摘除。控制台页面为 SPA 的 `/monitor/agents`。
   `basReport.instances` 只含运行中实例；`basReport.declared` 是本机 `server.xml` 声明的实例，
   控制台按 `id` 合并两者，停止后仍保留实例行并提供启动入口。
+- 授权：`/api/bashub/monitor/agents/*` 的读日志、立即上报与启停实例属于管理动作，除登录外还要求
+  `ROLE_ADMIN`（或 root）；不能只依赖 EMS 是否登记了 `/monitor/agents` 资源。
 - 立即刷新：`POST /api/bashub/monitor/agents/{profile}/report` → 202 表示 `report:now` 已入队；节点离线 404，
   agent 未申报该能力 409。随后到达的 `report:os` / `report:bas` 会覆盖现状。
 - 读日志：`GET /api/bashub/monitor/agents/{profile}/log?instance={farm.server}&from={from}&to={to}&tail={n}`。

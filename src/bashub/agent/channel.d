@@ -30,6 +30,9 @@ enum HubPrimitives = [
   "ping", "report:now", "log:read", "agent:log", "service:start", "service:stop", "service:restart"
 ];
 
+/// 请求号上限；与 basctl 的 `bas.channel.maxRequestIdLength` 保持一致。
+private enum size_t MaxRequestIdBytes = 64;
+
 /// 一条消息：`id` 非空表示请求，接收方要用 `result` 应答；空表示通知。
 struct Envelope {
   string typ;
@@ -70,6 +73,8 @@ bool parse(string text, out Envelope envelope) {
     Envelope parsed;
     parsed.typ = value;
     parsed.id = textOf(doc, "id");
+    if (parsed.id.length && !validRequestId(parsed.id))
+      return false;
     parsed.at = textOf(doc, "at");
     auto body = doc["body"];
     parsed.body = body.type == Json.Type.object ? body : Json.emptyObject;
@@ -78,6 +83,19 @@ bool parse(string text, out Envelope envelope) {
   } catch (Exception) {
     return false;
   }
+}
+
+/// 请求号只允许有限字符与长度，挡住超长缓存键和日志注入。
+private bool validRequestId(string id) @safe pure nothrow {
+  if (!id.length || id.length > MaxRequestIdBytes)
+    return false;
+  foreach (ch; id) {
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+        || ch == '-' || ch == '_' || ch == '.' || ch == ':')
+      continue;
+    return false;
+  }
+  return true;
 }
 
 /// 渲染一条消息；`id` 非空即请求。

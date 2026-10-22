@@ -33,6 +33,12 @@ enum RequestOutcome {
   offline
 }
 
+/// `hello` 的字段上限：异常 agent 不能让快照无界增长。
+private enum size_t MaxHelloHostBytes = 255;
+private enum size_t MaxHelloVersionBytes = 128;
+private enum size_t MaxHelloHomeBytes = 4096;
+private enum size_t MaxCapabilityBytes = 64;
+
 /// `result` 解开后的应答；`failed` 保留 agent 给出的错误串。
 struct AgentReply {
   RequestOutcome outcome;
@@ -240,10 +246,10 @@ final class AgentSession {
   }
 
   private void hello(Json body) {
-    host = channel.textOf(body, "host");
-    basctlVersion = channel.textOf(body, "basctl");
-    basVersion = channel.textOf(body, "bas");
-    basHome = channel.textOf(body, "basHome");
+    host = boundedText(body, "host", MaxHelloHostBytes);
+    basctlVersion = boundedText(body, "basctl", MaxHelloVersionBytes);
+    basVersion = boundedText(body, "bas", MaxHelloVersionBytes);
+    basHome = boundedText(body, "basHome", MaxHelloHomeBytes);
 
     bool[string] seen;
     string[] declared;
@@ -253,13 +259,20 @@ final class AgentSession {
         if (item.type != Json.Type.string)
           continue;
         auto capability = item.get!string.strip;
-        if (capability.length > 0 && capability !in seen) {
+        if (capability.length > 0 && capability.length <= MaxCapabilityBytes
+            && (channel.AgentPrimitives.canFind(capability)
+                || channel.HubPrimitives.canFind(capability)) && capability !in seen) {
           seen[capability] = true;
           declared ~= capability;
         }
       }
     }
     supports = declared.sort.release;
+  }
+
+  private string boundedText(Json body, string key, size_t maxBytes) {
+    auto value = channel.textOf(body, key);
+    return value.length <= maxBytes ? value : "";
   }
 
   private void complete(string id, Json body) {
@@ -319,6 +332,12 @@ final class AgentRegistry {
         sessions.remove(profile);
     }
     session.disconnect();
+  }
+
+  /// 主动作废旧连接；下一次握手会因 key 已重置而失败。
+  void supersede(string profile) {
+    if (auto found = profile in sessions)
+      (*found).supersede();
   }
 
   AgentSession find(string profile) {

@@ -13,6 +13,8 @@ import bashub.agent.channel;
 
 import vibe.data.json : Json, parseJsonString;
 
+import std.array : join;
+import std.range : repeat;
 import std.string : indexOf;
 
 @("parse a report notice and a log request")
@@ -41,6 +43,8 @@ unittest {
   assert(!parse("not json", message));
   assert(!parse(`[1,2,3]`, message));
   assert(!parse(`{"at":"2026-10-16T10:00:00+08:00"}`, message));
+  assert(!parse(`{"type":"result","id":"bad id","body":{}}`, message));
+  assert(!parse(`{"type":"result","id":"` ~ "a".repeat(65).join ~ `","body":{}}`, message));
 
   // 缺 body / id 不是错误，只是「没有」；字段开放
   assert(parse(`{"type":"pong"}`, message));

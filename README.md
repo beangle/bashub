@@ -319,7 +319,8 @@ curl -s -i -H 'Accept: application/vnd.api+json' -H "Cookie: URP_SID=$SID" \
   http://127.0.0.1:8080/api/bashub/ems/sessions
 ```
 
-`auth="none"` 时第 3 步拿不到会话是给演示用户（200）而不是 401。
+`auth="none"` 时第 3 步拿不到会话是给演示用户（200）而不是 401；这是显式本机调试模式，
+监听地址必须是回环，缺省（不写 `auth`）始终要求登录。
 
 试一下：
 
@@ -356,7 +357,7 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
 
 按「先铺骨架、后补业务」的顺序，下面这些**没有实现**，其中前几项是真实缺口而非有意裁剪：
 
-- **认证/授权边界**：票据登录只在当次请求生效，不抢写 CAS 域的共享 cookie；退出登录清本地
+- **认证/授权边界**：默认要求登录；`auth="none"` 仅限回环监听。票据登录只在当次请求生效，不抢写 CAS 域的共享 cookie；退出登录清本地
   会话和 cookie，随后由前端重定向到 CAS `/logout?service=...`，不做后通道单点登出。选中的
   Profile 参与安全上下文，但还没有把它用于列表/数据范围过滤。资源未在 ems 登记时只要求登录（与原后端
   `unknownIsProtected=true` 一致），不会因为远端资源表暂不可用而退回匿名可写。

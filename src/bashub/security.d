@@ -16,11 +16,12 @@ import bashub.config : HubConfig;
 import bashub.api : hubApiPrefixes, isApiGroup;
 
 import beangle.ems.authority : RemoteAuthoritySource;
-import beangle.security.authz : AuthorityDomain;
+import beangle.security.authz : AuthorityDomain, permissionAllows;
 import beangle.security.cas : CasConfig;
 import beangle.security.session : Session, SessionRepo;
 import beangle.security.web : AccessDecision, HttpSecurity, SecurityContext, loginUrlFor, wantsJson;
 
+import std.algorithm : canFind;
 import std.string : indexOf, startsWith, toLower;
 
 import vibe.core.log : logInfo, logWarn;
@@ -60,7 +61,13 @@ class HubSecurity {
     auto context = http.authenticate(req, cfg.sessionIdName);
     auto resource = resourceNameOf(req.requestPath.toString);
     auto action = httpMethodString(req.method).toLower;
-    auto decision = http.authorize(context, resource, action, domain());
+    AccessDecision decision;
+    // 未知资源默认只要求登录；监控节点是例外：它能让 agent 启停实例、读日志，
+    // 必须显式具备管理员身份，不能依赖 EMS 是否刚好登记了 /monitor/agents。
+    if (resource == "/monitor/agents" && !isAdministrator(context, action))
+      decision = context.session is null ? AccessDecision.unauthenticated : AccessDecision.forbidden;
+    else
+      decision = http.authorize(context, resource, action, domain());
 
     final switch (decision) {
     case AccessDecision.allow:
@@ -73,6 +80,17 @@ class HubSecurity {
           HTTPStatus.forbidden);
       return false;
     }
+  }
+
+  /// 监控/控制 agent 的内置管理员门槛；权限串里允许 `*` 或 `/monitor/agents:*`。
+  private bool isAdministrator(SecurityContext context, string action) {
+    auto session = context.session;
+    if (session is null || session.principal is null)
+      return false;
+    auto principal = session.principal;
+    return principal.isRoot
+        || principal.authorities.canFind("ROLE_ADMIN")
+        || permissionAllows(principal.permissions, "/monitor/agents", action);
   }
 
   /// 当前请求的安全上下文（`sessions` 端点复用同一套 cookie/ticket 解析）。
