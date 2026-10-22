@@ -204,7 +204,11 @@ src/bashub/                 业务：BAS 控制台这一份
   Private 资源角色不命中回 403，root 直接放行。资源名按能力域取
   `/{group}/{resource}`，因此 ems `resources.json` 需要登记 `/ems/apps`、`/ems/menus` 这类
   不带 API 根前缀的资源名；未登记资源按
-  `unknownIsProtected` 只要求登录。`configs` 不挂 guard，保持登录前可读。
+  `unknownIsProtected` 只要求登录。在线节点页的 GET 接口允许任何已登录用户查看；要求 agent
+  上报或执行启停的写接口则要求 EMS 中 `bas-hub` 的 `/monitor/agents` 资源为 **Private** 且已授权
+  当前用户的角色（会话 `authorities` 里是角色 ID，不是 `ROLE_ADMIN`）。其它 CAS 来源也可用
+  `permissions` 里的 `/monitor/agents:*`；普通 EMS 会话不会填充 `permissions`。`configs`
+  不挂 guard，保持登录前可读。
 - **CORS 与安全响应头**：同源不下发 CORS 头；允许来源的预检回 204，不允许的来源回 403；
   `<api cors-origins="https://hub.example.com,https://sas.openurp.net">` 可覆盖缺省的本机来源，
   ems base 的主机名会自动加入。API 响应带 `Cache-Control: no-store`，所有响应带
@@ -377,7 +381,8 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   （与原后端一致），没做负缓存——拿乱码 sid 打这个端点就是拿它打 CAS。
 - **会话报文只做 JSON**：CAS 的 `/session/{id}` 返回完整 JSON，bashub 不再维护第二套二进制协议。
   JSON 口径下 `DefaultAccount.isRoot` 恒为 false（原后端的 getter 进不了属性表），
-  普通授权仍按 `authorities` / `permissions` 判定。
+  普通授权按 `authorities` / `permissions` 与 EMS 资源角色判定，不能依赖 root 或字面量
+  `ROLE_ADMIN`；EMS 的 `authorities` 实际是角色 ID。
 - **ems 里那些「要网络 / 要加解密」的部分**：`Ems.decryptor`（PBE）没移植，所以 `EmsApp` 合并
   `${home}${path}.xml`、以及读 `<datasource>` 字段时**都不会**把 `ENC(...)` 解一遍密文（值原样
   保留并记一条警告，配了密文的部署得先填明文）；`redis` 配置、blob 仓库、classpath 与 HTTP 取资源
@@ -449,7 +454,9 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
 - **会话报文固定走 JSON**（`?format=application/json`）。现网 CAS 返回完整会话对象；
   id 是**带前缀的整个 cookie 值**（`URP-…`）、时间是 ISO_INSTANT 文本、
   `Map` 落成 `[[k,v],...]`、null/None 不落盘。`DefaultAccount.isRoot` 不在 JSON 属性表中，
-  因此恒为 false；普通授权按 `authorities` / `permissions` 判定。
+  因此恒为 false；普通授权按 `authorities` / `permissions` 判定。EMS 账号的 `authorities`
+  是角色 ID（如 `"42"`），所以 `/monitor/agents` 这类控制资源要在 EMS 角色授权里配置，
+  不能写成 `ROLE_ADMIN` 硬编码。
 - `access` 的返回值有两个特殊值：`-1` 表示已过期（此时清缓存并打 `expire` 让 CAS 也删），
   `0` 表示时钟回拨（按 0 计、**不**更新 lastAccessAt）；只有 `> accessDelaySeconds`（20~60 秒
   随机）才记一次心跳。

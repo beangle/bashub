@@ -129,6 +129,7 @@ private AuthorityDomain testDomain() {
     Authority("/config/hosts", Scope.protected_, []),
     Authority("/ems/apps", Scope.private_, ["ROLE_ADMIN"]),
     Authority("/ems/app-groups", Scope.private_, ["ROLE_ADMIN"]),
+    Authority("/monitor/agents", Scope.private_, ["ROLE_ADMIN"]),
   ]);
 }
 
@@ -222,18 +223,73 @@ unittest {
   assert(groups.status == 200, groups.body);
 }
 
-@("agent 监控与控制端点只允许管理员") unittest {
+@("agent 监控允许登录用户查看，控制端点只允许管理员") unittest {
   auto repo = new StaticSessionRepo();
   repo.put(sessionOf("user", ["ROLE_USER"]));
   auto router = securedRouter(authConfig(), repo, testDomain());
-  auto denied = call(router, HTTPMethod.GET,
+  auto visible = call(router, HTTPMethod.GET,
       "http://localhost/api/bashub/monitor/agents/status", "EMS_SID=user");
-  assert(denied.status == 403, denied.body);
+  assert(visible.status == 200, visible.body);
+
+  auto controlled = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=user");
+  assert(controlled.status == 403, controlled.body);
 
   repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
   auto allowed = call(router, HTTPMethod.GET,
       "http://localhost/api/bashub/monitor/agents/status", "EMS_SID=admin");
   assert(allowed.status == 200, allowed.body);
+
+  auto command = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=admin");
+  assert(command.status == 404, command.body);
+}
+
+@("agent 控制按 EMS 私有资源角色授权，命中角色 ID 才放行") unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("operator", ["42"]));
+  auto domain = authorityDomain([
+    Authority("/monitor/agents", Scope.private_, ["42"]),
+  ]);
+  auto router = securedRouter(authConfig(), repo, domain);
+
+  auto allowed = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=operator");
+  assert(allowed.status == 404, allowed.body);
+
+  repo.put(sessionOf("ordinary", ["7"]));
+  auto denied = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=ordinary");
+  assert(denied.status == 403, denied.body);
+}
+
+@("agent 控制不因资源未登记或 Protected 而向所有登录用户开放") unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("user", ["7"]));
+
+  auto unregistered = securedRouter(authConfig(), repo, authorityDomain([]));
+  auto denied = call(unregistered, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=user");
+  assert(denied.status == 403, denied.body);
+
+  auto protectedRouter = securedRouter(authConfig(), repo, authorityDomain([
+    Authority("/monitor/agents", Scope.protected_, []),
+  ]));
+  auto stillDenied = call(protectedRouter, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=user");
+  assert(stillDenied.status == 403, stillDenied.body);
+}
+
+@("agent 控制兼容 CAS permissions 的 /monitor/agents:*") unittest {
+  auto repo = new StaticSessionRepo();
+  auto account = new DefaultAccount("token-user", "token-user");
+  account.permissions = ["/monitor/agents:*"];
+  repo.put(new Session("token-user", account, nowSeconds(), new Agent("test", "127.0.0.1", "Linux"), 1800));
+  auto router = securedRouter(authConfig(), repo, authorityDomain([]));
+
+  auto allowed = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/demo.prod/report", "EMS_SID=token-user");
+  assert(allowed.status == 404, allowed.body);
 }
 
 @("SPA 的 Bearer token 与 URP_SID 都能恢复 CAS 会话") unittest {

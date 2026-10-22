@@ -16,12 +16,11 @@ import bashub.config : HubConfig;
 import bashub.api : hubApiPrefixes, isApiGroup;
 
 import beangle.ems.authority : RemoteAuthoritySource;
-import beangle.security.authz : AuthorityDomain, permissionAllows;
+import beangle.security.authz : AuthorityDomain, Scope, permissionAllows;
 import beangle.security.cas : CasConfig;
 import beangle.security.session : Session, SessionRepo;
 import beangle.security.web : AccessDecision, HttpSecurity, SecurityContext, loginUrlFor, wantsJson;
 
-import std.algorithm : canFind;
 import std.string : indexOf, startsWith, toLower;
 
 import vibe.core.log : logInfo, logWarn;
@@ -62,12 +61,18 @@ class HubSecurity {
     auto resource = resourceNameOf(req.requestPath.toString);
     auto action = httpMethodString(req.method).toLower;
     AccessDecision decision;
-    // 未知资源默认只要求登录；监控节点是例外：它能让 agent 启停实例、读日志，
-    // 必须显式具备管理员身份，不能依赖 EMS 是否刚好登记了 /monitor/agents。
-    if (resource == "/monitor/agents" && !isAdministrator(context, action))
-      decision = context.session is null ? AccessDecision.unauthenticated : AccessDecision.forbidden;
-    else
+    // 监控节点拆分读写：登录用户可查看在线状态、历史与日志；能向 agent 下发动作的
+    // 非 GET 请求仍必须显式具备控制权限。
+    if (resource == "/monitor/agents") {
+      if (context.session is null)
+        decision = AccessDecision.unauthenticated;
+      else if ((action == "get" || action == "head") || canControlAgents(context, action))
+        decision = AccessDecision.allow;
+      else
+        decision = AccessDecision.forbidden;
+    } else {
       decision = http.authorize(context, resource, action, domain());
+    }
 
     final switch (decision) {
     case AccessDecision.allow:
@@ -82,15 +87,27 @@ class HubSecurity {
     }
   }
 
-  /// 监控/控制 agent 的内置管理员门槛；权限串里允许 `*` 或 `/monitor/agents:*`。
-  private bool isAdministrator(SecurityContext context, string action) {
+  /** agent 控制权限：EMS `/monitor/agents` 私有资源的角色命中，或显式权限串。
+   *
+   * EMS 普通会话的 `authorities` 是角色 ID，且 JSON 会话没有 `isRoot`。因此不能靠
+   * `ROLE_ADMIN` / `isRoot` 判断，而要让管理员在 EMS 里把 `/monitor/agents` 资源设为
+   * Private 并授权给角色。`permissions` 里的 `/monitor/agents:*` 继续兼容其它 CAS 来源；
+   * 资源未登记时写操作仍拒绝，避免 unknownIsProtected 把控制接口开放给所有登录用户。
+   */
+  private bool canControlAgents(SecurityContext context, string action) {
     auto session = context.session;
     if (session is null || session.principal is null)
       return false;
     auto principal = session.principal;
-    return principal.isRoot
-        || principal.authorities.canFind("ROLE_ADMIN")
-        || permissionAllows(principal.permissions, "/monitor/agents", action);
+    if (principal.isRoot || permissionAllows(principal.permissions, "/monitor/agents", action))
+      return true;
+
+    auto authz = domain();
+    if (authz is null)
+      return false;
+    auto authority = authz.find("/monitor/agents");
+    return authority !is null && authority.level == Scope.private_
+        && authority.matches(principal.authorities);
   }
 
   /// 当前请求的安全上下文（`sessions` 端点复用同一套 cookie/ticket 解析）。

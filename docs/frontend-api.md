@@ -231,8 +231,12 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   历史来自 `bas.mon_server_samples`，每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`），
   只在 hub 的 `agent-health-*` 采样窗口内由 `report:health` 触发写入，保留 180 天；历史存储未启用时
   返回 503，profile 不存在返回 404，表未迁移或其他数据库查询失败返回 500。
-- 授权：`/api/bashub/monitor/agents/*` 的读日志、立即上报与启停实例属于管理动作，除登录外还要求
-  `ROLE_ADMIN`（或 root）；不能只依赖 EMS 是否登记了 `/monitor/agents` 资源。
+- 授权：`/api/bashub/monitor/agents/*` 的 GET（在线状态、历史、日志）允许已登录用户查看；
+  立即上报、启停实例等写操作要求 EMS 中 `bas-hub` 的 `/monitor/agents` 资源为 **Private**
+  且已授权当前用户的角色。EMS 会话的 `authorities` 是角色 ID（如 `"42"`），JSON 会话也没有
+  `isRoot`，因此不能按 `ROLE_ADMIN` 或 root 配置。资源未登记、资源不是 Private 或角色不命中时，
+  写操作一律 403；资源授权缓存最长 300 秒刷新。其它 CAS 来源若在 `permissions` 中提供
+  `/monitor/agents:*`，也可作为显式授权。
 - 立即刷新：`POST /api/bashub/monitor/agents/{profile}/report` → 202 表示 `report:now` 已入队；节点离线 404，
   agent 未申报该能力 409。随后到达的 `report:os` / `report:bas` 会覆盖现状。
 - 读日志：`GET /api/bashub/monitor/agents/{profile}/log?instance={farm.server}&from={from}&to={to}&tail={n}`。
