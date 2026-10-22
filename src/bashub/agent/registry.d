@@ -43,8 +43,8 @@ struct AgentReply {
     return AgentReply(RequestOutcome.ok, data, "");
   }
 
-  static AgentReply failure(RequestOutcome outcome, string error) {
-    return AgentReply(outcome, Json(null), error);
+  static AgentReply failure(RequestOutcome outcome, string error, Json data = Json(null)) {
+    return AgentReply(outcome, data, error);
   }
 }
 
@@ -290,7 +290,9 @@ final class AgentSession {
       return AgentReply.failure(RequestOutcome.failed, "bad result envelope");
     if (!ok.get!bool) {
       auto error = channel.textOf(body, "error");
-      return AgentReply.failure(RequestOutcome.failed, error.length > 0 ? error : "agent request failed");
+      auto data = body["data"];
+      return AgentReply.failure(RequestOutcome.failed, error.length > 0 ? error : "agent request failed",
+          data.type == Json.Type.object ? data : Json(null));
     }
     auto data = body["data"];
     return AgentReply.success(data.type == Json.Type.undefined ? Json.emptyObject : data);
@@ -365,6 +367,22 @@ final class AgentRegistry {
     if (tail > 0)
       body["tail"] = Json(tail);
     return session.request("log:read", body, timeout);
+  }
+
+  /// 下发 `agent:log` 并等待 agent 的 `result`；用于查 agent 自身日志。
+  AgentReply agentLog(string profile, long from, long to,
+      Duration timeout = 5.seconds, long tail = 0) {
+    auto session = find(profile);
+    if (session is null)
+      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
+    if (!session.supportsPrimitive("agent:log"))
+      return AgentReply.failure(RequestOutcome.failed, "unsupported:agent:log");
+    auto body = Json.emptyObject;
+    body["from"] = Json(from);
+    body["to"] = Json(to);
+    if (tail > 0)
+      body["tail"] = Json(tail);
+    return session.request("agent:log", body, timeout);
   }
 
   /// 下发 `service:start|stop|restart` 并等待 agent 的 `result`。

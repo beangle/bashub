@@ -258,13 +258,16 @@ string[] relationshipIds(Json resource, string attr) {
   return ids;
 }
 
-/// `errors[]`：400/404/500 用。
-Json errorDocument(int status, string title, string detail = null, string parameter = null) {
+/// `errors[]`：400/404/500 用。`meta` 用于附加机器可读或限长的排错信息。
+Json errorDocument(int status, string title, string detail = null, string parameter = null,
+    Json meta = Json.undefined) {
   auto err = Json.emptyObject;
   err["status"] = Json(status.to!string);
   err["title"] = Json(title);
   if (detail.length > 0)
     err["detail"] = Json(detail);
+  if (meta.type == Json.Type.object && meta.length > 0)
+    err["meta"] = meta;
   if (parameter.length > 0) {
     auto src = Json.emptyObject;
     src["parameter"] = Json(parameter);

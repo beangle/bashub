@@ -162,8 +162,20 @@ unittest {
   assert(answer.outcome == RequestOutcome.failed);
   assert(answer.error == "no-log");
 
+  id = session.startRequest("service:start", Json.emptyObject);
+  auto detailed = parseJsonString(`{"detail":"boom","logTail":["line"],"truncated":false}`);
+  assert(parse(result(id, false, detailed, "start-failed"), reply));
+  session.accept(reply);
+  answer = session.waitRequest(id, 0.seconds);
+  assert(answer.outcome == RequestOutcome.failed);
+  assert(answer.error == "start-failed");
+  assert(answer.data["detail"].get!string == "boom");
+  assert(answer.data["logTail"].get!(Json[])[0].get!string == "line");
+
   auto registry = new AgentRegistry();
   answer = registry.logRead("missing", "platform.server1", 0, 0, 0.seconds);
+  assert(answer.outcome == RequestOutcome.offline);
+  answer = registry.agentLog("missing", 0, 0, 0.seconds);
   assert(answer.outcome == RequestOutcome.offline);
 }
 
@@ -222,4 +234,27 @@ unittest {
   answer = registry.service("demo", "reload", "platform.server1", 0.seconds);
   assert(answer.outcome == RequestOutcome.failed);
   assert(answer.error == "bad-request");
+}
+
+@("agent log requests are gated by hello.supports")
+unittest {
+  auto registry = new AgentRegistry();
+  auto session = registry.attach("demo");
+  session.accept(envelope("hello", "2026-10-16T10:00:01+08:00",
+      `{"host":"app1","supports":["hello","pong","report:os","report:bas"]}`));
+
+  auto answer = registry.agentLog("demo", 0, 0, 0.seconds);
+  assert(answer.outcome == RequestOutcome.failed);
+  assert(answer.error == "unsupported:agent:log");
+  assert(session.takeOutbound().length == 0);
+
+  session.accept(envelope("hello", "2026-10-16T10:00:02+08:00",
+      `{"host":"app1","supports":["hello","pong","agent:log"]}`));
+  answer = registry.agentLog("demo", 0, 0, 0.seconds, 100);
+  assert(answer.outcome == RequestOutcome.timeout);
+  auto messages = session.takeOutbound();
+  assert(messages.length == 1);
+  auto request = parseJsonString(messages[0]);
+  assert(request["type"].get!string == "agent:log");
+  assert(request["body"]["tail"].get!long == 100);
 }

@@ -287,6 +287,30 @@ unittest {
   assert(parseJson(ex.body)["errors"][0]["detail"].get!string == "unsupported:log:read");
 }
 
+@("agents/agent-log validates parameters and requires agent:log")
+unittest {
+  auto agents = new AgentRegistry();
+  auto router = newRouter(false, agents);
+
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/agent-log?tail=100");
+  assert(ex.status == 404, ex.body);
+
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/agent-log?from=x");
+  assert(ex.status == 400, ex.body);
+
+  auto session = agents.attach("openurp.prod");
+  Envelope hello;
+  assert(parse(`{"type":"hello","at":"2026-10-16T10:00:00+08:00",
+      "body":{"host":"app1","supports":["hello","report:os","report:bas"]}}`, hello));
+  session.accept(hello);
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/agent-log?tail=100");
+  assert(ex.status == 409, ex.body);
+  assert(parseJson(ex.body)["errors"][0]["detail"].get!string == "unsupported:agent:log");
+}
+
 @("agents/report queues report:now only when the agent supports it")
 unittest {
   auto agents = new AgentRegistry();

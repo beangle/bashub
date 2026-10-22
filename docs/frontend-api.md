@@ -222,10 +222,14 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   `instance` 必填且只能是一层普通目录名；`from` / `to` 可省略，省略时交给 agent 取默认窗口；
   `tail` 只在 `from` / `to` 都省略时生效，取最后 N 行。
   成功返回 `{total, from, to, lines:[…]}`；节点离线 404、5 秒无应答 504、agent 返回失败 502。
+- 读 agent 日志：`GET /api/bashub/monitor/agents/{profile}/agent-log?from={from}&to={to}&tail={n}`。
+  窗口参数与实例日志相同，但没有 `instance`；返回同样的 `{total, from, to, lines:[…]}`。
 - 启停实例：`POST /api/bashub/monitor/agents/{profile}/service/{action}`，`action` 取 `start` / `stop` /
   `restart`，body 为 `{"instance":"{farm.server}"}`。接口等到 agent 执行完才返回，成功为
   `{"data":{"state":"running"|"stopped","pid":123}}`；节点离线 404、未申报能力 409、
   2 分钟无应答 504、agent 执行失败 502。`stop` / `restart` 是破坏性动作，前端二次确认。
+- 启停失败详情：502 错误文档的 `errors[0].meta` 可带 `{detail?, logTail?, truncated?}`。`detail`
+  最多 8 KiB，`logTail` 最多 100 行；完整内容继续通过实例日志接口读取。
 - 跟随日志：`GET /api/bashub/monitor/agents/{profile}/log/follow?instance={farm.server}&tail={n}`，
   响应 `text/event-stream`。首次取最后 `tail` 行（缺省 200、上限 2000），之后 hub 每 3 秒向 agent
   发一次 `log:read`，增量用 `from=上次 to + 1`；浏览器侧只维持一条 SSE 连接。
@@ -237,4 +241,5 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
     连接错误事件同名。节点离线 404、agent 未申报 `log:read` 409。
   - agent 侧协议不变：仍是普通区间 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
 - SPA 页面：`/monitor/agents` 展示在线节点、操作系统指标、运行实例与 `hello.supports`，支持立即上报、
-  按区间读日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；节点列表每 10 秒刷新一次。
+  按区间读实例或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；
+  节点列表每 10 秒刷新一次。

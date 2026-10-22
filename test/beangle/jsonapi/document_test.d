@@ -69,6 +69,11 @@ unittest {
   assert(err["errors"][0]["status"].get!string == "404");
   assert(err["errors"][0]["source"]["parameter"].get!string == "filter[whatever]");
 
+  auto meta = Json.emptyObject;
+  meta["detail"] = Json("boom");
+  auto detailed = errorDocument(502, "节点应答失败", "start-failed", null, meta);
+  assert(detailed["errors"][0]["meta"]["detail"].get!string == "boom");
+
   auto unauthorized = unauthorizedDocument("https://sas.openurp.net/cas");
   assert(unauthorized["errors"][0]["status"].get!string == "401");
   assert(unauthorized["errors"][0]["meta"]["redirectUrl"].get!string == "https://sas.openurp.net/cas");

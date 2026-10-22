@@ -66,6 +66,10 @@ unittest {
   assert(parseJsonString(ping())["type"].get!string == "ping");
   auto tail = parseJsonString(logRead("r3", "platform.server1", 0, 0, 100));
   assert(tail["body"]["tail"].get!long == 100);
+  auto own = parseJsonString(agentLog("r3", 0, 0, 100));
+  assert(own["type"].get!string == "agent:log");
+  assert(own["body"]["instance"].type == Json.Type.undefined);
+  assert(own["body"]["tail"].get!long == 100);
   assert(service("reload", "r3", "server1").length == 0);
 
   auto restart = parseJsonString(service("restart", "r4", "platform.server1"));

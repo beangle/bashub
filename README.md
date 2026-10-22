@@ -375,13 +375,15 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   当作没有配置（原 JVM 后端借 JDBC 驱动还能吃 mysql/oracle/dm）；也没移植「应用文件与 `resources.xml`
   都没有时去问 `EmsApi.getDatasourceUrl`」那一步（要网络）；`<url>` 只认
   `jdbc:postgresql://host[:port]/db` 与现成的 `key=value` 串，JDBC 的查询参数不搬。
-- **节点通道的写指令**：`log:read` 已接到 `GET /api/bashub/monitor/agents/{profile}/log`，带请求号等待
+- **节点通道的写指令**：`log:read` 已接到 `GET /api/bashub/monitor/agents/{profile}/log`，`agent:log`
+  接到 `GET /api/bashub/monitor/agents/{profile}/agent-log`，带请求号等待
   `result`、超时与断连唤醒；`GET .../log/follow` 用 SSE 持续跟随，首次取尾部后按游标增量拉取，
   轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/monitor/agents/{profile}/report`
   要求节点立即刷新快照。`POST /api/bashub/monitor/agents/{profile}/service/{action}`（`start` / `stop` /
   `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。
-  SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读日志、SSE 跟随，
-  以及实例的重启 / 停止（带二次确认）。
+  SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持立即上报、区间读实例或
+  agent 日志、SSE 跟随，以及实例的重启 / 停止（带二次确认）。启停失败时错误文档的
+  `errors[0].meta` 会带上 agent 返回的限长 `detail` / `logTail` / `truncated`。
 - **`/api/bashub/config|ems|micdn/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。
 - **其余定制动作**：`profiles/{id}/reset-key`、`webapps/upgrade`、`hosts/{id}/webapps`、

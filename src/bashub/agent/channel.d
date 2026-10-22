@@ -26,7 +26,9 @@ import std.string : strip, toLower;
 enum AgentPrimitives = ["hello", "report:os", "report:bas", "result", "pong"];
 
 /// hub → agent 的原语。
-enum HubPrimitives = ["ping", "report:now", "log:read", "service:start", "service:stop", "service:restart"];
+enum HubPrimitives = [
+  "ping", "report:now", "log:read", "agent:log", "service:start", "service:stop", "service:restart"
+];
 
 /// 一条消息：`id` 非空表示请求，接收方要用 `result` 应答；空表示通知。
 struct Envelope {
@@ -110,6 +112,16 @@ string logRead(string id, string instance, long from, long to, long tail = 0) {
   return render("log:read", id, body);
 }
 
+/// 读 basagent 自身日志，不带实例名；窗口语义与 `log:read` 相同。
+string agentLog(string id, long from, long to, long tail = 0) {
+  auto body = Json.emptyObject;
+  body["from"] = Json(from);
+  body["to"] = Json(to);
+  if (tail > 0)
+    body["tail"] = Json(tail);
+  return render("agent:log", id, body);
+}
+
 /// 服务动作：basctl 在 `hello.supports` 里申报后，hub 才能下发。
 string service(string action, string id, string instance) {
   if (action != "start" && action != "stop" && action != "restart")
@@ -123,9 +135,9 @@ string service(string action, string id, string instance) {
 string result(string id, bool ok, Json data, string error) {
   auto body = Json.emptyObject;
   body["ok"] = Json(ok);
-  if (ok)
+  if (ok || data.type == Json.Type.object)
     body["data"] = data.type == Json.Type.object ? data : Json.emptyObject;
-  else
+  if (!ok)
     body["error"] = Json(error);
   return render("result", id, body);
 }

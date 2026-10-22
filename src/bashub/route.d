@@ -838,9 +838,23 @@ class HubService {
       else if (reply.error.startsWith("bad-request"))
         writeJsonApi(res, errorDocument(400, "请求参数非法", reply.error), HTTPStatus.badRequest);
       else
-        writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error), HTTPStatus.badGateway);
+        writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error, null, serviceFailureMeta(reply.data)),
+            HTTPStatus.badGateway);
       break;
     }
+  }
+
+  /// agent 返回的限长排错字段原样挂在 `errors[0].meta`，不把它们拼进 `detail`。
+  private Json serviceFailureMeta(Json data) {
+    auto meta = Json.emptyObject;
+    if (data.type != Json.Type.object)
+      return meta;
+    foreach (name; ["detail", "logTail", "truncated"]) {
+      auto value = data[name];
+      if (value.type != Json.Type.undefined)
+        meta[name] = value;
+    }
+    return meta;
   }
 
   /// `GET /api/bashub/monitor/agents/{profile}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
@@ -879,6 +893,42 @@ class HubService {
       break;
     case RequestOutcome.failed:
       writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error), HTTPStatus.badGateway);
+      break;
+    }
+  }
+
+  /// `GET /api/bashub/monitor/agents/{profile}/agent-log`：读取 agent 自身 console 日志。
+  void agentOwnLog(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+
+    long from;
+    long to;
+    long tail;
+    if (!queryLong(req, "from", from) || !queryLong(req, "to", to) || !queryLong(req, "tail", tail)
+        || tail < 0) {
+      writeJsonApi(res, errorDocument(400, "请求参数非法", "from/to/tail must be integers and tail >= 0"),
+          HTTPStatus.badRequest);
+      return;
+    }
+
+    auto profile = req.params.get("profile", "");
+    auto reply = agents.agentLog(profile, from, to, 5.seconds, tail);
+    final switch (reply.outcome) {
+    case RequestOutcome.ok:
+      writeJsonApi(res, reply.data, HTTPStatus.ok);
+      break;
+    case RequestOutcome.offline:
+      writeJsonApi(res, errorDocument(404, "节点不在线", reply.error), HTTPStatus.notFound);
+      break;
+    case RequestOutcome.timeout:
+      writeJsonApi(res, errorDocument(504, "节点应答超时", reply.error), HTTPStatus.gatewayTimeout);
+      break;
+    case RequestOutcome.failed:
+      if (reply.error.startsWith("unsupported:"))
+        writeJsonApi(res, errorDocument(409, "节点不支持该指令", reply.error), HTTPStatus.conflict);
+      else
+        writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error), HTTPStatus.badGateway);
       break;
     }
   }
@@ -1660,6 +1710,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
 
   // monitor：在线节点、日志与实例启停
   router.get(api.monitor ~ "/agents/status", &hub.agentStatus);
+  router.get(api.monitor ~ "/agents/:profile/agent-log", &hub.agentOwnLog);
   router.get(api.monitor ~ "/agents/:profile/log/follow", &hub.agentLogFollow);
   router.get(api.monitor ~ "/agents/:profile/log", &hub.agentLog);
   router.post(api.monitor ~ "/agents/:profile/service/:action", &hub.agentService);

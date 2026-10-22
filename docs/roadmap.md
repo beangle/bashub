@@ -106,6 +106,7 @@
 | Hub 下发 `ping` | ✅ | 每条连接 30s 一次 app 层 ping |
 | Hub 下发 `report:now` | ✅ | `POST /api/bashub/monitor/agents/{profile}/report`；按 `hello.supports` 门禁 |
 | Hub 下发 `log:read` | ✅ | `GET /api/bashub/monitor/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
+| Hub 下发 `agent:log` | ✅ | `GET /api/bashub/monitor/agents/{profile}/agent-log`；读 agent 自身 console，按能力门禁 |
 | 浏览器日志跟随 | ✅ | `GET /api/bashub/monitor/agents/{profile}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
 | `service:start/stop/restart` | ✅ | `POST /api/bashub/monitor/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
 | 在线节点登记与摘除 | ✅ | 只摘自己那条，旧连接迟到的关闭不会挤掉新连接 |

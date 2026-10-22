@@ -31,6 +31,14 @@
               </div>
               <div class="agent-actions">
                 <t-button
+                  v-if="agent.supports?.includes('agent:log')"
+                  size="small"
+                  variant="outline"
+                  @click="openAgentLog(agent)"
+                >
+                  Agent 日志
+                </t-button>
+                <t-button
                   size="small"
                   variant="outline"
                   :loading="reporting[agent.profile] === true"
@@ -173,16 +181,32 @@
       @closed="resetLog"
     >
       <div class="log-toolbar">
-        <t-input v-model="logInstance" placeholder="实例名，如 platform.server1" :disabled="logFollowing" />
+        <t-input
+          v-model="logInstance"
+          placeholder="实例名，如 platform.server1"
+          :disabled="logTarget === 'agent' || logFollowing"
+        />
         <t-input v-model="logFrom" placeholder="起始行（可选）" :disabled="logFollowing" />
         <t-input v-model="logTo" placeholder="结束行（可选）" :disabled="logFollowing" />
         <t-button theme="primary" :loading="logLoading" :disabled="logFollowing" @click="readLogOnce">
           读取
         </t-button>
-        <t-button v-if="!logFollowing" variant="outline" :disabled="logLoading" @click="startFollowing">
+        <t-button
+          v-if="logTarget === 'instance' && !logFollowing"
+          variant="outline"
+          :disabled="logLoading"
+          @click="startFollowing"
+        >
           跟随尾部
         </t-button>
-        <t-button v-else theme="danger" variant="outline" @click="stopFollowing">停止跟随</t-button>
+        <t-button
+          v-else-if="logTarget === 'instance'"
+          theme="danger"
+          variant="outline"
+          @click="stopFollowing"
+        >
+          停止跟随
+        </t-button>
       </div>
       <t-alert v-if="logError" theme="error" :message="logError" class="agent-alert" />
       <div class="log-status">
@@ -196,15 +220,28 @@
       </div>
       <pre v-if="logLoaded" ref="logRef" class="agent-log">{{ logLines.join('\n') || '（空）' }}</pre>
     </t-dialog>
+
+    <t-dialog
+      v-model:visible="serviceErrorVisible"
+      :header="serviceErrorTitle"
+      width="900px"
+      :footer="false"
+    >
+      <p v-if="serviceErrorDetail" class="service-error-detail">{{ serviceErrorDetail }}</p>
+      <p v-if="serviceErrorTruncated" class="agent-muted">日志与详情已截断，完整内容请打开实例日志。</p>
+      <pre v-if="serviceErrorLogTail.length" class="agent-log">{{ serviceErrorLogTail.join('\n') }}</pre>
+    </t-dialog>
   </section>
 </template>
 
 <script setup lang="ts">
+import { JsonApiRequestError } from '@beangle/ems-app'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   followAgentLog,
   listAgents,
+  readAgentOwnLog,
   readAgentLog,
   requestAgentReport,
   serviceAgentInstance,
@@ -221,9 +258,15 @@ const loading = ref(false)
 const error = ref('')
 const reporting = ref<Record<string, boolean>>({})
 const serviceLoading = ref<Record<string, boolean>>({})
+const serviceErrorVisible = ref(false)
+const serviceErrorTitle = ref('节点应答失败')
+const serviceErrorDetail = ref('')
+const serviceErrorLogTail = ref<string[]>([])
+const serviceErrorTruncated = ref(false)
 
 const logVisible = ref(false)
 const logAgent = ref('')
+const logTarget = ref<'instance' | 'agent'>('instance')
 const logInstance = ref('')
 const logFrom = ref('')
 const logTo = ref('')
@@ -245,6 +288,7 @@ const LOG_MAX_LINES = 2000
 
 const logHeader = () => {
   if (!logAgent.value) return '实例日志'
+  if (logTarget.value === 'agent') return `${logAgent.value} · Agent 日志`
   return logInstance.value
     ? `${logAgent.value} · ${logInstance.value} 日志`
     : `${logAgent.value} · 实例日志`
@@ -311,13 +355,23 @@ async function runService(agent: AgentStatus, instance: AgentInstance, action: A
     MessagePlugin.success(`${instance.id} 已${label}（${result.state}）`)
     await load(true)
   } catch (reason) {
-    MessagePlugin.error(errorText(reason))
+    const failure = serviceFailure(reason)
+    if (failure) {
+      serviceErrorTitle.value = failure.title
+      serviceErrorDetail.value = failure.detail
+      serviceErrorLogTail.value = failure.logTail
+      serviceErrorTruncated.value = failure.truncated
+      serviceErrorVisible.value = true
+    } else {
+      MessagePlugin.error(errorText(reason))
+    }
   } finally {
     serviceLoading.value = { ...serviceLoading.value, [key]: false }
   }
 }
 
 function openLog(agent: AgentStatus, instance: AgentInstance) {
+  logTarget.value = 'instance'
   logAgent.value = agent.profile
   logInstance.value = instance.id || ''
   logFrom.value = ''
@@ -328,10 +382,22 @@ function openLog(agent: AgentStatus, instance: AgentInstance) {
   if (logInstance.value) void startFollowing()
 }
 
+function openAgentLog(agent: AgentStatus) {
+  logTarget.value = 'agent'
+  logAgent.value = agent.profile
+  logInstance.value = ''
+  logFrom.value = ''
+  logTo.value = ''
+  logError.value = ''
+  resetLogWindow()
+  logVisible.value = true
+  void readLogOnce()
+}
+
 async function readLogOnce() {
   if (logLoading.value) return
   stopFollowing()
-  if (!logInstance.value.trim()) {
+  if (logTarget.value === 'instance' && !logInstance.value.trim()) {
     logError.value = '请填写实例名'
     return
   }
@@ -339,13 +405,21 @@ async function readLogOnce() {
   logError.value = ''
   resetLogWindow()
   try {
-    const window = await readAgentLog(
-      logAgent.value,
-      logInstance.value.trim(),
-      logFrom.value,
-      logTo.value,
-      !logFrom.value.trim() && !logTo.value.trim() ? LOG_TAIL_LINES : undefined,
-    )
+    const hasRange = logFrom.value.trim() || logTo.value.trim()
+    const window = logTarget.value === 'agent'
+      ? await readAgentOwnLog(
+          logAgent.value,
+          logFrom.value,
+          logTo.value,
+          hasRange ? undefined : LOG_TAIL_LINES,
+        )
+      : await readAgentLog(
+          logAgent.value,
+          logInstance.value.trim(),
+          logFrom.value,
+          logTo.value,
+          hasRange ? undefined : LOG_TAIL_LINES,
+        )
     applyWindow(window)
   } catch (reason) {
     logError.value = errorText(reason)
@@ -357,6 +431,7 @@ async function readLogOnce() {
 /** 打开 SSE：首次取尾部，之后服务端推送增量；断线由 EventSource 自动重连。 */
 function startFollowing() {
   if (logLoading.value) return
+  if (logTarget.value !== 'instance') return
   stopFollowing()
   const generation = logGeneration
   if (!logInstance.value.trim()) {
@@ -487,6 +562,7 @@ function scrollToBottom() {
 
 function resetLog() {
   stopFollowing()
+  logTarget.value = 'instance'
   logAgent.value = ''
   logInstance.value = ''
   logFrom.value = ''
@@ -588,6 +664,35 @@ function formatBytes(value: number): string {
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
+}
+
+interface ServiceFailure {
+  title: string
+  detail: string
+  logTail: string[]
+  truncated: boolean
+}
+
+function serviceFailure(reason: unknown): ServiceFailure | null {
+  if (!(reason instanceof JsonApiRequestError)) return null
+  const error = (reason.errors[0] ?? {}) as {
+    title?: string
+    detail?: string
+    meta?: { detail?: unknown; logTail?: unknown; truncated?: unknown }
+  }
+  const meta = error.meta
+  if (!meta) return null
+  const detail = typeof meta.detail === 'string' ? meta.detail : ''
+  const logTail = Array.isArray(meta.logTail)
+    ? meta.logTail.filter((line): line is string => typeof line === 'string')
+    : []
+  if (!detail && logTail.length === 0) return null
+  return {
+    title: error.title || '节点应答失败',
+    detail: detail || error.detail || reason.message,
+    logTail,
+    truncated: meta.truncated === true,
+  }
 }
 
 onMounted(() => {
@@ -864,6 +969,13 @@ onBeforeUnmount(() => {
   font-size: 13px;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.service-error-detail {
+  margin: 0 0 12px;
+  color: var(--td-text-color-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 @media (max-width: 760px) {

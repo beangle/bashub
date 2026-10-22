@@ -144,3 +144,20 @@ export function followAgentLog(profile: string, instance: string, tail = 200): E
   )
   return new EventSource(url, { withCredentials: true })
 }
+
+/** 读取 basagent 自身的 console 日志；窗口参数与实例日志相同，但没有实例名。 */
+export function readAgentOwnLog(
+  profile: string,
+  from?: string,
+  to?: string,
+  tail?: number,
+): Promise<AgentLogWindow> {
+  const query: Record<string, string> = {}
+  if (from?.trim()) query.from = from.trim()
+  if (to?.trim()) query.to = to.trim()
+  if (tail && tail > 0) query.tail = String(tail)
+  return apiClient.getPlain<AgentLogWindow>(
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/agent-log`),
+    { query },
+  )
+}
