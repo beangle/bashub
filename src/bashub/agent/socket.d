@@ -15,7 +15,7 @@ module bashub.agent.socket;
 import bashub.agent.channel : Envelope, parse, ping, reportHealth, reportNow;
 import bashub.agent.registry : AgentRegistry, AgentSession;
 
-import vibe.core.log : logInfo, logWarn;
+import vibe.core.log : logDebug, logWarn;
 import vibe.http.server : HTTPServerRequest, HTTPServerResponse;
 import vibe.http.websockets : WebSocket, handleWebSockets;
 
@@ -78,7 +78,9 @@ void runAgentLoop(AgentRegistry registry, string profile, string profileId, scop
 
   try {
     session = registry.attach(profile, profileId);
-    logInfo("%s: agent connected", profile);
+    // 每次重连都会走到这里；稳定连接只应出现一次，周期重复说明 agent 在反复重连。
+    // 属于排错信息，放 debug 级（log-level=debug 时才出现），默认 info 不刷日志。
+    logDebug("%s: agent connected", profile);
 
     auto lastPing = MonoTime.currTime;
     auto lastHealth = lastPing;

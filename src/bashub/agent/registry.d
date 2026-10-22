@@ -69,6 +69,8 @@ final class AgentSession {
   immutable string profile;
   immutable string profileId;
   immutable string connectedAt;
+  /// 建立连接的本地时刻：只用来算在线时长，对外展示仍用 `connectedAt`。
+  immutable MonoTime startedAt;
 
   string host;
   string basctlVersion;
@@ -104,6 +106,7 @@ final class AgentSession {
     this.profile = profile;
     this.profileId = profileId;
     this.connectedAt = channel.now();
+    this.startedAt = MonoTime.currTime;
     this.lastSeenAt = connectedAt;
     pendingLock = new TaskMutex();
     pendingChanged = new TaskCondition(pendingLock);
@@ -434,10 +437,19 @@ final class AgentSession {
   }
 }
 
+/// 同一个 profile 在 60 秒内又一次被新连接顶掉：多半是两个 agent 共用一个 profile，在互相踢。
+private enum SupersedeChurnSeconds = 60;
+/// 「互相踢」告警的间隔：同一 profile 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
+private enum SupersedeWarnSeconds = 60;
+
 /// 每个 profile 一条在线连接。
 final class AgentRegistry {
   private AgentSession[string] sessions;
   private AgentHistoryStore historyStore;
+  /// profile → 上次被新连接顶掉的时刻，用于识别「互相踢」而不是一次正常重连。
+  private MonoTime[string] lastSupersedeAt;
+  /// profile → 上次「互相踢」告警的时刻，用于限流。
+  private MonoTime[string] lastSupersedeWarnAt;
 
   this(AgentHistoryStore historyStore = null) {
     this.historyStore = historyStore;
@@ -446,10 +458,39 @@ final class AgentRegistry {
   /// 登记新连接；同一 profile 的旧连接被标记为 `superseded`。
   AgentSession attach(string profile, string profileId = "") {
     auto session = new AgentSession(profile, profileId);
-    if (auto previous = profile in sessions)
+    if (auto previous = profile in sessions) {
       (*previous).supersede();
+      noteSupersede(profile, *previous);
+    }
     sessions[profile] = session;
     return session;
+  }
+
+  /**
+   * 记录一次「新连接顶掉在线旧连接」。
+   *
+   * 正常重连时旧连接往往还没超时，这一次顶替不值得告警；只有同一 profile 在
+   * {@link SupersedeChurnSeconds} 内被顶掉多次，才说明两个 agent 在互相踢
+   * （各自按 10 秒的 `reconnectDelay` 重连、再踢回对方）。告警带旧连接的 host
+   * 与在线时长，按 profile 每分钟最多一条。
+   */
+  private void noteSupersede(string profile, AgentSession previous) {
+    auto now = MonoTime.currTime;
+    bool churn;
+    if (auto last = profile in lastSupersedeAt)
+      churn = now - *last < seconds(SupersedeChurnSeconds);
+    lastSupersedeAt[profile] = now;
+    if (!churn)
+      return;
+    if (auto warned = profile in lastSupersedeWarnAt) {
+      if (now - *warned < seconds(SupersedeWarnSeconds))
+        return;
+    }
+    lastSupersedeWarnAt[profile] = now;
+    logWarn("%s: agent replaced again within %d s (previous host=%s, online %d s); "
+        ~ "two basagents may share this profile and keep kicking each other", profile,
+        SupersedeChurnSeconds, previous.host.length ? previous.host : "unknown",
+        (now - previous.startedAt).total!"seconds");
   }
 
   /// 摘除一条连接；只摘自己那条，旧连接迟到的关闭不能把新连接挤掉。

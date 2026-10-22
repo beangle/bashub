@@ -209,7 +209,10 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   `{profile}` 同时参与校验；仍兼容只发 `<Profile.key>` 的旧客户端。
   未通过的连接在握手阶段被关掉，拿不到一个字节的协议。因此这一段路径**必须放行**（不能挂 CAS
   拦截器，升级请求不能被 302）。
-- 端点：`ws(s)://<host>/api/bashub/monitor/agents/{profile}/channel`；一个 profile 一条连接，重复登录踢掉旧连接。
+- 端点：`ws(s)://<host>/api/bashub/monitor/agents/{profile}/channel`；一个 profile 一条连接，重复登录踢掉旧连接
+  （旧连接收到 1008 `superseded`）。正常重连时旧连接常常还没超时，这一次顶替不告警；同一 profile 在
+  60 秒内被反复顶掉，才说明两个 agent 共用一个 profile 在互相踢，hub 会记一条 WARN
+  （`agent replaced again …; two basagents may share this profile`），同一 profile 每分钟最多一条。
 - 消息协议、原语表、节拍：**唯一权威在 basctl 仓库**
   （[docs/channel-protocol.md](https://github.com/beangle/basctl/blob/main/docs/channel-protocol.md)），
   本仓库 D 侧的 `bashub.agent.*` 是服务端实现（信封编解码 + 现状快照 + 内存登记册 + 握手鉴权），
