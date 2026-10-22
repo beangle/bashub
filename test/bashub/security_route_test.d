@@ -236,6 +236,21 @@ unittest {
   assert(allowed.status == 200, allowed.body);
 }
 
+@("SPA 的 Bearer token 与 URP_SID 都能恢复 CAS 会话") unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
+  auto router = securedRouter(authConfig(), repo, testDomain());
+
+  auto bearer = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/status", null,
+      ["Authorization": "Bearer admin"]);
+  assert(bearer.status == 200, bearer.body);
+
+  auto query = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/monitor/agents/status?URP_SID=admin");
+  assert(query.status == 200, query.body);
+}
+
 @("CAS ticket 登录会把 authorities 映射进账户并访问 Private 资源")
 unittest {
   auto cas = new FakeCas();

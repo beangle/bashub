@@ -40,7 +40,8 @@ URL 契约由 `test/bashub/route_test.d` 覆盖，路由变更以该测试为准
 ## 前端客户端
 
 SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/api/client.ts`），它负责内容协商、
-`page[...]`/`filter[...]` 查询串、`URP_SID` 追加与 401/302 跳 CAS：
+`page[...]`/`filter[...]` 查询串、`URP_SID` 追加与 401/302 跳 CAS。后端接受会话 cookie、
+`Authorization: Bearer <CAS session id>` 和 `URP_SID` 查询参数三种登录凭证：
 
 | 方法 | 用途 |
 |---|---|

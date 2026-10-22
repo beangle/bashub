@@ -135,6 +135,25 @@ string loginUrlFor(CasConfig cfg, HTTPServerRequest req, string fallbackCasBase)
   return fallbackCasBase.length > 0 ? fallbackCasBase : service;
 }
 
+/// SPA 的登录凭证：优先 cookie，其次 `Authorization: Bearer <sid>`，最后 `URP_SID` 查询参数。
+///
+/// ems-app 在 CAS 登录后保存 token，并用 Bearer 访问同源 API；跨域或 development proxy 场景
+/// 还会把它追加为 `URP_SID`。不认这两种形态时，浏览器明明已经登录，后端仍会回 401。
+private string sessionIdFromRequest(HTTPServerRequest req, string sessionIdName) {
+  auto sid = req.cookies.get(sessionIdName, "").strip;
+  if (sid.length > 0)
+    return sid;
+
+  auto authorization = req.headers.get("Authorization", "").strip;
+  if (authorization.length > 7 && authorization[0 .. 7].toLower == "bearer ") {
+    sid = authorization[7 .. $].strip;
+    if (sid.length > 0)
+      return sid;
+  }
+
+  return req.query.get("URP_SID", "").strip;
+}
+
 /// 从请求参数或 cookie 取当前 Profile，并且只接受会话里确实存在的 id。
 Profile selectedProfile(Session session, HTTPServerRequest req) {
   if (session is null || session.principal is null)
@@ -172,7 +191,7 @@ class HttpSecurity {
 
   SecurityContext authenticate(HTTPServerRequest req, string sessionIdName) {
     SecurityContext context;
-    auto sid = req.cookies.get(sessionIdName, "");
+    auto sid = sessionIdFromRequest(req, sessionIdName);
     if (sessions !is null && sid.length > 0)
       context.session = sessions.access(sid, nowSeconds());
 

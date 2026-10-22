@@ -197,7 +197,8 @@ src/bashub/                 业务：BAS 控制台这一份
   `GET {cas}/session/{id}/expire` 作废、`sessions/logout` 只 `evict`（CAS 那边的会话让它自己过期）。
   心跳每 3 分钟（`flushIntervalSeconds`）打一次
   `/session/{id}/access?time=`，只报「这次真推进了 lastAccessAt」的会话。
-- **登录与资源授权**（M4）：有 `EMS_SID` 就直接读会话；没有会话但带 `ticket` 时调用
+- **登录与资源授权**（M4）：有 `EMS_SID` cookie、SPA 的 `Authorization: Bearer <sid>` 或
+  `URP_SID` 查询参数就直接读会话；没有会话但带 `ticket` 时调用
   `{cas}/serviceValidate`，把 CAS 的 `authorities`/`permissions` 映射进账户。JSON 请求未登录回
   401 + `errors[0].meta.redirectUrl`，浏览器导航回 302 到 `{cas}/login?service=...`；已登录但
   Private 资源角色不命中回 403，root 直接放行。资源名按能力域取
