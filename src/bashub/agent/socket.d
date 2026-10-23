@@ -22,8 +22,8 @@ import vibe.http.websockets : WebSocket, handleWebSockets;
 import core.time : Duration, MonoTime, msecs, seconds;
 import std.datetime : Clock, SysTime;
 
-/// 保活节拍：agent 沉默 90s 就重连，30s 一次 `ping` 留足余量。
-enum HeartbeatInterval = 30.seconds;
+/// 保活节拍：agent 沉默 150s 就重连，60s 一次 `ping` 留一次丢失的余量。
+enum HeartbeatInterval = 60.seconds;
 
 /// 出站队列与 supersede 标记的检查间隔；命令延迟上限也就是这个值。
 private enum PollInterval = 250.msecs;

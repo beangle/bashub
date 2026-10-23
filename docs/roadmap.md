@@ -103,7 +103,7 @@
 | `hello` 身份与能力协商 | ✅ | host / basctl / bas / basHome / supports，能力去重排序 |
 | `report:os`、`report:bas` | ✅ | 整份替换现状快照，保留各自 `at` |
 | `pong`、`result` | ✅ | `pong` 已接收；`result` 按请求号唤醒等待者，超时与断连都会收敛为错误 |
-| Hub 下发 `ping` | ✅ | 每条连接 30s 一次 app 层 ping |
+| Hub 下发 `ping` | ✅ | 每条连接 60s 一次 app 层 ping |
 | Hub 下发 `report:now` | ✅ | `POST /api/bashub/monitor/agents/{profile}/report`；按 `hello.supports` 门禁 |
 | Hub 下发 `log:read` | ✅ | `GET /api/bashub/monitor/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
 | Hub 下发 `agent:log` | ✅ | `GET /api/bashub/monitor/agents/{profile}/agent-log`；读 agent 自身 console，按能力门禁 |
