@@ -227,8 +227,8 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   `profileTitle` 是 profile 的说明，SPA 用它当卡片大标题（`org` 只用于 Logo 与兜底）。
   只在线的、只留最近一次；断连即摘除。`basReport.instances` 只含运行中实例；
   `basReport.declared` 是本机 `server.xml` 声明的实例，控制台按 `id` 合并两者，停止后仍保留实例行并
-  提供启动入口。`basReport.instances[].webapps[].title` 由 hub 读 profile 的 webapp 配置反查
-  artifact.title 后补上（先按运行中的 gav，再按 context）：agent 只上报 gav/context，不扩协议，
+  提供启动入口。`basReport.instances[].webapps[].title` 与 `basReport.declared[].webapps[].title`
+  都由 hub 读 profile 的 webapp 配置反查 artifact.title 后补上（先按 gav，再按 context）：agent 只上报 gav/context，不扩协议，
   也不要求 SPA 有配置读取权限。`org` 是 profile 所属机构的展示信息 `{name,title,shortTitle,logoUrl}`（按 profile
   名的 `org.` 前缀从 `organizations` 查得），SPA 只用它的 Logo 与兜底标题；查不到就省略该字段。
 - 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，每台机器一项，只含

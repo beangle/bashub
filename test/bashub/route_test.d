@@ -261,7 +261,12 @@ unittest {
       {"id":"bas","uri":"gav://org.beangle.bashub:bas-web:0.0.8","context":"/bas"},
       {"id":"otk","uri":"gav://org.beangle.otk:beangle-otk-ws:war:0.0.30","context":"/api/tools"}
     ]}],
-    "declared":[{"id":"prod-farm.app1","http.port":8080}]
+    "declared":[
+      {"id":"prod-farm.app1","http.port":8080},
+      {"id":"prod-farm.app2","http.port":8081,"webapps":[
+        {"uri":"gav://org.beangle.bashub:bas-web:0.0.8","context":"/bas"}
+      ]}
+    ]
   }`);
   agents.attach("openurp.demo").host = "app0";
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/status");
@@ -280,6 +285,33 @@ unittest {
   auto webapps = list[1]["basReport"]["instances"][0]["webapps"].get!(Json[]);
   assert(webapps[0]["title"].get!string == "BAS 控制台");
   assert(webapps[1]["title"].type == Json.Type.undefined);
+  // 停止的实例来自 declared，也要按同样的规则补标题
+  auto declared = list[1]["basReport"]["declared"].get!(Json[]);
+  auto stoppedApps = declared[1]["webapps"].get!(Json[]);
+  assert(stoppedApps[0]["title"].get!string == "BAS 控制台");
+}
+
+@("agents/status fills titles for declared-only stopped instances") unittest {
+  auto agents = new AgentRegistry();
+  auto router = newRouter(false, agents);
+
+  auto person = agents.attach("openurp.prod", "1002");
+  person.host = "app1";
+  // 全部停止：instances 为空，只剩 declared；标题仍要按 profile 的 webapp 配置补上
+  person.basReport = parseJsonString(`{
+    "instances":[],
+    "declared":[{"id":"prod-farm.app1","http.port":8080,"webapps":[
+      {"uri":"gav://org.beangle.bashub:bas-web:0.0.8","context":"/bas"}
+    ]}]
+  }`);
+
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/status");
+  assert(ex.status == 200);
+  auto list = parseJson(ex.body)["agents"].get!(Json[]);
+  assert(list.length == 1);
+  auto declared = list[0]["basReport"]["declared"].get!(Json[]);
+  auto webapps = declared[0]["webapps"].get!(Json[]);
+  assert(webapps[0]["title"].get!string == "BAS 控制台");
 }
 
 @("agents/summary returns health counts without full snapshots") unittest {

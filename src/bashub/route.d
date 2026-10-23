@@ -961,7 +961,34 @@ class HubService {
     return "";
   }
 
-  /// 给 agent 上报的每个 webapp 补 `title`：先按运行中的 gav 反查，再按 context。
+  /// 一组实例里有没有 webapps 数组；运行中的 instances 与声明的 declared 都要看。
+  private static bool hasWebappArray(Json items) {
+    foreach (ref item; items) {
+      if (jsonGet(item, "webapps").type == Json.Type.array)
+        return true;
+    }
+    return false;
+  }
+
+  /// 给一组实例的 webapp 补 `title`：先按 gav 反查，再按 context。
+  private static void addWebappTitles(Json items, const WebappTitles titles) {
+    foreach (ref instance; items) {
+      if (instance.type != Json.Type.object)
+        continue;
+      auto webapps = instance["webapps"];
+      if (webapps.type != Json.Type.array)
+        continue;
+      foreach (ref webapp; webapps) {
+        if (webapp.type != Json.Type.object)
+          continue;
+        auto title = webappTitleOf(titles, jsonText(webapp["context"]), jsonText(webapp["uri"]));
+        if (title.length > 0)
+          webapp["title"] = Json(title);
+      }
+    }
+  }
+
+  /// 给 agent 上报的每个 webapp 补 `title`（运行中的 instances 与停止的 declared 都补）。
   private Json withWebappTitles(Json agentsJson) {
     WebappTitles[string] cache;
     foreach (ref item; agentsJson) {
@@ -971,14 +998,8 @@ class HubService {
       if (report.type != Json.Type.object)
         continue;
       auto instances = jsonGet(report, "instances");
-      bool hasWebapps = false;
-      foreach (ref instance; instances) {
-        if (jsonGet(instance, "webapps").type == Json.Type.array) {
-          hasWebapps = true;
-          break;
-        }
-      }
-      if (!hasWebapps)
+      auto declared = jsonGet(report, "declared");
+      if (!hasWebappArray(instances) && !hasWebappArray(declared))
         continue;
       auto profileId = jsonText(item["profileId"]);
       if (profileId.length == 0)
@@ -986,20 +1007,8 @@ class HubService {
       if (profileId !in cache)
         cache[profileId] = webappTitles(profileId);
       auto titles = profileId in cache;
-      foreach (ref instance; instances) {
-        if (instance.type != Json.Type.object)
-          continue;
-        auto webapps = instance["webapps"];
-        if (webapps.type != Json.Type.array)
-          continue;
-        foreach (ref webapp; webapps) {
-          if (webapp.type != Json.Type.object)
-            continue;
-          auto title = webappTitleOf(*titles, jsonText(webapp["context"]), jsonText(webapp["uri"]));
-          if (title.length > 0)
-            webapp["title"] = Json(title);
-        }
-      }
+      addWebappTitles(instances, *titles);
+      addWebappTitles(declared, *titles);
     }
     return agentsJson;
   }
