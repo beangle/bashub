@@ -84,8 +84,7 @@
                         <th>Server</th>
                         <th>状态</th>
                         <th class="instance-col-port">端口</th>
-                        <th>应用标题</th>
-                        <th>上下文</th>
+                        <th>应用</th>
                         <th class="instance-col-actions">操作</th>
                       </tr>
                     </thead>
@@ -107,8 +106,20 @@
                           </div>
                         </td>
                         <td>{{ instance.httpPort ?? '-' }}</td>
-                        <td class="instance-apps" :title="appTitleText(instance)">{{ appTitleText(instance) || '—' }}</td>
-                        <td class="instance-apps" :title="webappText(instance)">{{ webappText(instance) || '—' }}</td>
+                        <td class="instance-apps">
+                          <template v-if="(instance.webapps ?? []).length">
+                            <div
+                              v-for="app in instance.webapps"
+                              :key="app.id || app.uri"
+                              class="instance-app"
+                            >
+                              <code>{{ app.context || '/' }}</code>
+                              <span v-if="app.title" class="instance-app-title">{{ app.title }}</span>
+                              <span v-if="app.uri" class="instance-app-uri" :title="app.uri">{{ app.uri }}</span>
+                            </div>
+                          </template>
+                          <span v-else class="agent-muted">—</span>
+                        </td>
                         <td class="instance-actions">
                           <template v-if="instance.id">
                             <t-button size="small" variant="text" @click="openLog(agent, instance)">查看日志</t-button>
@@ -462,14 +473,6 @@ function agentGroupStopped(group: AgentGroup): number {
 /** 单台 agent 的实例，按 server 名升序；卡片只展示这台机器的服务，不做跨 agent 合并。 */
 function agentInstances(agent: AgentStatus): AgentInstance[] {
   return instancesOf(agent).sort((a, b) => (a.id || '').localeCompare(b.id || '', 'zh-CN', { numeric: true }))
-}
-
-/** 应用标题由 hub 按配置反查后放进每个 webapp（agent 只报 context/uri）。 */
-function appTitleText(instance: AgentInstance): string {
-  const titles = (instance.webapps ?? [])
-    .map((app) => app.title)
-    .filter((title): title is string => Boolean(title))
-  return titles.join(' · ')
 }
 
 /**
@@ -889,15 +892,6 @@ function instanceStateLabel(instance: AgentInstance): string {
 function instanceStateTheme(instance: AgentInstance): 'success' | 'warning' | 'danger' {
   if (instance.state === 'error') return 'danger'
   return isRunning(instance) ? 'success' : 'warning'
-}
-
-function webappText(instance: AgentInstance): string {
-  const labels: string[] = []
-  for (const app of instance.webapps ?? []) {
-    const label = app.context || app.uri || app.id
-    if (label) labels.push(label)
-  }
-  return labels.join(' · ')
 }
 
 /** 卡片副标题：操作系统名称与内核版本；还没上报时给一句提示。 */
@@ -1365,12 +1359,37 @@ onBeforeUnmount(() => {
 }
 
 .instance-apps {
-  max-width: 240px;
   min-width: 0;
-  overflow: hidden;
   color: var(--td-text-color-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+}
+
+.instance-app {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  padding: 1px 0;
+}
+
+.instance-app code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--td-bg-color-container-hover);
+  font-family: 'Andale Mono', ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.instance-app-title {
+  color: var(--td-text-color-primary);
+}
+
+.instance-app-uri {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--td-text-color-placeholder);
+  font-family: 'Andale Mono', ui-monospace, monospace;
+  font-size: 11px;
 }
 
 .instance-actions {
