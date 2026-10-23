@@ -129,7 +129,7 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 |---|---|---|
 | `organizations` | Organization | 机构 |
 | `platforms` | Platform | 操作系统平台 |
-| `profiles` | Profile | 新建时填默认仓库；`hostname` 是域名，`proxyByHostname` 默认 `false`，为 `true` 时才把它输出为 server.xml 的 `setline-hostname`；`sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥，编辑私钥时留空表示保持原值，管理台不回显私钥。Micdn 配置走专用聚合端点，不再是普通资源 |
+| `profiles` | Profile | 新建时填默认仓库；`hostname` 是域名，`proxyByHostname` 默认 `false`，为 `true` 时才把它输出为 server.xml 的 `setline-hostname`。证书不放在 profile 资源里（避免列表/详情每次携带大字段）：公钥与「私钥是否已设置」走专用端点 `/api/bashub/config/profiles/{id}/certificate`。Micdn 配置走专用聚合端点，不再是普通资源 |
 | `engines` | Engine | `type` 取 `tomcat-server`/`tomcat`/`undertow`/`jetty`/`any`（与 basctl 的 creator 同名）；`listeners`/`jars` 支持分隔符字符串；`jspSupport` 仅 `tomcat-server` 有效 |
 | `farms` | Farm | 群集 |
 | `servers` | Server | 群集实例 |
@@ -191,6 +191,8 @@ Freemarker 模板运行时，不属于 JSON:API。
 | `GET /api/bashub/config/profiles/{id}/server` | 管理台查看最终 server.xml；登录会话鉴权 |
 | `GET /api/bashub/config/profiles/{id}/proxy` | 管理台查看所选引擎的最终代理配置；登录会话鉴权 |
 | `GET /api/bashub/config/profiles/{id}/setline-peers` | 管理台查看 setline peer 列表；登录会话鉴权 |
+| `GET /api/bashub/config/profiles/{id}/certificate` | 管理台读取 PEM 公钥证书与 `keySet`（私钥原文永不回显）；登录会话鉴权 |
+| `PATCH /api/bashub/config/profiles/{id}/certificate` | 保存公钥证书；`privateKey` 留空表示保持原私钥；登录会话鉴权 |
 
 sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自己那份 setline 配置仍需让
 `listen` 可被 sidecar 主机访问，并把 sidecar 主机地址写进 `peerReaders`；这条读链路按

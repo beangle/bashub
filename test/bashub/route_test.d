@@ -819,31 +819,57 @@ unittest {
   assert(doc["xml"].get!string.canFind(`<bucket name="demo" key="01**ef"/>`));
 }
 
-@("profile certificates are masked in the admin API and downloadable by token")
+@("profile certificates live outside profile and are downloadable by token")
 unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, demoDao(reg));
   auto cert = "-----BEGIN CERTIFICATE-----\nCERT\n-----END CERTIFICATE-----";
+  auto cert2 = "-----BEGIN CERTIFICATE-----\nCERT2\n-----END CERTIFICATE-----";
   auto key = "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----";
-  assert(store.updateColumns(reg.find("profiles"), "1002", [
-    "ssl_certificate": Json(cert), "ssl_certificate_key": Json(key),
+  assert(store.upsertColumns(reg.find("profile-certificates"), "1002", [
+    "certificate": Json(cert), "private_key": Json(key),
   ]));
   auto router = newRouterWith(reg, store);
 
+  // profile 资源不再携带证书大字段
   auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002");
   assert(ex.status == 200, ex.body);
   auto attributes = parseJson(ex.body)["data"]["attributes"];
-  assert(attributes["sslCertificate"].get!string == cert);
-  assert(attributes["sslCertificateKeySet"].get!bool);
-  assert(attributes["sslCertificateKey"].get!string == "********");
-  assert(!attributes["sslCertificateKey"].get!string.canFind("PRIVATE KEY"));
+  assert(attributes["sslCertificate"].type == Json.Type.undefined);
+  assert(attributes["sslCertificateKey"].type == Json.Type.undefined);
 
+  // 管理台专用端点：回公钥与「私钥是否已设置」，绝不回私钥原文
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/certificate");
+  assert(ex.status == 200, ex.body);
+  auto info = parseJson(ex.body);
+  assert(info["certificate"].get!string == cert);
+  assert(info["keySet"].get!bool);
+  assert(!ex.body.canFind("PRIVATE KEY"));
+
+  // PATCH 只换公钥：私钥留空保持原值
+  auto body = Json.emptyObject;
+  body["certificate"] = Json(cert2);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/profiles/1002/certificate",
+      body.toString);
+  assert(ex.status == 200, ex.body);
+  auto cert2Pem = cert2 ~ "\n";
+  auto updated = parseJson(ex.body);
+  assert(updated["certificate"].get!string == cert2Pem);
+  assert(updated["keySet"].get!bool);
+
+  // 非法 PEM 拒绝
+  body["certificate"] = Json("not a certificate");
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/profiles/1002/certificate",
+      body.toString);
+  assert(ex.status == 400, ex.body);
+
+  // setline 的机器端点仍按 Profile key 下载
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate");
   assert(ex.status == 401, ex.body);
   ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate",
       ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
-  assert(ex.body == cert);
+  assert(ex.body == cert2Pem);
   ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate-key",
       ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);

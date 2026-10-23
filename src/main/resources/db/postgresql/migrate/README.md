@@ -20,5 +20,6 @@
 | 13 | `0.0.8-13-host-setline-admin-port.sql` | 管理口下沉到主机；把旧 Profile 端口回填给已启用 setline 的主机 |
 | 14 | `0.0.8-14-profile-proxy-by-hostname.sql` | Profile 增加 `proxyByHostname`，控制 setline 路由是否按域名分组 |
 | 15 | `0.0.8-15-agent-status-history.sql` | 新增节点运行状态采样表，保留最近 180 天 |
+| 16 | `0.0.8-16-profile-certificate-table.sql` | SSL 公私钥从 Profile 拆到独立表 |
 
 全新安装直接执行 `../init/*.sql` 建库，不需要运行本目录的升级脚本。

@@ -56,8 +56,6 @@ Registry hubRegistry() {
         Column("remote_repo", "remoteRepo", Kind.text),
         Column("ssl_ciphers", "sslCiphers", Kind.text),
         Column("ssl_protocols", "sslProtocols", Kind.text),
-        Column("ssl_certificate", "sslCertificate", Kind.text),
-        Column("ssl_certificate_key", "sslCertificateKey", Kind.text),
         Column("key", "key", Kind.text, true, "\"key\""),
       ],
       [Relation("org", "org_id", "organizations")],
@@ -67,6 +65,15 @@ Registry hubRegistry() {
       ],
       "name",
       []),
+    /// 证书单独成表：profile 的列表/详情不再携带大字段；只给专用端点内部使用。
+    Resource(
+      "profile-certificates", "profileCertificates", "bas.cfg_profile_certificates", "profile_id",
+      [
+        Column("certificate", "certificate", Kind.text),
+        Column("private_key", "privateKey", Kind.text),
+      ],
+      [], [],
+      "profile_id"),
     Resource(
       "engines", "engines", "bas.cfg_engines", "id",
       [

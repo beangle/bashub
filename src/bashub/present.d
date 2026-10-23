@@ -26,9 +26,6 @@ import std.string : replace, split, strip;
 /// 在一条资源对象的 attributes 成形后补充计算字段。
 void decorateHub(Registry reg, Dao dao, const Resource res, Row row, RelIndex relIndex, ref Json attributes) {
   switch (res.path) {
-  case "profiles":
-    decorateProfile(row, attributes);
-    break;
   case "artifacts":
     attributes["gav"] = Json(gavOf(row, jsonText(rowGet(row, "latest_version"))));
     break;
@@ -44,20 +41,6 @@ void decorateHub(Registry reg, Dao dao, const Resource res, Row row, RelIndex re
   default:
     break;
   }
-}
-
-/// 管理台永远不返回私钥原文。公钥证书可以查看，私钥只给 setline 的机器端点。
-private void decorateProfile(Row row, ref Json attributes) {
-  auto key = jsonText(rowGet(row, "ssl_certificate_key"));
-  attributes["sslCertificateKeySet"] = Json(key.length > 0);
-  attributes["sslCertificateKey"] = Json(maskSecret(key));
-}
-
-private string maskSecret(string value) {
-  if (value.length == 0)
-    return "";
-  // PEM 私钥的首尾固定是 `--`，保留首尾没有信息量；管理台只显示固定掩码。
-  return "********";
 }
 
 private void decorateWebapp(Registry reg, Dao dao, const Resource res, Row row, RelIndex relIndex,

@@ -14,6 +14,7 @@ alter table bas.cfg_platform_feature_scripts add constraint fk_jog57ijvhnujc2n1v
 alter table bas.cfg_platform_feature_scripts add constraint fk_tn5avaugjeejhifxstb9ro16h foreign key (platform_id) references bas.cfg_platforms (id);
 alter table bas.cfg_platform_features_dependencies add constraint fk_70atmhqmevy2qa1fd0xvekk1p foreign key (from_feature_id) references bas.cfg_platform_features (id);
 alter table bas.cfg_platform_features_dependencies add constraint fk_s1u0hlwtti8pmijx0ehhnx5rm foreign key (platform_feature_id) references bas.cfg_platform_features (id);
+alter table bas.cfg_profile_certificates add constraint fk_cfg_profile_certificates_profile foreign key (profile_id) references bas.cfg_profiles (id);
 alter table bas.cfg_profile_micdn add constraint fk_cfg_profile_micdn_profile foreign key (profile_id) references bas.cfg_profiles (id);
 alter table bas.cfg_profile_micdn_components add constraint fk_profile_micdn_components_profile foreign key (profile_id) references bas.cfg_profiles (id);
 alter table bas.cfg_profile_micdn_components add constraint fk_profile_micdn_components_component foreign key (component_id) references bas.cdn_components (id);

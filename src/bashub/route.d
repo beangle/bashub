@@ -282,13 +282,78 @@ class HubService {
     }
 
     Row row;
-    if (!store.fetchRaw(reg.find("profiles"), profile.id, row)) {
-      res.writeBody("", HTTPStatus.notFound);
-      return;
-    }
-    auto text = jsonText(rowGet(row, privateKey ? "ssl_certificate_key" : "ssl_certificate"));
+    auto text = "";
+    if (store.fetchRaw(reg.find("profile-certificates"), profile.id, row))
+      text = jsonText(rowGet(row, privateKey ? "private_key" : "certificate"));
     res.headers["Cache-Control"] = "no-store";
     res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
+  }
+
+  /// `GET /api/bashub/config/profiles/{id}/certificate`：管理台读取公钥与私钥是否已设置。
+  void profileCertificateInfo(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto id = req.params.get("id", "");
+    ProfileContext profile;
+    if (!findProfileById(reg, store, id, profile)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+      return;
+    }
+    auto doc = Json.emptyObject;
+    doc["certificate"] = Json("");
+    doc["keySet"] = Json(false);
+    Row row;
+    if (store.fetchRaw(reg.find("profile-certificates"), profile.id, row)) {
+      doc["certificate"] = Json(jsonText(rowGet(row, "certificate")));
+      doc["keySet"] = Json(jsonText(rowGet(row, "private_key")).length > 0);
+    }
+    res.headers["Cache-Control"] = "no-store";
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// `PATCH /api/bashub/config/profiles/{id}/certificate`：保存 PEM 公钥证书；私钥留空表示保持原值。
+  void updateProfileCertificate(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto id = req.params.get("id", "");
+    ProfileContext profile;
+    if (!findProfileById(reg, store, id, profile)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+      return;
+    }
+    auto body = requestJson(req, res);
+    if (body.type == Json.Type.undefined)
+      return;
+    auto certificate = normalizePem(jsonText(jsonGet(body, "certificate")));
+    if (certificate.length == 0 || !certificate.canFind("-----BEGIN CERTIFICATE-----")) {
+      writeJsonApi(res, errorDocument(400, "证书格式非法", "certificate must be PEM with BEGIN CERTIFICATE",
+          "certificate"), HTTPStatus.badRequest);
+      return;
+    }
+    auto privateKey = normalizePem(jsonText(jsonGet(body, "privateKey")));
+    if (privateKey.length > 0 && !privateKey.canFind("PRIVATE KEY-----")) {
+      writeJsonApi(res, errorDocument(400, "私钥格式非法", "privateKey must be PEM with PRIVATE KEY", "privateKey"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    Row values;
+    values["certificate"] = Json(certificate);
+    if (privateKey.length > 0)
+      values["private_key"] = Json(privateKey);
+    auto certificates = reg.find("profile-certificates");
+    store.upsertColumns(certificates, profile.id, values);
+    Row stored;
+    auto doc = Json.emptyObject;
+    doc["certificate"] = Json(certificate);
+    doc["keySet"] = Json(store.fetchRaw(certificates, profile.id, stored)
+        && jsonText(rowGet(stored, "private_key")).length > 0);
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// PEM 只保留一份稳定的换行。
+  private static string normalizePem(string value) {
+    auto text = value.replace("\r\n", "\n").replace("\r", "\n").strip;
+    return text.length > 0 && !text.endsWith("\n") ? text ~ "\n" : text;
   }
 
   /// `GET /api/bashub/config/{profile}/setline-peers`：setline 的 peer 列表机器下载端点。
@@ -321,15 +386,15 @@ class HubService {
     }
 
     Row row;
-    if (!store.fetchRaw(reg.find("profiles"), profile.id, row)) {
-      res.writeBody("", HTTPStatus.notFound);
-      return;
+    auto certificate = "";
+    auto certificateKey = "";
+    if (store.fetchRaw(reg.find("profile-certificates"), profile.id, row)) {
+      certificate = jsonText(rowGet(row, "certificate"));
+      certificateKey = jsonText(rowGet(row, "private_key"));
     }
     try {
       auto peers = renderPeers(store, reg, profile);
       auto proxy = renderProxy(store, reg, profile);
-      auto certificate = jsonText(rowGet(row, "ssl_certificate"));
-      auto certificateKey = jsonText(rowGet(row, "ssl_certificate_key"));
       auto text = renderSetlineManifest(peers, proxy, certificate, certificateKey);
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "application/json");
@@ -1972,6 +2037,8 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   // config：机器配置分发与配置详情
   router.get(api.config ~ "/:profile/server", &hub.profileServer);
   router.get(api.config ~ "/:profile/proxy", &hub.profileProxy);
+  router.get(api.config ~ "/profiles/:id/certificate", &hub.profileCertificateInfo);
+  router.patch(api.config ~ "/profiles/:id/certificate", &hub.updateProfileCertificate);
   router.get(api.config ~ "/:profile/certificate", &hub.profileCertificate);
   router.get(api.config ~ "/:profile/certificate-key", &hub.profileCertificateKey);
   router.get(api.config ~ "/:profile/setline-peers", &hub.profilePeers);
@@ -2023,7 +2090,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   string[] emsResources;
   foreach (item; reg.all) {
     if (item.path != "cdn-components" && item.path != "profile-micdn"
-        && item.path != "profile-micdn-components") {
+        && item.path != "profile-micdn-components" && item.path != "profile-certificates") {
       auto group = resourceApiGroup(item);
       if (group == "ems")
         emsResources ~= item.path;

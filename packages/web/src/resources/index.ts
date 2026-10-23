@@ -122,16 +122,6 @@ export const resourceSchemas: ResourceSchema[] = [
         help: '不填写时由代理使用默认套件',
       },
       { key: 'sslProtocols', label: 'SSL 协议', column: false },
-      {
-        key: 'sslCertificate', label: 'HTTPS 公钥证书', type: 'textarea', column: false,
-        requiredWhen: 'enableHttps',
-        help: 'PEM 格式；启用 HTTPS 时必填。nginx 用作 ssl_certificate，建议贴完整证书链（fullchain）',
-      },
-      {
-        key: 'sslCertificateKey', label: 'HTTPS 私钥', type: 'textarea', column: false, secret: true,
-        requiredWhen: 'enableHttps', preserveWhenSet: 'sslCertificateKeySet',
-        help: 'PEM 格式；编辑时留空表示保持原私钥。nginx 用作 ssl_certificate_key',
-      },
       { key: 'localRepo', label: '本地仓库', column: false, help: '默认 ~/.m2/repository' },
       { key: 'remoteRepo', label: '远程仓库', column: false, width: 260 },
     ],

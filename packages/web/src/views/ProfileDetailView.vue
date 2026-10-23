@@ -220,9 +220,12 @@
                   <h4>HTTPS 与证书状态</h4>
                   <p>管理台只展示公钥证书，私钥永远不会下发到浏览器。</p>
                 </div>
-                <t-tag :theme="enableHttps ? 'success' : 'default'" variant="light">
-                  {{ enableHttps ? 'HTTPS 已启用' : 'HTTPS 未启用' }}
-                </t-tag>
+                <div class="detail-card__actions">
+                  <t-tag :theme="enableHttps ? 'success' : 'default'" variant="light">
+                    {{ enableHttps ? 'HTTPS 已启用' : 'HTTPS 未启用' }}
+                  </t-tag>
+                  <t-button size="small" theme="primary" @click="openCertificateEditor">编辑证书</t-button>
+                </div>
               </header>
               <div class="fact-grid">
                 <div class="fact"><span>HTTPS 端口</span><strong>{{ enableHttps ? (httpsPort || '—') : '—' }}</strong></div>
@@ -477,6 +480,30 @@
       </div>
       <t-empty v-else-if="!loading" description="未找到配置" />
     </t-loading>
+
+    <t-dialog
+      v-model:visible="certificateVisible"
+      header="编辑 HTTPS 证书"
+      width="720px"
+      :confirm-btn="{ loading: savingCertificate }"
+      @confirm="saveCertificate"
+    >
+      <div class="certificate-form">
+        <label>公钥证书（PEM，可含完整证书链）</label>
+        <t-textarea
+          v-model="certificateDraft"
+          :autosize="{ minRows: 6, maxRows: 14 }"
+          placeholder="-----BEGIN CERTIFICATE-----"
+        />
+        <label>私钥（PEM；留空表示保持原私钥）</label>
+        <t-textarea
+          v-model="privateKeyDraft"
+          :autosize="{ minRows: 4, maxRows: 10 }"
+          placeholder="-----BEGIN PRIVATE KEY-----"
+        />
+        <t-alert v-if="certificateError" theme="error" :message="certificateError" />
+      </div>
+    </t-dialog>
   </section>
 </template>
 
@@ -495,7 +522,13 @@ import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listAgents, type AgentInstance, type AgentStatus } from '@/api/agents'
 import { getMicdnProfile, type MicdnBinding, type MicdnProfileDocument } from '@/api/micdn'
-import { readProfileConfig, readSetlinePeers, type SetlinePeer } from '@/api/profile-detail'
+import {
+  readProfileCertificate,
+  readProfileConfig,
+  readSetlinePeers,
+  saveProfileCertificate,
+  type SetlinePeer,
+} from '@/api/profile-detail'
 import {
   attributeText,
   getResourceDetail,
@@ -599,8 +632,13 @@ const proxyEngineLabel = computed(() => {
 })
 const sslProtocols = computed(() => attrOf(profile.value, 'sslProtocols'))
 const sslCiphers = computed(() => attrOf(profile.value, 'sslCiphers'))
-const certificateText = computed(() => attrOf(profile.value, 'sslCertificate'))
-const privateKeySet = computed(() => boolOf(profile.value?.attributes.sslCertificateKeySet))
+const certificateText = ref('')
+const privateKeySet = ref(false)
+const certificateVisible = ref(false)
+const certificateDraft = ref('')
+const privateKeyDraft = ref('')
+const savingCertificate = ref(false)
+const certificateError = ref('')
 const keyConfigured = computed(() => Boolean(attrOf(profile.value, 'key')) || micdn.value?.profile.keySet === true)
 const setlineHosts = computed(() =>
   hosts.value
@@ -841,6 +879,38 @@ async function copyText(value: string, label: string) {
   }
 }
 
+/** 打开证书编辑框：公钥回填，私钥不回显（留空保持原值）。 */
+function openCertificateEditor() {
+  certificateDraft.value = certificateText.value
+  privateKeyDraft.value = ''
+  certificateError.value = ''
+  certificateVisible.value = true
+}
+
+async function saveCertificate() {
+  if (savingCertificate.value) return
+  certificateError.value = ''
+  if (!certificateDraft.value.includes('BEGIN CERTIFICATE')) {
+    certificateError.value = '公钥证书必须是 PEM 格式（包含 BEGIN CERTIFICATE）'
+    return
+  }
+  savingCertificate.value = true
+  try {
+    const info = await saveProfileCertificate(profileId, {
+      certificate: certificateDraft.value,
+      privateKey: privateKeyDraft.value,
+    })
+    certificateText.value = info.certificate
+    privateKeySet.value = info.keySet
+    certificateVisible.value = false
+    MessagePlugin.success('证书已保存')
+  } catch (reason) {
+    certificateError.value = errorText(reason)
+  } finally {
+    savingCertificate.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   loadError.value = ''
@@ -858,7 +928,10 @@ async function load() {
   profile.value = detail.row
   const includedRows = [...detail.included]
 
-  const [farmsResult, hostsResult, webappsResult, agentsResult, proxyResult, serverResult, peersResult, micdnResult] =
+  const [
+    farmsResult, hostsResult, webappsResult, agentsResult, proxyResult, serverResult, peersResult,
+    micdnResult, certificateResult,
+  ] =
     await Promise.allSettled([
       listResource('/farms', {
         filters: { 'farm.profile.id': profileId },
@@ -879,6 +952,7 @@ async function load() {
       readProfileConfig(profileId, 'server'),
       readSetlinePeers(profileId),
       getMicdnProfile(profileId),
+      readProfileCertificate(profileId),
     ])
 
   if (farmsResult.status === 'fulfilled') {
@@ -916,6 +990,13 @@ async function load() {
 
   if (micdnResult.status === 'fulfilled') micdn.value = micdnResult.value
   else warning('micdn', 'Micdn 配置', micdnResult.reason)
+
+  if (certificateResult.status === 'fulfilled') {
+    certificateText.value = certificateResult.value.certificate
+    privateKeySet.value = certificateResult.value.keySet
+  } else {
+    warning('certificate', '证书', certificateResult.reason)
+  }
 
   const farmIds = farms.value.map((farm) => farm.id)
   if (farmIds.length > 0) {
@@ -1351,6 +1432,17 @@ onMounted(load)
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.certificate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.certificate-form label {
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
 }
 
 .config-preview--certificate {

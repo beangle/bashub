@@ -14,6 +14,7 @@ alter table bas.cfg_platform_feature_scripts add constraint pk_rmm7vn5sjxej75psv
 alter table bas.cfg_platform_features add constraint pk_801cr12kkx4lqccjq8yo31rxj primary key (id);
 alter table bas.cfg_platform_features_dependencies add constraint pk_i89r1dro2uhe54fe1ta7e2iyg primary key (from_feature_id,platform_feature_id);
 alter table bas.cfg_platforms add constraint pk_giwqec5q65yu05qsao5ijus8e primary key (id);
+alter table bas.cfg_profile_certificates add constraint pk_cfg_profile_certificates primary key (profile_id);
 alter table bas.cfg_profile_micdn add constraint pk_cfg_profile_micdn primary key (profile_id);
 alter table bas.cfg_profile_micdn_components add constraint pk_cfg_profile_micdn_components primary key (id);
 alter table bas.cfg_profile_micdn_components add constraint uq_profile_micdn_component unique (profile_id,component_id);

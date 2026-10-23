@@ -164,8 +164,10 @@ src/bashub/                 业务：BAS 控制台这一份
   `GET /api/bashub/config/{profile}/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
   只按请求 `path` 做 `map_beg` 路由，只有带 targets 的 webapp 参与，按 farm + server 集合分组。
   proxy 下载使用同样的 Bearer 凭证。
-  Profile 的 `sslCertificate` / `sslCertificateKey` 保存 PEM 公钥证书与私钥；管理台只回显公钥，
-  私钥始终脱敏。setline 用同一凭证分别拉取 `GET /api/bashub/config/{profile}/certificate` 与
+  PEM 公钥证书与私钥单独存放在 `cfg_profile_certificates`，profile 的列表/详情不再携带这两个大字段；
+  管理台通过 `GET/PATCH /api/bashub/config/profiles/{id}/certificate` 查看公钥、保存证书（私钥原文
+  永不回显，编辑时留空保持原值）。setline 用 Profile 凭证分别拉取
+  `GET /api/bashub/config/{profile}/certificate` 与
   `GET /api/bashub/config/{profile}/certificate-key`，落成 `/etc/setline/certs/cert.pem`、`key.pem` 和 haproxy 的
   `bundle.pem`。未配置证书时两个端点返回空 Body。
   `GET /api/bashub/config/{profile}/setline-peers` 输出 sidecar 的 peer 列表（JSON）：

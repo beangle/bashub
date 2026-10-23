@@ -110,9 +110,6 @@ private void normalizeHubWrite(Store store, Registry reg, const Resource res, st
     validateServerTargetHost(store, reg, id, values);
     return;
   }
-  if (res.path == "profiles") {
-    normalizeProfileCertificate(values);
-  }
 }
 
 /// 主机的 setline listen/admin 端口必须同时出现或同时为空。
@@ -277,29 +274,6 @@ private Json[] allRows(Store store, const Resource res) {
   Query q;
   q.pageSize = 100000;
   return documentRows(store.search(res, q));
-}
-
-/// PEM 只保留一份稳定的换行；同时挡住把管理台脱敏值误写回数据库。
-private void normalizeProfileCertificate(ref Row values) {
-  if (auto value = "ssl_certificate" in values) {
-    auto pem = normalizePem(jsonText(*value));
-    if (pem.length > 0 && !pem.canFind("-----BEGIN CERTIFICATE-----"))
-      throw new StoreException("sslCertificate", "证书必须是 PEM 格式（包含 BEGIN CERTIFICATE）");
-    values["ssl_certificate"] = Json(pem);
-  }
-  if (auto value = "ssl_certificate_key" in values) {
-    auto pem = normalizePem(jsonText(*value));
-    if (pem.length > 0 && !pem.canFind("PRIVATE KEY-----"))
-      throw new StoreException("sslCertificateKey", "私钥必须是 PEM 格式（包含 PRIVATE KEY）");
-    values["ssl_certificate_key"] = Json(pem);
-  }
-}
-
-private string normalizePem(string value) {
-  auto text = value.replace("\r\n", "\n").replace("\r", "\n").strip;
-  if (text.length > 0 && !text.endsWith("\n"))
-    text ~= "\n";
-  return text;
 }
 
 private string normalizeChannelType(string value) {
