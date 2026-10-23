@@ -33,11 +33,19 @@ end $$;
 -- ===== 3. 修正主键生成器表名 =====
 -- public.next_id(schema.table) 以 'schema.table' 字符串为键，schema 改名后旧键名会失效，
 -- 若不修正，新记录会退化为 max(id)+1 重新计数（并发下可能撞主键）。
+-- schema 已经手工改过名时 `sas.*` 与 `bas.*` 两套键可能并存；此时保留较大的 currval，
+-- 再删掉 `sas.*` 旧键，避免 rename 撞主键或计数器回退。
 do $$
 begin
   if to_regclass('public.table_sequences') is not null then
-    update public.table_sequences
-       set table_name = 'bas.' || substr(table_name, 5)
-     where table_name like 'sas.%';
+    insert into public.table_sequences (table_name, currval)
+    select 'bas.' || substr(ts.table_name, 5), ts.currval
+      from public.table_sequences ts
+     where ts.table_name like 'sas.%'
+       and to_regclass('bas.' || substr(ts.table_name, 5)) is not null
+    on conflict (table_name) do update
+       set currval = greatest(public.table_sequences.currval, excluded.currval);
+
+    delete from public.table_sequences where table_name like 'sas.%';
   end if;
 end $$;
