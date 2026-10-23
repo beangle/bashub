@@ -274,3 +274,5 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
 - SPA 页面：`/monitor/agents` 展示在线节点、实例状态、运行历史与 `hello.supports`；操作系统指标与
   webapps 明细按需加载。支持刷新节点快照（先下发 `report:now`，再读 `/agents/status`）、按区间读实例
   或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；节点快照每 30 秒自动刷新一次。
+  多个 profile 同时在线时**一次只展示一个**：右上角下拉切换，选择记在浏览器 localStorage，当前 profile
+  离线后自动退回列表里的第一个。

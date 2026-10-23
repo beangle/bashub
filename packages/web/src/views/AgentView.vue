@@ -8,6 +8,15 @@
           列表每 30 秒自动刷新；点节点的“刷新”会先让 agent 重报，再拉取一次完整快照。
         </p>
       </div>
+      <div v-if="profileOptions.length > 1" class="page-actions">
+        <t-select
+          v-model="selectedProfile"
+          class="profile-select"
+          :options="profileOptions"
+          filterable
+          placeholder="选择 Profile"
+        />
+      </div>
     </div>
 
     <t-alert v-if="error" theme="error" :message="error" class="agent-alert" />
@@ -17,7 +26,7 @@
     </div>
 
     <div v-else class="agent-grid">
-      <t-card v-for="group in groups" :key="group.profile" :bordered="true" class="agent-card">
+      <t-card v-for="group in visibleGroups" :key="group.profile" :bordered="true" class="agent-card">
         <div class="agent-card-head">
           <div class="agent-identity">
             <div class="agent-title-row">
@@ -341,7 +350,7 @@
 import { JsonApiRequestError } from '@beangle/ems-app'
 import { CopyIcon, DownloadIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   followAgentLog,
   listAgents,
@@ -469,6 +478,57 @@ const groups = computed<AgentGroup[]>(() => {
     group.agents.push(agent)
   }
   return [...byProfile.values()]
+})
+
+const MONITOR_PROFILE_KEY = 'bashub.monitor_profile'
+
+function readSelectedProfile(): string {
+  try {
+    return window.localStorage.getItem(MONITOR_PROFILE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/** 多个 profile 同时在线时只展示一个，用右上角下拉切换。 */
+const selectedProfile = ref(readSelectedProfile())
+
+function profileLabel(group: AgentGroup): string {
+  const title = groupOrgTitle(group)
+  return title === group.profile ? group.profile : `${title}（${group.profile}）`
+}
+
+const profileOptions = computed(() =>
+  groups.value.map((group) => ({ value: group.profile, label: profileLabel(group) })),
+)
+
+/** 当前选中的 profile；选中的已经离线时退回第一个。 */
+const activeGroup = computed<AgentGroup | undefined>(() => {
+  const list = groups.value
+  if (!list.length) return undefined
+  return list.find((group) => group.profile === selectedProfile.value) ?? list[0]
+})
+
+/** 卡片模板按数组渲染，但只放当前选中的那个 profile。 */
+const visibleGroups = computed(() => (activeGroup.value ? [activeGroup.value] : []))
+
+watch(
+  groups,
+  (list) => {
+    if (!list.length) return
+    if (!list.some((group) => group.profile === selectedProfile.value)) {
+      selectedProfile.value = list[0].profile
+    }
+  },
+  { immediate: true },
+)
+
+watch(selectedProfile, (value) => {
+  try {
+    window.localStorage.setItem(MONITOR_PROFILE_KEY, value)
+  } catch {
+    /* 隐私模式等场景忽略写入失败 */
+  }
 })
 
 /** 同一 profile 下多台 agent 的键：后端用 `ip` 区分机器，没有 ip 时退回 host。 */
@@ -1222,6 +1282,12 @@ onBeforeUnmount(() => {
   height: 32px;
   border-radius: 4px;
   object-fit: contain;
+}
+
+/* 右上角的 profile 切换；窄屏下占满整行。 */
+.profile-select {
+  width: 280px;
+  max-width: 100%;
 }
 
 .agent-profile {
