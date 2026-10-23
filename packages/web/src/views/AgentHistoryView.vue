@@ -6,7 +6,7 @@
         <h2 class="page-title">运行历史</h2>
         <p class="page-subtitle">
           {{ profile || '-' }} · 最近 {{ days }} 天；采样窗口与频率由 bashub 的
-          <code>agent-health-*</code> 配置决定。
+          <code>&lt;agent health-interval&gt;</code> 配置决定。
         </p>
       </div>
       <div class="page-actions">

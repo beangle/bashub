@@ -86,6 +86,40 @@ unittest {
   assert(loadBashub(ems).listen == "0.0.0.0:8899");
 }
 
+@("loadBashub reads the maven download token from a snapshot child node") unittest {
+  auto home = uniqueTempDir("bashub-ems-snapshot-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"), `<app><snapshot download-token="node-secret"/></app>`);
+
+  auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
+  assert(loadBashub(ems).mavenDownloadToken == "node-secret");
+}
+
+@("loadBashub reads the agent schedule from a child node") unittest {
+  auto home = uniqueTempDir("bashub-ems-agent-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"),
+      `<app><agent health-interval="600" health-start="22:00" health-end="07:30"/></app>`);
+
+  auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
+  auto cfg = loadBashub(ems);
+  assert(cfg.agentHealthIntervalSeconds == 600);
+  assert(cfg.agentHealthStartMinute == 22 * 60);
+  assert(cfg.agentHealthEndMinute == 7 * 60 + 30);
+}
+
+@("loadBashub reads the maven download token from the application file") unittest {
+  auto home = uniqueTempDir("bashub-ems-maven-");
+  scope (exit) rmdirRecurse(home);
+  mkdirRecurse(buildPath(home, "bas"));
+  write(buildPath(home, "bas/hub.xml"), `<app maven-download-token="maven-secret"/>`);
+
+  auto ems = loadEms(home, ["base": "https://sas.openurp.net"]);
+  assert(loadBashub(ems).mavenDownloadToken == "maven-secret");
+}
+
 @("loadBashub reads the agent health schedule from the application file") unittest {
   auto home = uniqueTempDir("bashub-ems-health-");
   scope (exit) rmdirRecurse(home);

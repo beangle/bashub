@@ -205,7 +205,8 @@ class HubService {
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, profile), HTTPStatus.ok, "application/xml");
+      res.writeBody(renderServerXml(store, reg, profile, false, cfg.mavenDownloadToken),
+          HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
       res.writeBody("", HTTPStatus.internalServerError);
@@ -226,7 +227,8 @@ class HubService {
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, profile, true), HTTPStatus.ok, "application/xml");
+      res.writeBody(renderServerXml(store, reg, profile, true, cfg.mavenDownloadToken),
+          HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
       res.writeBody("", HTTPStatus.internalServerError);

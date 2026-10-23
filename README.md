@@ -163,7 +163,10 @@ src/bashub/                 业务：BAS 控制台这一份
   `GET /api/bashub/config/profiles/{id}/server`（登录会话鉴权）查看同一份结果。
   `GET /api/bashub/config/{profile}/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
   只按请求 `path` 做 `map_beg` 路由，只有带 targets 的 webapp 参与，按 farm + server 集合分组。
-  proxy 下载使用同样的 Bearer 凭证。
+  proxy 下载使用同样的 Bearer 凭证。server.xml 里的
+  `<snapshot-repo remote=".../maven" token="...">` 优先取该 Profile 的 micdn
+  `<auth download-key>`；为空时回退 `hub.xml` 的 `maven-download-token`，用于多个 Profile
+  共用同一个 micdn `/maven` 的场景。
   PEM 公钥证书与私钥单独存放在 `cfg_profile_certificates`，profile 的列表/详情不再携带这两个大字段；
   管理台通过 `GET/PATCH /api/bashub/config/profiles/{id}/certificate` 查看公钥、保存证书（私钥原文
   永不回显，编辑时留空保持原值）。setline 用 Profile 凭证分别拉取
@@ -281,18 +284,21 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 提供数据库连接；没有 `default` 数据源时再找 `~/.ems/bas/resources.xml`。根元素还可以配置监听地址：
 
 ```xml
-<app listen="0.0.0.0:8888"
-     agent-health-interval="300"
-     agent-health-start="07:00"
-     agent-health-end="22:00">
+<app listen="0.0.0.0:8888">
+  <snapshot download-token="shared-micdn-download-token"/>
+  <agent health-interval="300" health-start="07:00" health-end="22:00"/>
   ...
 </app>
 ```
 
 监听地址优先级为：命令行 `--listen` > `hub.xml` 的 `<app listen>` > 内置 `127.0.0.1:8080`。
-节点运行历史由 bashub 主动下发 `report:health` 采样：`agent-health-interval` 是秒数，0 表示关闭；
-`agent-health-start/end` 是 bashub 主机时区的窗口（含 start、不含 end，可跨午夜）。这三项只改 bashub，
-生产机上的 basagent 不需要采样间隔或时间窗口配置。
+`<snapshot download-token>` 是共享 micdn 的 `/maven` 下载令牌（也兼容
+`<app maven-download-token="...">`），只在 Profile 未配置 micdn `<auth download-key>` 时写进
+server.xml；两边都没配时 server.xml 保持原样，不写 `token`。
+节点运行历史由 bashub 主动下发 `report:health` 采样：`<agent health-interval>` 是秒数，0 表示关闭；
+`health-start/end` 是 bashub 主机时区的窗口（含 start、不含 end，可跨午夜）。也兼容根元素上的旧写法
+`agent-health-interval` / `agent-health-start` / `agent-health-end`。这些只改 bashub，生产机上的
+basagent 不需要采样间隔或时间窗口配置。
 
 数据库结构检查可以独立执行，不启动 HTTP：
 
@@ -412,7 +418,7 @@ ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.e
   `GET /api/bashub/monitor/agents/{profile}/history?days=180` 一次返回该 profile 的原始采样
   `samples:[{at, servers:{id:state}}]`，按 server/天聚合、可用率与单 server 视图都由 SPA 本地计算。
   `bas.mon_server_samples` 每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`）；
-  采样由 hub 在 `agent-health-*` 窗口内主动触发，同一 profile 下多台 agent 的 health 先合并成一份
+  采样由 hub 在 `<agent health-interval>` 窗口内主动触发，同一 profile 下多台 agent 的 health 先合并成一份
   再入库（同一分钟重复触发用最新合并结果覆盖），数据保留 180 天。
 - **`/api/bashub/config|ems|micdn/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。

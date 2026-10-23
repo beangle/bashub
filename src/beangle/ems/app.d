@@ -66,6 +66,26 @@ string appFileAttribute(string home, string appName, string key) {
   return getAttrs(root).get(key, "").strip;
 }
 
+/** 读 `${home}${path}.xml` 根元素下第一个同名子节点的全部属性；没有返回空表。 */
+string[string] appFileChildAttributes(string home, string appName, string childName) {
+  string[string] result;
+  auto text = readAppFile(home, appPathOf(appName));
+  if (text.isNull)
+    return result;
+  auto root = parseRoot(text.get);
+  foreach (node; children(root, childName)) {
+    foreach (key, value; getAttrs(node))
+      result[key] = value.strip;
+    break;
+  }
+  return result;
+}
+
+/** 读子节点的某个属性；子节点或属性不存在返回空串。 */
+string appFileChildAttribute(string home, string appName, string childName, string key) {
+  return appFileChildAttributes(home, appName, childName).get(key, "");
+}
+
 /** 从 XML 文本里读第一个 `<ems app-name="...">` 与它的 `props/prop`；没有 app-name 就返回空值。
  *
  * scala 缺清单时是 `printStackTrace` + `System.exit(1)`；D 侧不该因为一份清单缺失就把进程带走，

@@ -178,7 +178,7 @@ Freemarker 模板运行时，不属于 JSON:API。
 
 | URL | 说明 |
 |---|---|
-| `GET /api/bashub/config/{profile}/server` | 服务器/集群配置；`Authorization: Bearer <profile>:<profile.key>` 鉴权。存在已启用 setline 的 Host 时，在对应 `<host>` 上输出 `setline-listen-port` / `setline-admin-port`；`proxyByHostname=true` 时还要求 `profile.hostname` 非空并输出 `setline-hostname="<profile.hostname>"`，否则省略该属性，由 basctl 使用 `*` 默认组。不再生成 `<setline>`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
+| `GET /api/bashub/config/{profile}/server` | 服务器/集群配置；`Authorization: Bearer <profile>:<profile.key>` 鉴权。`<snapshot-repo>` 的 `token` 取 Profile 的 micdn `<auth download-key>`，为空时回退 hub.xml 的 `<snapshot download-token>`（兼容 `maven-download-token` 属性）；都没有则不写 `token`。存在已启用 setline 的 Host 时，在对应 `<host>` 上输出 `setline-listen-port` / `setline-admin-port`；`proxyByHostname=true` 时还要求 `profile.hostname` 非空并输出 `setline-hostname="<profile.hostname>"`，否则省略该属性，由 basctl 使用 `*` 默认组。不再生成 `<setline>`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
 | `GET /api/bashub/config/{profile}/proxy` | 反向代理配置（haproxy/nginx，按 `profile.proxyEngine` 选择模板）；使用同样的 Profile 令牌。只输出所选引擎自身的合法配置，不混入 setline agent 配置；HAProxy 按请求 `path` 做 `map_beg` 路由，不再生成 Host 分组查找、path ACL 或 inline backend |
 | `GET /api/bashub/config/{profile}/certificate` | Profile 的 PEM 公钥证书（可含完整证书链）；使用同样的 Profile 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{profile}/certificate-key` | Profile 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
@@ -242,7 +242,7 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   每个 server 的每日运行/停止/异常计数、可用率、最近状态和状态变化。单 server 视图直接复用
   这份数据，不再按 `instance` 单独请求。
   历史来自 `bas.mon_server_samples`，每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`），
-  只在 hub 的 `agent-health-*` 采样窗口内由 `report:health` 触发写入：同一 profile 下所有 agent 的
+  只在 hub 的 `<agent health-interval>` 采样窗口内由 `report:health` 触发写入：同一 profile 下所有 agent 的
   health 先合并成一份（按 server id 取并集），同一分钟重复触发用最新合并结果覆盖，保留 180 天；
   历史存储未启用时返回 503，profile 不存在返回 404，表未迁移或其他数据库查询失败返回 500。
 - 授权：`/api/bashub/monitor/agents/*` 的 GET（在线状态、历史、日志）允许已登录用户查看；

@@ -31,10 +31,11 @@ import std.string : strip;
 
 /// 渲染 server.xml；返回内容只依赖数据库，不读请求上下文。
 ///
-/// SNAPSHOT 上游的令牌取 Profile 的 micdn `<auth download-key>`：有值才写 `token`，
-/// 空值即匿名下载。`maskSecrets` 只用于 SPA 预览，机器下载端点必须传 false。
+/// SNAPSHOT 上游的令牌优先取 Profile 的 micdn `<auth download-key>`，为空时回退 `fallbackToken`
+/// （hub.xml 的 `maven-download-token`）：有值才写 `token`，空值即匿名下载。`maskSecrets` 只用于
+/// SPA 预览，机器下载端点必须传 false。
 string renderServerXml(Store store, Registry reg, const ProfileContext context,
-    bool maskSecrets = false) {
+    bool maskSecrets = false, string fallbackToken = "") {
   auto data = loadProfileData(store, reg, context);
   auto farms = data.farms.dup;
   auto hosts = data.hosts.dup;
@@ -69,6 +70,8 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context,
   xml.put("\"/>\n");
   xml.put("  <snapshot-repo remote=\"${bas_remote_url}/maven\"");
   auto downloadKey = micdnDownloadKey(store, reg, context.id);
+  if (downloadKey.length == 0)
+    downloadKey = fallbackToken.strip;
   if (downloadKey.length > 0)
     putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
   xml.put("/>\n");

@@ -12,7 +12,7 @@ module bashub.config;
 /// 不再读取独立的 bashub 配置文件，因此没有可热加载的部分。
 
 import beangle.ems : Ems;
-import beangle.ems.app : appFileAttribute;
+import beangle.ems.app : appFileAttribute, appFileChildAttribute, appFileChildAttributes;
 import beangle.ems.datasource : findDatasource, postgresConnInfo;
 import std.conv : ConvException, to;
 import std.string : indexOf, lastIndexOf, strip, toLower;
@@ -52,6 +52,9 @@ struct HubConfig {
   string casServer;
   /// 会话 cookie 名（ems 的 `Ems.sid.name`）
   string sessionIdName = "EMS_SID";
+  /// micdn `/maven` 的下载令牌；Profile 的 micdn `<auth download-key>` 为空时用它写进
+  /// server.xml 的 `<snapshot-repo token>`。
+  string mavenDownloadToken = "";
   /// 组件最新版本刷新间隔（分钟）；0 表示关闭周期刷新
   uint artifactRefreshMinutes = 360;
   /// 节点轻量健康采样间隔（秒）；0 表示关闭 `report:health` 下发
@@ -88,15 +91,30 @@ HubConfig loadBashub(Ems ems) {
     else
       throw new Exception("unknown auth value in " ~ cfg.appName ~ ".xml: " ~ auth);
   }
-  auto healthInterval = appFileAttribute(ems.env.home, cfg.appName, "agent-health-interval");
+  // 优先 hub.xml 的 <snapshot download-token="..."/>，其次兼容 app 上的同名属性
+  auto mavenToken = appFileChildAttribute(ems.env.home, cfg.appName, "snapshot", "download-token");
+  if (mavenToken.length == 0)
+    mavenToken = appFileAttribute(ems.env.home, cfg.appName, "maven-download-token").strip;
+  if (mavenToken.length > 0)
+    cfg.mavenDownloadToken = mavenToken;
+  // <agent health-interval="..." health-start="HH:MM" health-end="HH:MM"/>；
+  // 兼容旧写法：<app agent-health-interval=...>。
+  auto agentAttrs = appFileChildAttributes(ems.env.home, cfg.appName, "agent");
+  auto healthInterval = agentAttrs.get("health-interval", "");
+  if (healthInterval.length == 0)
+    healthInterval = appFileAttribute(ems.env.home, cfg.appName, "agent-health-interval");
   if (healthInterval.length > 0)
-    cfg.agentHealthIntervalSeconds = parseUIntAttr(healthInterval, "agent-health-interval");
-  auto healthStart = appFileAttribute(ems.env.home, cfg.appName, "agent-health-start");
+    cfg.agentHealthIntervalSeconds = parseUIntAttr(healthInterval, "agent health-interval");
+  auto healthStart = agentAttrs.get("health-start", "");
+  if (healthStart.length == 0)
+    healthStart = appFileAttribute(ems.env.home, cfg.appName, "agent-health-start");
   if (healthStart.length > 0)
-    cfg.agentHealthStartMinute = parseClockAttr(healthStart, "agent-health-start");
-  auto healthEnd = appFileAttribute(ems.env.home, cfg.appName, "agent-health-end");
+    cfg.agentHealthStartMinute = parseClockAttr(healthStart, "agent health-start");
+  auto healthEnd = agentAttrs.get("health-end", "");
+  if (healthEnd.length == 0)
+    healthEnd = appFileAttribute(ems.env.home, cfg.appName, "agent-health-end");
   if (healthEnd.length > 0)
-    cfg.agentHealthEndMinute = parseClockAttr(healthEnd, "agent-health-end");
+    cfg.agentHealthEndMinute = parseClockAttr(healthEnd, "agent health-end");
   if (cfg.authorityUrl.length == 0 && cfg.emsInnerApi.length > 0)
     cfg.authorityUrl = cfg.emsInnerApi ~ "/platform/security/func/" ~ cfg.appName ~ "/resources.json";
   return cfg;

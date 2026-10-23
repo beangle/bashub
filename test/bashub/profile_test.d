@@ -109,6 +109,8 @@ unittest {
 
   auto xml = renderServerXml(store, reg, profile);
   assert(xml.canFind(`version="6.0.0"`));
+  // Profile 自己的 micdn 下载凭证优先于 hub.xml 的全局 token
+  assert(renderServerXml(store, reg, profile, false, "hub-secret").canFind(`token="download-secret"`));
   assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
   assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
   assert(!xml.canFind("<hub"));
@@ -132,6 +134,18 @@ unittest {
   ProfileContext demo;
   assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", demo));
   assert(!renderServerXml(store, reg, demo).canFind("setline-"));
+}
+
+@("server.xml falls back to the hub maven token") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  ProfileContext demo;
+  assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", demo));
+  // 该 profile 没有 micdn auth；用 hub.xml 的 maven-download-token 兜底
+  auto xml = renderServerXml(store, reg, demo, false, "hub-secret");
+  assert(xml.canFind(`token="hub-secret"`));
+  // 预览遮掉令牌
+  assert(renderServerXml(store, reg, demo, true, "hub-secret").canFind(`token="********"`));
 }
 
 @("server.xml rejects invalid host setline ports") unittest {
