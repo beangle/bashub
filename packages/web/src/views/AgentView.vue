@@ -161,7 +161,6 @@
               </div>
 
               <aside class="ip-card__agent">
-                <p class="agent-conn-home" :title="agent.basHome || ''">{{ agent.basHome || '-' }}</p>
                 <dl class="agent-conn-facts">
                   <div class="agent-conn-row">
                     <dt>连接</dt>
@@ -170,6 +169,10 @@
                   <div class="agent-conn-row">
                     <dt>心跳</dt>
                     <dd>{{ shortTime(agent.lastSeenAt) }}</dd>
+                  </div>
+                  <div class="agent-conn-row">
+                    <dt>BAS_HOME</dt>
+                    <dd class="agent-conn-home" :title="agent.basHome || ''">{{ agent.basHome || '-' }}</dd>
                   </div>
                 </dl>
                 <dl class="agent-conn-metrics">
@@ -1226,10 +1229,6 @@ onBeforeUnmount(() => {
   border-left: 1px solid var(--td-component-stroke);
 }
 
-.ip-card__agent .agent-conn-home {
-  padding: 0 0 8px;
-}
-
 .ip-card__agent .agent-conn-facts,
 .ip-card__agent .agent-conn-metrics {
   padding: 8px 0;
@@ -1241,14 +1240,14 @@ onBeforeUnmount(() => {
   background: none;
 }
 
-/* BAS_HOME 只给值，不做标签；等宽字体便于辨认路径。 */
+/* BAS_HOME 的值：等宽字体便于辨认路径，过长时省略。 */
 .agent-conn-home {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--td-text-color-secondary);
   font-family: 'Andale Mono', ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
