@@ -97,6 +97,8 @@ export interface FieldSchema {
   columnTitle?: string
   type?: FieldType
   required?: boolean
+  /** textarea/lines：最少显示行数（缺省 4）。 */
+  rows?: number
   /** number：允许的最小值。 */
   min?: number
   /** number：允许的最大值。 */

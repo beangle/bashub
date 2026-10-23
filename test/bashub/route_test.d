@@ -819,6 +819,31 @@ unittest {
   assert(doc["xml"].get!string.canFind(`<bucket name="demo" key="01**ef"/>`));
 }
 
+@("webapp libs folds pasted newlines into commas")
+unittest {
+  auto reg = hubRegistry();
+  auto store = createHubStore(reg, demoDao(reg));
+  auto router = newRouterWith(reg, store);
+  auto body = parseJsonString(`{"data":{"type":"webapps","id":"7001","attributes":{"libs":"a:b:1\nc:d:2"}}}`);
+  auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/webapps/7001", body.toString);
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["data"]["attributes"]["libs"].get!string == "a:b:1,c:d:2");
+}
+
+@("servers expose qualified name and host ip for deployment pickers")
+unittest {
+  auto router = newRouter();
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/servers/search?filter[server.farm.id]=4001&include=farm,host");
+  assert(ex.status == 200, ex.body);
+  auto rows = parseJson(ex.body)["data"].get!(Json[]);
+  assert(rows.length == 2);
+  // 应用部署的「运行在」用 qualifiedName + hostIp 显示，避免不同群集的同名 server 混淆
+  assert(rows[0]["attributes"]["qualifiedName"].get!string == "prod-farm.app1");
+  assert(rows[0]["attributes"]["hostIp"].get!string == "10.0.0.11");
+  assert(rows[0]["attributes"]["displayName"].get!string == "prod-farm.app1 (10.0.0.11)");
+}
+
 @("profile certificates live outside profile and are downloadable by token")
 unittest {
   auto reg = hubRegistry();

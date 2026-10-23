@@ -153,13 +153,13 @@
             v-else-if="inputType(field) === 'textarea'"
             v-model="form[field.key]"
             :placeholder="field.placeholder || `请输入${field.label}`"
-            :autosize="{ minRows: 4 }"
+            :autosize="{ minRows: field.rows ?? 4 }"
           />
           <t-textarea
             v-else-if="inputType(field) === 'lines'"
             v-model="form[field.key]"
             :placeholder="field.placeholder || '一行一项'"
-            :autosize="{ minRows: 4 }"
+            :autosize="{ minRows: field.rows ?? 4 }"
           />
           <t-switch v-else-if="inputType(field) === 'boolean'" v-model="form[field.key]" />
           <t-radio-group

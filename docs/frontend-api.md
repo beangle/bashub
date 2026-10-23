@@ -132,7 +132,7 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 | `profiles` | Profile | 新建时填默认仓库；`hostname` 是域名，`proxyByHostname` 默认 `false`，为 `true` 时才把它输出为 server.xml 的 `setline-hostname`。证书不放在 profile 资源里（避免列表/详情每次携带大字段）：公钥与「私钥是否已设置」走专用端点 `/api/bashub/config/profiles/{id}/certificate`。Micdn 配置走专用聚合端点，不再是普通资源 |
 | `engines` | Engine | `type` 取 `tomcat-server`/`tomcat`/`undertow`/`jetty`/`any`（与 basctl 的 creator 同名）；`listeners`/`jars` 支持分隔符字符串；`jspSupport` 仅 `tomcat-server` 有效 |
 | `farms` | Farm | 群集 |
-| `servers` | Server | 群集实例 |
+| `servers` | Server | 群集实例；派生 `qualifiedName`（`群集.服务`）、`hostIp` 与 `displayName`（`群集.服务 (IP)`），供部署选择器显示 |
 | `hosts` | Host | `arch` 以 1 起的序号或枚举名提交；`setlineListenPort` / `setlineAdminPort` 是成对的主机级 setline 端口（1-65535），都为空表示该主机不部署 setline；listen 供 peer agent 读取 `/_setline/routes`，admin 供 basctl 在本机推路由；两个端口下发到 server.xml 的 `<host>`，不生成 `<setline>`；列表下发按 `platform` 过滤后的 `featureLogos`；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
 | `artifacts` | Artifact | 下发计算属性 `gav`；`GET /api/bashub/config/artifacts/{id}/webapps?include=artifact` 返回使用该组件的部署；`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[..]}`）从 Maven Central 的 `maven-metadata.xml` 刷新 `latestVersion` |
 | `webapps` | Webapp | `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 只能选择位于同时配置了 `Host.setlineListenPort` 与 `Host.setlineAdminPort` 的主机上的 server，否则无法生成有效的 `run-at`；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |

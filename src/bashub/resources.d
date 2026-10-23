@@ -123,7 +123,11 @@ Registry hubRegistry() {
         Relation("farm", "farm_id", "farms"),
         Relation("host", "host_id", "hosts"),
       ],
-      [Derived("qualifiedName", ["farm"], "{farm.name}.{name}")],
+      [
+        Derived("qualifiedName", ["farm"], "{farm.name}.{name}"),
+        Derived("hostIp", ["host"], "{host.ip}"),
+        Derived("displayName", ["farm", "host"], "{farm.name}.{name} ({host.ip})"),
+      ],
       "name"),
     Resource(
       "hosts", "hosts", "bas.cfg_hosts", "id",

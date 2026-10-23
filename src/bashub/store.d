@@ -110,6 +110,12 @@ private void normalizeHubWrite(Store store, Registry reg, const Resource res, st
     validateServerTargetHost(store, reg, id, values);
     return;
   }
+  if (res.path == "webapps") {
+    // 扩展库输入框允许换行粘贴；容器按逗号/分号拆分，保存时把换行折成逗号。
+    if (auto value = "libs" in values)
+      values["libs"] = Json(jsonText(*value).replace("\r\n", "\n").replace("\r", "").replace("\n", ",").strip);
+    return;
+  }
 }
 
 /// 主机的 setline listen/admin 端口必须同时出现或同时为空。

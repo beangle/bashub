@@ -14,7 +14,7 @@ const appRef: ResourceRef = { path: '/apps', type: 'apps', labelFields: ['title'
 const resourceRef: ResourceRef = { path: '/resources', type: 'resources', labelFields: ['name', 'title'] }
 const farmRef: ResourceRef = { path: '/farms', type: 'farms', labelFields: ['name'] }
 const hostRef: ResourceRef = { path: '/hosts', type: 'hosts', labelFields: ['name', 'ip'] }
-const serverRef: ResourceRef = { path: '/servers', type: 'servers', labelFields: ['name'] }
+const serverRef: ResourceRef = { path: '/servers', type: 'servers', labelFields: ['displayName'], sort: 'name' }
 const artifactRef: ResourceRef = { path: '/artifacts', type: 'artifacts', labelFields: ['title', 'artifactId'] }
 
 /**
@@ -249,7 +249,7 @@ export const resourceSchemas: ResourceSchema[] = [
         onChange: (value, form) => {
           if (value === 'yes') {
             form.setlineListenPort = 8080
-            form.setlineAdminPort = 10080
+            form.setlineAdminPort = 8082
           } else {
             form.setlineListenPort = null
             form.setlineAdminPort = null
@@ -264,7 +264,7 @@ export const resourceSchemas: ResourceSchema[] = [
       },
       {
         key: 'setlineAdminPort', label: 'Setline 管理口端口', type: 'number', column: false, nullable: true,
-        min: 1, max: 65535, placeholder: '10080', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
+        min: 1, max: 65535, placeholder: '8082', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
         help: 'setline adminListen 端口；basctl 在本机连接 127.0.0.1:<端口> 推路由，不写入 server.xml',
       },
       { key: 'features', label: '系统特性', type: 'refs', ref: featureRef, column: false },
@@ -339,7 +339,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，反代与 setline 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
       { key: 'unpack', label: '解压执行', type: 'boolean' },
       { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, help: '只能选择配置了 Setline 监听端口的主机上的服务' },
-      { key: 'libs', label: '扩展库', column: false, help: 'gav 形式，分号或逗号分割' },
+      { key: 'libs', label: '扩展库', type: 'textarea', rows: 6, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
     ],
   },
   {
