@@ -58,6 +58,11 @@ const router = createRouter({
     ...tabRoutes,
     ...detailRoutes,
     { path: '/monitor/agents', component: () => import('@/views/AgentView.vue'), meta: { title: '在线节点' } },
+    {
+      path: '/monitor/agents/:profile/history',
+      component: () => import('@/views/AgentHistoryView.vue'),
+      meta: { title: '运行历史' },
+    },
   ],
 })
 

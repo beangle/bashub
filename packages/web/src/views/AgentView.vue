@@ -3,10 +3,6 @@
     <div class="page-head">
       <div>
         <h2 class="page-title">在线节点</h2>
-        <p class="page-subtitle">
-          basctl 主动连到 <code>/api/bashub/monitor/agents/{profile}/channel</code>。
-          列表每 30 秒自动刷新；点节点的“刷新”会先让 agent 重报，再拉取一次完整快照。
-        </p>
       </div>
       <div v-if="profileOptions.length > 1" class="page-actions">
         <t-select
@@ -40,15 +36,26 @@
                 />
                 <h3>{{ groupOrgTitle(group) }}</h3>
                 <t-tag theme="success" variant="light">{{ group.agents.length }} 个 agent</t-tag>
+                <span class="agent-profile">
+                  {{ group.profile }}
+                  · {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
+                </span>
               </div>
               <div class="agent-actions">
-                <t-button size="small" variant="outline" @click="openHistory(group.agents[0])">运行历史</t-button>
+                <t-button size="small" variant="outline" :loading="refreshing" @click="refreshNow">
+                  刷新（{{ secondsLeft }}s）
+                </t-button>
+                <t-button size="small" variant="outline" @click="goHistory(group.profile)">运行历史</t-button>
+                <t-button
+                  v-if="group.agents[0]?.profileId"
+                  size="small"
+                  variant="outline"
+                  @click="goProfile(group.agents[0].profileId)"
+                >
+                  配置
+                </t-button>
               </div>
             </div>
-            <p class="agent-profile">
-              {{ group.profile }}
-              · {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
-            </p>
           </div>
         </div>
 
@@ -152,118 +159,55 @@
               <span class="agent-muted">{{ group.agents.length }} 台</span>
             </div>
             <article v-for="agent in group.agents" :key="agentKey(agent)" class="agent-conn">
-              <div class="agent-conn-head">
-                <strong>{{ agentTitle(agent) }}</strong>
+              <header class="agent-conn-head">
+                <div class="agent-conn-id">
+                  <strong class="agent-conn-ip">{{ agent.ip || agent.host || '-' }}</strong>
+                  <span class="agent-conn-os">{{ osText(agent) }}</span>
+                </div>
                 <t-tag size="small" theme="success" variant="light">在线</t-tag>
-              </div>
-              <p class="agent-conn-line">
-                {{ agent.ip || '-' }} · {{ runningOf(agent) }} 运行 / {{ stoppedOf(agent) }} 停止
-              </p>
-              <p class="agent-conn-line">
-                basctl {{ agent.basctl || '-' }} · BAS {{ agent.bas || '-' }}
-              </p>
-              <p class="agent-conn-line" :title="agent.basHome || ''">
-                BAS_HOME {{ agent.basHome || '-' }}
-              </p>
-              <p class="agent-conn-line">连接 {{ agent.connectedAt || '-' }}</p>
-              <p class="agent-conn-line">心跳 {{ agent.lastSeenAt || '-' }} · 采样 {{ agent.healthAt || '-' }}</p>
-              <p class="agent-conn-line" :title="systemText(agent)">{{ systemText(agent) }}</p>
-              <p class="agent-conn-line">
-                CPU {{ cpuText(agent) }} · 内存 {{ memoryText(agent) }} · 磁盘 {{ diskCountText(agent) }}
-              </p>
-              <div class="agent-conn-actions">
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :loading="detailLoading[agentKey(agent)] === true"
-                  @click="refreshAgent(agent)"
-                >
-                  刷新
-                </t-button>
-                <t-button
-                  v-if="agent.supports?.includes('agent:log')"
-                  size="small"
-                  variant="outline"
-                  @click="openAgentLog(agent)"
-                >
-                  Agent 日志
-                </t-button>
-              </div>
+              </header>
+
+              <p class="agent-conn-home" :title="agent.basHome || ''">{{ agent.basHome || '-' }}</p>
+
+              <dl class="agent-conn-facts">
+                <div class="agent-conn-row">
+                  <dt>连接</dt>
+                  <dd>{{ shortTime(agent.connectedAt) }}</dd>
+                </div>
+                <div class="agent-conn-row">
+                  <dt>心跳</dt>
+                  <dd>{{ shortTime(agent.lastSeenAt) }}</dd>
+                </div>
+                <div class="agent-conn-row">
+                  <dt>实例</dt>
+                  <dd>{{ runningOf(agent) }} 运行 / {{ stoppedOf(agent) }} 停止</dd>
+                </div>
+              </dl>
+
+              <dl class="agent-conn-metrics">
+                <div class="agent-conn-row">
+                  <dt>CPU</dt>
+                  <dd>{{ cpuText(agent) }}</dd>
+                </div>
+                <div class="agent-conn-row">
+                  <dt>内存</dt>
+                  <dd>{{ memoryText(agent) }}</dd>
+                </div>
+                <div class="agent-conn-row">
+                  <dt>磁盘</dt>
+                  <dd>{{ diskCountText(agent) }}</dd>
+                </div>
+              </dl>
+
+              <footer v-if="agent.supports?.includes('agent:log')" class="agent-conn-actions">
+                <t-button size="small" variant="outline" @click="openAgentLog(agent)">Agent 日志</t-button>
+              </footer>
             </article>
           </div>
         </div>
       </t-card>
     </div>
 
-    <t-dialog
-      v-model:visible="historyVisible"
-      :header="historyHeader()"
-      width="1100px"
-      :footer="false"
-      @closed="resetHistory"
-    >
-      <div class="history-toolbar">
-        <span class="agent-muted">
-          采样窗口与频率由 bashub 的 <code>agent-health-*</code> 配置决定。
-        </span>
-        <div class="history-tools">
-          <t-select
-            v-model="historyServer"
-            size="small"
-            clearable
-            filterable
-            placeholder="全部 Server"
-            style="width: 220px"
-          >
-            <t-option v-for="id in historyServerIds" :key="id" :value="id" :label="id" />
-          </t-select>
-          <t-button size="small" variant="outline" :loading="historyLoading" @click="reloadHistory">刷新</t-button>
-        </div>
-      </div>
-      <t-alert v-if="historyError" theme="error" :message="historyError" class="agent-alert" />
-      <div v-if="historyLoading && !history" class="agent-muted">正在加载运行历史…</div>
-      <div v-else-if="history && historyRows.length === 0" class="agent-muted">所选时间范围内没有采样记录。</div>
-      <div v-else-if="history" class="history-list">
-        <div class="history-legend">
-          <span><i class="history-dot history-dot-running" />运行</span>
-          <span><i class="history-dot history-dot-stopped" />停止</span>
-          <span><i class="history-dot history-dot-error" />异常</span>
-          <span><i class="history-dot history-dot-unknown" />无采样</span>
-        </div>
-        <article v-for="(row, index) in historyRows" :key="row.id" class="history-card">
-          <div class="history-card-head">
-            <div class="history-title">
-              <span class="history-index">{{ index + 1 }}</span>
-              <strong>{{ row.id }}</strong>
-              <t-tag size="small" variant="light" :theme="stateTheme(row.lastState)">
-                {{ stateLabel(row.lastState) }}
-              </t-tag>
-            </div>
-            <div class="history-summary">
-              <span>可用率 {{ row.availability.toFixed(1) }}%</span>
-              <span>采样 {{ row.sampledDays }} 天</span>
-              <span v-if="row.lastAt">最近 {{ row.lastAt }}</span>
-            </div>
-          </div>
-          <div class="history-strip" aria-label="最近 180 天运行状态">
-            <span
-              v-for="cell in row.cells"
-              :key="cell.date"
-              class="history-cell"
-              :class="`history-cell-${cell.state}`"
-              :title="`${cell.date} · ${cell.title}`"
-            />
-          </div>
-          <div class="history-axis"><span>{{ row.firstDate }}</span><span>{{ row.lastDate }}</span></div>
-          <div v-if="row.changes.length" class="history-changes">
-            <span class="agent-muted">最近状态变化：</span>
-            <span v-for="change in row.changes.slice(0, 8)" :key="`${change.at}-${change.state}`" class="history-change">
-              {{ change.at }} {{ stateLabel(change.state) }}
-            </span>
-          </div>
-        </article>
-      </div>
-    </t-dialog>
 
     <t-dialog
       v-model:visible="logVisible"
@@ -351,17 +295,15 @@ import { JsonApiRequestError } from '@beangle/ems-app'
 import { CopyIcon, DownloadIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   followAgentLog,
   listAgents,
-  readAgentHistory,
   readAgentOwnLog,
   readAgentLog,
   requestAgentReport,
   serviceAgentInstance,
   type AgentDiskInfo,
-  type AgentHealth,
-  type AgentHistory,
   type AgentInstance,
   type AgentLogEvent,
   type AgentLogWindow,
@@ -369,12 +311,6 @@ import {
   type AgentServiceAction,
   type AgentStatus,
 } from '@/api/agents'
-
-interface HistoryCell {
-  date: string
-  state: AgentHealth['state'] | 'unknown'
-  title: string
-}
 
 /** 同一个 profile 下的多台 agent（每台一张连接卡片，实例表合并）。 */
 interface AgentGroup {
@@ -389,22 +325,9 @@ interface MergedInstance {
   instance: AgentInstance
 }
 
-interface HistoryRow {
-  id: string
-  lastAt: string
-  lastState: AgentHealth['state'] | ''
-  availability: number
-  sampledDays: number
-  firstDate: string
-  lastDate: string
-  cells: HistoryCell[]
-  changes: { at: string; state: AgentHealth['state'] }[]
-}
-
 const agents = ref<AgentStatus[]>([])
 const loading = ref(false)
 const error = ref('')
-const detailLoading = ref<Record<string, boolean>>({})
 const serviceLoading = ref<Record<string, boolean>>({})
 const serviceErrorVisible = ref(false)
 const serviceErrorTitle = ref('节点应答失败')
@@ -412,12 +335,6 @@ const serviceErrorDetail = ref('')
 const serviceErrorLogTail = ref<string[]>([])
 const serviceErrorTruncated = ref(false)
 
-const historyVisible = ref(false)
-const historyAgent = ref('')
-const historyServer = ref('')
-const history = ref<AgentHistory | null>(null)
-const historyLoading = ref(false)
-const historyError = ref('')
 
 const logVisible = ref(false)
 const logAgent = ref('')
@@ -434,6 +351,10 @@ const logReconnecting = ref(false)
 const logLines = ref<string[]>([])
 const logTotal = ref(0)
 const logRef = ref<HTMLElement>()
+
+const POLL_SECONDS = 30
+const secondsLeft = ref(POLL_SECONDS)
+const refreshing = ref(false)
 
 let timer: ReturnType<typeof setInterval> | undefined
 let logSource: EventSource | undefined
@@ -531,17 +452,32 @@ watch(selectedProfile, (value) => {
   }
 })
 
+const router = useRouter()
+
+/** 运行历史是独立页面：`/monitor/agents/:profile/history`。 */
+function goHistory(profile: string) {
+  if (!profile) return
+  void router.push(`/monitor/agents/${encodeURIComponent(profile)}/history`)
+}
+
+/** 跳到该 profile 的配置详情（管理 server.xml / webapp 的地方）。 */
+function goProfile(profileId?: string) {
+  if (!profileId) return
+  void router.push(`/config/profiles/${encodeURIComponent(profileId)}`)
+}
+
 /** 同一 profile 下多台 agent 的键：后端用 `ip` 区分机器，没有 ip 时退回 host。 */
 function agentKey(agent: AgentStatus): string {
   return `${agent.profile}@${agent.ip || agent.host || ''}`
 }
 
+/** 运行/停止数以实例表为准：service:start 后 agent 先补发 report:bas，health 要等下一次采样。 */
 function runningOf(agent: AgentStatus): number {
-  return (agent.health ?? []).filter((item) => item.state === 'running').length
+  return instancesOf(agent).filter(isRunning).length
 }
 
 function stoppedOf(agent: AgentStatus): number {
-  return (agent.health ?? []).filter((item) => item.state !== 'running').length
+  return instancesOf(agent).filter((instance) => !isRunning(instance)).length
 }
 
 function agentGroupRunning(group: AgentGroup): number {
@@ -561,19 +497,31 @@ function mergedInstances(group: AgentGroup): MergedInstance[] {
   return rows
 }
 
-/** 连接卡片上的“刷新”：先让这台 agent 重报一次现状，再取一次完整快照。 */
-async function refreshAgent(agent: AgentStatus) {
-  const key = agentKey(agent)
-  detailLoading.value = { ...detailLoading.value, [key]: true }
+/**
+ * 手动刷新：让当前 profile 的每台 agent 重报一次，再取一次完整快照，倒计时归零重来。
+ * 30 秒自动刷新只重读 `/agents/status`，不打扰 agent。
+ */
+async function refreshNow() {
+  if (refreshing.value) return
+  refreshing.value = true
+  secondsLeft.value = POLL_SECONDS
   try {
-    await requestAgentReport(agent.profile, agent.ip)
-    await delay(900)
-    await load(true)
-    MessagePlugin.success(`已刷新 ${agent.host || agent.ip || agent.profile}`)
-  } catch (reason) {
-    MessagePlugin.error(errorText(reason))
+    const group = activeGroup.value
+    if (group) {
+      const results = await Promise.allSettled(
+        group.agents.map((agent) => requestAgentReport(agent.profile, agent.ip)),
+      )
+      const rejected = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      )
+      if (rejected.length === results.length && rejected.length > 0) {
+        MessagePlugin.error(errorText(rejected[0].reason))
+      }
+      await delay(900)
+    }
+    await load()
   } finally {
-    detailLoading.value = { ...detailLoading.value, [key]: false }
+    refreshing.value = false
   }
 }
 
@@ -590,10 +538,7 @@ function groupLogo(group: AgentGroup): string {
   return url && !failedLogos.value[group.profile] ? url : ''
 }
 
-/** 每台 agent 的标题：主机名优先，其次 IP。 */
-function agentTitle(agent: AgentStatus): string {
-  return agent.host || agent.ip || agent.profile
-}
+
 
 /** Logo 加载失败只隐藏图片，标题与在线状态照常显示。 */
 function markLogoFailed(profile: string) {
@@ -975,10 +920,18 @@ function webappText(instance: AgentInstance): string {
   return labels.join(' · ')
 }
 
-function systemText(agent: AgentStatus): string {
+/** 卡片副标题：操作系统名称与内核版本；还没上报时给一句提示。 */
+function osText(agent: AgentStatus): string {
   const os = agent.os?.os
-  if (!os) return '点击“刷新”加载'
-  return [os.name, os.kernel, os.arch].filter(Boolean).join(' · ') || '不可用'
+  if (!os) return '系统信息未上报'
+  return [os.name, os.kernel].filter(Boolean).join(' · ') || '系统信息未上报'
+}
+
+/** 时间只留「月日T时分秒」；时区由服务器 locale 决定，卡面上不重复展示。 */
+function shortTime(value?: string): string {
+  if (!value) return '-'
+  const match = /^\d{4}-(\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(value)
+  return match ? `${match[1]}T${match[2]}` : value
 }
 
 function cpuText(agent: AgentStatus): string {
@@ -1056,169 +1009,14 @@ function serviceFailure(reason: unknown): ServiceFailure | null {
   }
 }
 
-const historyServerIds = computed<string[]>(() => {
-  const ids = new Set<string>()
-  for (const sample of history.value?.samples ?? []) {
-    for (const [id, state] of Object.entries(sample.servers ?? {})) {
-      if (isHealthState(state)) ids.add(id)
-    }
-  }
-  return [...ids].sort(compareServerIds)
-})
-
-const historyRows = computed<HistoryRow[]>(() => {
-  const data = history.value
-  if (!data) return []
-  const dates = recentDateKeys(data.days)
-  const samplesByServer = new Map<string, { at: string; state: AgentHealth['state'] }[]>()
-  for (const sample of data.samples) {
-    if (Number.isNaN(new Date(sample.at).getTime())) continue
-    for (const [id, state] of Object.entries(sample.servers ?? {})) {
-      if (!isHealthState(state)) continue
-      let items = samplesByServer.get(id)
-      if (!items) {
-        items = []
-        samplesByServer.set(id, items)
-      }
-      items.push({ at: sample.at, state })
-    }
-  }
-
-  let ids = [...samplesByServer.keys()].sort(compareServerIds)
-  if (historyServer.value) ids = ids.filter((id) => id === historyServer.value)
-
-  return ids.map((id) => {
-    const samples = samplesByServer.get(id) ?? []
-    const byDate = new Map<string, { running: number; stopped: number; error: number }>()
-    let lastAt = ''
-    let lastState: AgentHealth['state'] | '' = ''
-    const changes: { at: string; state: AgentHealth['state'] }[] = []
-    for (const sample of samples) {
-      const date = localDateKey(new Date(sample.at))
-      let day = byDate.get(date)
-      if (!day) {
-        day = { running: 0, stopped: 0, error: 0 }
-        byDate.set(date, day)
-      }
-      if (sample.state === 'running') day.running++
-      else if (sample.state === 'stopped') day.stopped++
-      else day.error++
-      if (lastState !== sample.state) {
-        changes.push({ at: sample.at, state: sample.state })
-        lastState = sample.state
-      }
-      lastAt = sample.at
-    }
-
-    let running = 0
-    let stopped = 0
-    let failed = 0
-    let sampledDays = 0
-    const cells = dates.map((date): HistoryCell => {
-      const day = byDate.get(date)
-      if (!day) return { date, state: 'unknown', title: '无采样' }
-      running += day.running
-      stopped += day.stopped
-      failed += day.error
-      sampledDays++
-      const state = day.error > 0 ? 'error' : day.stopped > 0 ? 'stopped' : 'running'
-      return {
-        date,
-        state,
-        title: `${day.running} 运行 / ${day.stopped} 停止 / ${day.error} 异常`,
-      }
-    })
-    const total = running + stopped + failed
-    return {
-      id,
-      lastAt,
-      lastState,
-      availability: total > 0 ? (running / total) * 100 : 0,
-      sampledDays,
-      firstDate: dates[0] ?? '',
-      lastDate: dates[dates.length - 1] ?? '',
-      cells,
-      changes: changes.slice(-200).reverse(),
-    }
-  })
-})
-
-function compareServerIds(left: string, right: string): number {
-  return left.localeCompare(right, 'zh-CN', { numeric: true, sensitivity: 'base' })
-}
-
-function isHealthState(value: unknown): value is AgentHealth['state'] {
-  return value === 'running' || value === 'stopped' || value === 'error'
-}
-
-function recentDateKeys(count: number): string[] {
-  const dates: string[] = []
-  const end = new Date()
-  end.setHours(12, 0, 0, 0)
-  for (let offset = count - 1; offset >= 0; offset--) {
-    const day = new Date(end)
-    day.setDate(end.getDate() - offset)
-    dates.push(localDateKey(day))
-  }
-  return dates
-}
-
-function localDateKey(value: Date): string {
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${value.getFullYear()}-${month}-${day}`
-}
-
-function historyHeader(): string {
-  return historyAgent.value ? `${historyAgent.value} · 最近 180 天运行历史` : '运行历史'
-}
-
-function stateLabel(state: AgentHealth['state'] | ''): string {
-  if (state === 'running') return '运行中'
-  if (state === 'stopped') return '已停止'
-  if (state === 'error') return '异常'
-  return '无采样'
-}
-
-function stateTheme(state: AgentHealth['state'] | ''): 'success' | 'warning' | 'danger' | 'default' {
-  if (state === 'running') return 'success'
-  if (state === 'stopped') return 'warning'
-  if (state === 'error') return 'danger'
-  return 'default'
-}
-
-async function openHistory(agent: AgentStatus) {
-  historyAgent.value = agent.profile
-  historyServer.value = ''
-  history.value = null
-  historyError.value = ''
-  historyVisible.value = true
-  await reloadHistory()
-}
-
-async function reloadHistory() {
-  if (!historyAgent.value || historyLoading.value) return
-  historyLoading.value = true
-  historyError.value = ''
-  try {
-    history.value = await readAgentHistory(historyAgent.value, { days: 180 })
-  } catch (reason) {
-    historyError.value = errorText(reason)
-  } finally {
-    historyLoading.value = false
-  }
-}
-
-function resetHistory() {
-  historyAgent.value = ''
-  historyServer.value = ''
-  history.value = null
-  historyError.value = ''
-}
-
 onMounted(() => {
   void load()
-  timer = setInterval(() => void load(true), 30_000)
+  timer = setInterval(() => {
+    secondsLeft.value -= 1
+    if (secondsLeft.value > 0) return
+    secondsLeft.value = POLL_SECONDS
+    void load(true)
+  }, 1000)
 })
 
 onBeforeUnmount(() => {
@@ -1383,32 +1181,95 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+/* 连接卡片分四层：IP/系统 → BAS_HOME → 事实行 → 指标行 → 操作行。 */
 .agent-conn {
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--td-component-stroke);
   border-radius: 8px;
-  background: var(--td-bg-color-container-hover);
+  background: var(--td-bg-color-container);
 }
 
 .agent-conn-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 4px;
+  padding: 10px 12px 8px;
 }
 
-.agent-conn-line {
-  margin: 2px 0;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
+.agent-conn-id {
+  min-width: 0;
+}
+
+.agent-conn-ip {
+  display: block;
   overflow-wrap: anywhere;
+  color: var(--td-text-color-primary);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-conn-os {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* BAS_HOME 只给值，不做标签；等宽字体便于辨认路径。 */
+.agent-conn-home {
+  margin: 0;
+  padding: 0 12px 10px;
+  overflow: hidden;
+  color: var(--td-text-color-secondary);
+  font-family: 'Andale Mono', ui-monospace, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-conn-facts,
+.agent-conn-metrics {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--td-component-stroke);
+}
+
+.agent-conn-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.agent-conn-row dt {
+  flex: 0 0 auto;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.agent-conn-row dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--td-text-color-primary);
+  font-size: 12px;
+  text-align: right;
 }
 
 .agent-conn-actions {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--td-component-stroke);
+  background: var(--td-bg-color-container-hover);
 }
 
 .instance-col-node,
@@ -1559,142 +1420,6 @@ onBeforeUnmount(() => {
   word-break: break-word;
 }
 
-.history-toolbar,
-.history-card-head,
-.history-title,
-.history-summary,
-.history-legend,
-.history-changes,
-.history-axis {
-  display: flex;
-  align-items: center;
-}
-
-.history-toolbar {
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.history-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.history-list {
-  display: grid;
-  gap: 12px;
-}
-
-.history-legend {
-  flex-wrap: wrap;
-  gap: 14px;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-}
-
-.history-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.history-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-}
-
-.history-dot-running,
-.history-cell-running {
-  background: var(--td-success-color, #2ba471);
-}
-
-.history-dot-stopped,
-.history-cell-stopped {
-  background: var(--td-warning-color, #e37318);
-}
-
-.history-dot-error,
-.history-cell-error {
-  background: var(--td-error-color, #d54941);
-}
-
-.history-dot-unknown,
-.history-cell-unknown {
-  background: var(--td-component-stroke, #dcdcdc);
-}
-
-.history-card {
-  padding: 12px 14px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  background: var(--td-bg-color-container-hover);
-}
-
-.history-card-head {
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.history-title {
-  min-width: 0;
-  gap: 8px;
-}
-
-.history-title strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.history-index {
-  color: var(--td-text-color-placeholder);
-  font-variant-numeric: tabular-nums;
-}
-
-.history-summary {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.history-strip {
-  display: grid;
-  grid-template-columns: repeat(180, minmax(0, 1fr));
-  gap: 1px;
-  height: 18px;
-  margin-top: 10px;
-  overflow: hidden;
-  border-radius: 3px;
-}
-
-.history-cell {
-  min-width: 0;
-}
-
-.history-axis {
-  justify-content: space-between;
-  margin-top: 4px;
-  color: var(--td-text-color-placeholder);
-  font-size: 11px;
-}
-
-.history-changes {
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 6px;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-}
-
-.history-change {
-  white-space: nowrap;
-}
 
 @media (max-width: 760px) {
   .agent-layout {
@@ -1710,16 +1435,6 @@ onBeforeUnmount(() => {
   .agent-title-row {
     align-items: flex-start;
     flex-wrap: wrap;
-  }
-
-  .history-toolbar,
-  .history-card-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .history-summary {
-    justify-content: flex-start;
   }
 }
 </style>
