@@ -5,11 +5,8 @@
         <h2 class="page-title">在线节点</h2>
         <p class="page-subtitle">
           basctl 主动连到 <code>/api/bashub/monitor/agents/{profile}/channel</code>。
-          列表每 30 秒刷新实例摘要；点节点的“刷新”会先让 agent 重报，再拉取完整系统信息。
+          列表每 30 秒自动刷新；点节点的“刷新”会先让 agent 重报，再拉取一次完整快照。
         </p>
-      </div>
-      <div class="page-actions">
-        <t-button variant="outline" :loading="loading" @click="load()">刷新</t-button>
       </div>
     </div>
 
@@ -20,38 +17,28 @@
     </div>
 
     <div v-else class="agent-grid">
-      <t-card v-for="agent in agents" :key="agent.profile" :bordered="true" class="agent-card">
+      <t-card v-for="group in groups" :key="group.profile" :bordered="true" class="agent-card">
         <div class="agent-card-head">
           <div class="agent-identity">
             <div class="agent-title-row">
               <div class="agent-name">
-                <h3>{{ agent.host || agent.profile }}</h3>
-                <t-tag theme="success" variant="light">在线</t-tag>
+                <img
+                  v-if="groupLogo(group)"
+                  class="agent-org-logo"
+                  :src="groupLogo(group)"
+                  :alt="groupOrgTitle(group)"
+                  @error="markLogoFailed(group.profile)"
+                />
+                <h3>{{ groupOrgTitle(group) }}</h3>
+                <t-tag theme="success" variant="light">{{ group.agents.length }} 个 agent</t-tag>
               </div>
               <div class="agent-actions">
-                <t-button
-                  size="small"
-                  variant="outline"
-                  :loading="detailLoading[agent.profile] === true"
-                  @click="refreshAgent(agent)"
-                >
-                  刷新
-                </t-button>
-                <t-button size="small" variant="outline" @click="openHistory(agent)">运行历史</t-button>
-                <t-button
-                  v-if="agent.supports?.includes('agent:log')"
-                  size="small"
-                  variant="outline"
-                  @click="openAgentLog(agent)"
-                >
-                  Agent 日志
-                </t-button>
+                <t-button size="small" variant="outline" @click="openHistory(group.agents[0])">运行历史</t-button>
               </div>
             </div>
             <p class="agent-profile">
-              {{ agent.profile }}
-              <span v-if="agent.basctl"> · basctl {{ agent.basctl }}</span>
-              <span v-if="agent.bas"> · BAS {{ agent.bas }}</span>
+              {{ group.profile }}
+              · {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
             </p>
           </div>
         </div>
@@ -59,15 +46,16 @@
         <div class="agent-layout">
           <div class="agent-section">
             <div class="agent-section-title">
-              <span>实例</span>
-              <span class="agent-muted">{{ instancesOf(agent).length }} 个</span>
+              <span>实例（{{ group.agents.length }} 台 agent 合并）</span>
+              <span class="agent-muted">{{ mergedInstances(group).length }} 个</span>
             </div>
-            <div v-if="instancesOf(agent).length === 0" class="agent-muted">暂无已声明实例</div>
+            <div v-if="mergedInstances(group).length === 0" class="agent-muted">暂无已声明实例</div>
             <div v-else class="instance-table-wrap">
               <table class="instance-table">
                 <thead>
                   <tr>
                     <th class="instance-col-index">序号</th>
+                    <th class="instance-col-node">节点</th>
                     <th>Server</th>
                     <th>状态</th>
                     <th class="instance-col-port">端口</th>
@@ -76,61 +64,67 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(instance, index) in instancesOf(agent)" :key="instance.id || instance.pid">
+                  <tr
+                    v-for="(row, index) in mergedInstances(group)"
+                    :key="`${agentKey(row.agent)}:${row.instance.id || row.instance.pid}`"
+                  >
                     <td class="instance-index">{{ index + 1 }}</td>
-                    <td class="instance-name" :title="instance.id || '-'">{{ instance.id || '-' }}</td>
+                    <td class="instance-node" :title="row.agent.host || ''">
+                      {{ row.agent.ip || row.agent.host || '-' }}
+                    </td>
+                    <td class="instance-name" :title="row.instance.id || '-'">{{ row.instance.id || '-' }}</td>
                     <td>
                       <div class="instance-status">
                         <t-tag
                           size="small"
                           variant="light"
-                          :theme="instanceStateTheme(instance)"
+                          :theme="instanceStateTheme(row.instance)"
                         >
-                          {{ instanceStateLabel(instance) }}
+                          {{ instanceStateLabel(row.instance) }}
                         </t-tag>
-                        <span v-if="isRunning(instance)" class="instance-pid">
-                          PID {{ instance.pid ?? '-' }}
+                        <span v-if="isRunning(row.instance)" class="instance-pid">
+                          PID {{ row.instance.pid ?? '-' }}
                         </span>
                       </div>
                     </td>
-                    <td>{{ instance.httpPort ?? '-' }}</td>
-                    <td class="instance-apps" :title="webappText(instance)">
-                      {{ webappText(instance) || '—' }}
+                    <td>{{ row.instance.httpPort ?? '-' }}</td>
+                    <td class="instance-apps" :title="webappText(row.instance)">
+                      {{ webappText(row.instance) || '—' }}
                     </td>
                     <td class="instance-actions">
-                      <template v-if="instance.id">
+                      <template v-if="row.instance.id">
                         <t-button
                           size="small"
                           variant="text"
-                          @click="openLog(agent, instance)"
+                          @click="openLog(row.agent, row.instance)"
                         >
                           查看日志
                         </t-button>
                         <t-button
-                          v-if="!isRunning(instance) && canService(agent, 'start')"
+                          v-if="!isRunning(row.instance) && canService(row.agent, 'start')"
                           size="small"
                           theme="primary"
-                          :loading="serviceLoading[serviceKey(agent, instance)] === true"
-                          @click="confirmService(agent, instance, 'start')"
+                          :loading="serviceLoading[serviceKey(row.agent, row.instance)] === true"
+                          @click="confirmService(row.agent, row.instance, 'start')"
                         >
                           启动
                         </t-button>
                         <t-button
-                          v-if="isRunning(instance) && canService(agent, 'restart')"
+                          v-if="isRunning(row.instance) && canService(row.agent, 'restart')"
                           size="small"
                           variant="outline"
-                          :loading="serviceLoading[serviceKey(agent, instance)] === true"
-                          @click="confirmService(agent, instance, 'restart')"
+                          :loading="serviceLoading[serviceKey(row.agent, row.instance)] === true"
+                          @click="confirmService(row.agent, row.instance, 'restart')"
                         >
                           重启
                         </t-button>
                         <t-button
-                          v-if="isRunning(instance) && canService(agent, 'stop')"
+                          v-if="isRunning(row.instance) && canService(row.agent, 'stop')"
                           size="small"
                           theme="danger"
                           variant="outline"
-                          :loading="serviceLoading[serviceKey(agent, instance)] === true"
-                          @click="confirmService(agent, instance, 'stop')"
+                          :loading="serviceLoading[serviceKey(row.agent, row.instance)] === true"
+                          @click="confirmService(row.agent, row.instance, 'stop')"
                         >
                           停止
                         </t-button>
@@ -143,39 +137,50 @@
             </div>
           </div>
 
-          <div class="server-card">
-            <div class="server-card-title">节点信息</div>
-            <div class="server-card-facts">
-              <div class="server-fact server-fact-wide">
-                <span>BAS_HOME</span>
-                <strong :title="detailFor(agent)?.basHome || '-'">{{ detailFor(agent)?.basHome || '详情未加载' }}</strong>
-              </div>
-              <div class="server-fact">
-                <span>连接时间</span>
-                <strong>{{ agent.connectedAt || '-' }}</strong>
-              </div>
-              <div class="server-fact">
-                <span>最近心跳</span>
-                <strong>{{ agent.lastSeenAt || '-' }}</strong>
-              </div>
-              <div class="server-fact">
-                <span>最近采样</span>
-                <strong>{{ agent.healthAt || '-' }}</strong>
-              </div>
-              <div class="server-fact">
-                <span>实例摘要</span>
-                <strong>{{ agent.running ?? 0 }} 运行 / {{ agent.stopped ?? 0 }} 停止</strong>
-              </div>
-              <div class="server-fact server-fact-wide">
-                <span>系统</span>
-                <strong :title="systemText(agent)">{{ systemText(agent) }}</strong>
-              </div>
+          <div class="agent-agents">
+            <div class="agent-section-title">
+              <span>Agent 连接</span>
+              <span class="agent-muted">{{ group.agents.length }} 台</span>
             </div>
-            <div class="server-metrics">
-              <span>CPU {{ cpuText(agent) }}</span>
-              <span>内存 {{ memoryText(agent) }}</span>
-              <span>磁盘 {{ diskCountText(agent) }}</span>
-            </div>
+            <article v-for="agent in group.agents" :key="agentKey(agent)" class="agent-conn">
+              <div class="agent-conn-head">
+                <strong>{{ agentTitle(agent) }}</strong>
+                <t-tag size="small" theme="success" variant="light">在线</t-tag>
+              </div>
+              <p class="agent-conn-line">
+                {{ agent.ip || '-' }} · {{ runningOf(agent) }} 运行 / {{ stoppedOf(agent) }} 停止
+              </p>
+              <p class="agent-conn-line">
+                basctl {{ agent.basctl || '-' }} · BAS {{ agent.bas || '-' }}
+              </p>
+              <p class="agent-conn-line" :title="agent.basHome || ''">
+                BAS_HOME {{ agent.basHome || '-' }}
+              </p>
+              <p class="agent-conn-line">连接 {{ agent.connectedAt || '-' }}</p>
+              <p class="agent-conn-line">心跳 {{ agent.lastSeenAt || '-' }} · 采样 {{ agent.healthAt || '-' }}</p>
+              <p class="agent-conn-line" :title="systemText(agent)">{{ systemText(agent) }}</p>
+              <p class="agent-conn-line">
+                CPU {{ cpuText(agent) }} · 内存 {{ memoryText(agent) }} · 磁盘 {{ diskCountText(agent) }}
+              </p>
+              <div class="agent-conn-actions">
+                <t-button
+                  size="small"
+                  variant="outline"
+                  :loading="detailLoading[agentKey(agent)] === true"
+                  @click="refreshAgent(agent)"
+                >
+                  刷新
+                </t-button>
+                <t-button
+                  v-if="agent.supports?.includes('agent:log')"
+                  size="small"
+                  variant="outline"
+                  @click="openAgentLog(agent)"
+                >
+                  Agent 日志
+                </t-button>
+              </div>
+            </article>
           </div>
         </div>
       </t-card>
@@ -295,6 +300,26 @@
           共 {{ logTotal }} 行 · 当前显示 {{ logLines.length }} 行
         </span>
         <t-button v-if="logLoaded" size="small" variant="text" @click="clearLogView">清空</t-button>
+        <t-button
+          v-if="logLoaded"
+          size="small"
+          variant="text"
+          title="复制日志"
+          :disabled="logLines.length === 0"
+          @click="copyLog"
+        >
+          <template #icon><CopyIcon /></template>
+        </t-button>
+        <t-button
+          v-if="logLoaded"
+          size="small"
+          variant="text"
+          title="下载日志"
+          :disabled="logLines.length === 0"
+          @click="downloadLog"
+        >
+          <template #icon><DownloadIcon /></template>
+        </t-button>
       </div>
       <pre v-if="logLoaded" ref="logRef" class="agent-log">{{ logLines.join('\n') || '（空）' }}</pre>
     </t-dialog>
@@ -314,11 +339,11 @@
 
 <script setup lang="ts">
 import { JsonApiRequestError } from '@beangle/ems-app'
+import { CopyIcon, DownloadIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   followAgentLog,
-  listAgentSummaries,
   listAgents,
   readAgentHistory,
   readAgentOwnLog,
@@ -331,8 +356,8 @@ import {
   type AgentInstance,
   type AgentLogEvent,
   type AgentLogWindow,
+  type AgentOrganization,
   type AgentServiceAction,
-  type AgentSummary,
   type AgentStatus,
 } from '@/api/agents'
 
@@ -340,6 +365,19 @@ interface HistoryCell {
   date: string
   state: AgentHealth['state'] | 'unknown'
   title: string
+}
+
+/** 同一个 profile 下的多台 agent（每台一张连接卡片，实例表合并）。 */
+interface AgentGroup {
+  profile: string
+  org?: AgentOrganization
+  agents: AgentStatus[]
+}
+
+/** 合并实例表的一行：记住所属 agent，启停/日志要按 `?agent=` 路由过去。 */
+interface MergedInstance {
+  agent: AgentStatus
+  instance: AgentInstance
 }
 
 interface HistoryRow {
@@ -354,8 +392,7 @@ interface HistoryRow {
   changes: { at: string; state: AgentHealth['state'] }[]
 }
 
-const agents = ref<AgentSummary[]>([])
-const details = ref<Record<string, AgentStatus>>({})
+const agents = ref<AgentStatus[]>([])
 const loading = ref(false)
 const error = ref('')
 const detailLoading = ref<Record<string, boolean>>({})
@@ -375,6 +412,7 @@ const historyError = ref('')
 
 const logVisible = ref(false)
 const logAgent = ref('')
+const logIp = ref('')
 const logTarget = ref<'instance' | 'agent'>('instance')
 const logInstance = ref('')
 const logFrom = ref('')
@@ -399,10 +437,9 @@ const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(reso
 
 const logHeader = () => {
   if (!logAgent.value) return '实例日志'
-  if (logTarget.value === 'agent') return `${logAgent.value} · Agent 日志`
-  return logInstance.value
-    ? `${logAgent.value} · ${logInstance.value} 日志`
-    : `${logAgent.value} · 实例日志`
+  const who = logIp.value ? `${logAgent.value}@${logIp.value}` : logAgent.value
+  if (logTarget.value === 'agent') return `${who} · Agent 日志`
+  return logInstance.value ? `${who} · ${logInstance.value} 日志` : `${who} · 实例日志`
 }
 
 async function load(quiet = false) {
@@ -410,7 +447,8 @@ async function load(quiet = false) {
   loading.value = true
   if (!quiet) error.value = ''
   try {
-    agents.value = await listAgentSummaries()
+    // 一个 profile 可以有多台 agent：/agents/status 每台一项，页面按 profile 分组展示。
+    agents.value = await listAgents()
   } catch (reason) {
     error.value = errorText(reason)
   } finally {
@@ -418,40 +456,99 @@ async function load(quiet = false) {
   }
 }
 
-/** 节点卡片上的“刷新”：先让 agent 重报一次现状，再取摘要与完整详情。 */
-async function refreshAgent(agent: AgentSummary) {
-  detailLoading.value = { ...detailLoading.value, [agent.profile]: true }
+/** 同一 profile 的 agent 归到一张卡片：实例表合并，右侧列各台连接信息。 */
+const groups = computed<AgentGroup[]>(() => {
+  const byProfile = new Map<string, AgentGroup>()
+  for (const agent of agents.value) {
+    let group = byProfile.get(agent.profile)
+    if (!group) {
+      group = { profile: agent.profile, org: agent.org, agents: [] }
+      byProfile.set(agent.profile, group)
+    }
+    group.org ??= agent.org
+    group.agents.push(agent)
+  }
+  return [...byProfile.values()]
+})
+
+/** 同一 profile 下多台 agent 的键：后端用 `ip` 区分机器，没有 ip 时退回 host。 */
+function agentKey(agent: AgentStatus): string {
+  return `${agent.profile}@${agent.ip || agent.host || ''}`
+}
+
+function runningOf(agent: AgentStatus): number {
+  return (agent.health ?? []).filter((item) => item.state === 'running').length
+}
+
+function stoppedOf(agent: AgentStatus): number {
+  return (agent.health ?? []).filter((item) => item.state !== 'running').length
+}
+
+function agentGroupRunning(group: AgentGroup): number {
+  return group.agents.reduce((sum, agent) => sum + runningOf(agent), 0)
+}
+
+function agentGroupStopped(group: AgentGroup): number {
+  return group.agents.reduce((sum, agent) => sum + stoppedOf(agent), 0)
+}
+
+/** 合并后的实例行：每行记住所属 agent，操作按 `?agent=` 路由过去。 */
+function mergedInstances(group: AgentGroup): MergedInstance[] {
+  const rows: MergedInstance[] = []
+  for (const agent of group.agents) {
+    for (const instance of instancesOf(agent)) rows.push({ agent, instance })
+  }
+  return rows
+}
+
+/** 连接卡片上的“刷新”：先让这台 agent 重报一次现状，再取一次完整快照。 */
+async function refreshAgent(agent: AgentStatus) {
+  const key = agentKey(agent)
+  detailLoading.value = { ...detailLoading.value, [key]: true }
   try {
-    await requestAgentReport(agent.profile)
+    await requestAgentReport(agent.profile, agent.ip)
     await delay(900)
-    await Promise.all([load(true), loadDetail(agent.profile)])
-    MessagePlugin.success(`已刷新 ${agent.profile}`)
+    await load(true)
+    MessagePlugin.success(`已刷新 ${agent.host || agent.ip || agent.profile}`)
   } catch (reason) {
     MessagePlugin.error(errorText(reason))
   } finally {
-    detailLoading.value = { ...detailLoading.value, [agent.profile]: false }
+    detailLoading.value = { ...detailLoading.value, [key]: false }
   }
 }
 
-function detailFor(agent: AgentSummary): AgentStatus | undefined {
-  return details.value[agent.profile]
+/** 加载失败的 Logo 按 profile 记住，避免每次重渲染都再请求一次坏地址。 */
+const failedLogos = ref<Record<string, boolean>>({})
+
+/** 卡片大标题：机构标题优先；没有机构信息时退回 profile。 */
+function groupOrgTitle(group: AgentGroup): string {
+  return group.org?.title || group.org?.shortTitle || group.profile
 }
 
-async function loadDetail(profile: string) {
-  const all = await listAgents()
-  const found = all.find((item) => item.profile === profile)
-  if (found) details.value = { ...details.value, [profile]: found }
+function groupLogo(group: AgentGroup): string {
+  const url = group.org?.logoUrl
+  return url && !failedLogos.value[group.profile] ? url : ''
 }
 
-function canService(agent: AgentSummary, action: AgentServiceAction): boolean {
+/** 每台 agent 的标题：主机名优先，其次 IP。 */
+function agentTitle(agent: AgentStatus): string {
+  return agent.host || agent.ip || agent.profile
+}
+
+/** Logo 加载失败只隐藏图片，标题与在线状态照常显示。 */
+function markLogoFailed(profile: string) {
+  failedLogos.value = { ...failedLogos.value, [profile]: true }
+}
+
+function canService(agent: AgentStatus, action: AgentServiceAction): boolean {
   return agent.supports?.includes(`service:${action}`) === true
 }
 
-function serviceKey(agent: AgentSummary, instance: AgentInstance): string {
-  return `${agent.profile}:${instance.id ?? instance.pid ?? ''}`
+function serviceKey(agent: AgentStatus, instance: AgentInstance): string {
+  return `${agentKey(agent)}:${instance.id ?? instance.pid ?? ''}`
 }
 
-function confirmService(agent: AgentSummary, instance: AgentInstance, action: AgentServiceAction) {
+function confirmService(agent: AgentStatus, instance: AgentInstance, action: AgentServiceAction) {
   const name = instance.id || '该实例'
   const label = action === 'restart' ? '重启' : action === 'stop' ? '停止' : '启动'
   const dialog = DialogPlugin.confirm({
@@ -470,20 +567,17 @@ function confirmService(agent: AgentSummary, instance: AgentInstance, action: Ag
   })
 }
 
-async function runService(agent: AgentSummary, instance: AgentInstance, action: AgentServiceAction) {
+async function runService(agent: AgentStatus, instance: AgentInstance, action: AgentServiceAction) {
   if (!instance.id) return
   const key = serviceKey(agent, instance)
   // 同一实例已有启停请求在途时不再下发，挡住确认框淡出期间的二次点击。
   if (serviceLoading.value[key]) return
   serviceLoading.value = { ...serviceLoading.value, [key]: true }
   try {
-    const result = await serviceAgentInstance(agent.profile, instance.id, action)
+    const result = await serviceAgentInstance(agent.profile, instance.id, action, agent.ip)
     const label = action === 'restart' ? '重启' : action === 'stop' ? '停止' : '启动'
     MessagePlugin.success(`${instance.id} 已${label}（${result.state}）`)
-    const cached = { ...details.value }
-    delete cached[agent.profile]
-    details.value = cached
-    await load(true)
+    await waitForServiceSnapshot(agent, instance.id, result.state)
   } catch (reason) {
     const failure = serviceFailure(reason)
     if (failure) {
@@ -500,9 +594,29 @@ async function runService(agent: AgentSummary, instance: AgentInstance, action: 
   }
 }
 
-function openLog(agent: AgentSummary, instance: AgentInstance) {
+/**
+ * 启停接口只等到 agent 执行完，agent 随后补发的 `report:bas` 可能晚于 HTTP 响应；
+ * 直接取快照常常还是旧状态。短轮询几次，等列表真的反映新状态再收工；
+ * 都等不到（agent 慢或报告丢了）就交给 30 秒轮询兜底。
+ */
+async function waitForServiceSnapshot(
+  agent: AgentStatus,
+  instance: string,
+  expected: 'running' | 'stopped',
+) {
+  for (const wait of [800, 1200, 1500]) {
+    await delay(wait)
+    await load(true)
+    const current = agents.value.find((item) => agentKey(item) === agentKey(agent))
+    const running = (current?.basReport?.instances ?? []).some((item) => item.id === instance)
+    if ((expected === 'running') === running) return
+  }
+}
+
+function openLog(agent: AgentStatus, instance: AgentInstance) {
   logTarget.value = 'instance'
   logAgent.value = agent.profile
+  logIp.value = agent.ip || ''
   logInstance.value = instance.id || ''
   logFrom.value = ''
   logTo.value = ''
@@ -512,9 +626,10 @@ function openLog(agent: AgentSummary, instance: AgentInstance) {
   if (logInstance.value) void startFollowing()
 }
 
-function openAgentLog(agent: AgentSummary) {
+function openAgentLog(agent: AgentStatus) {
   logTarget.value = 'agent'
   logAgent.value = agent.profile
+  logIp.value = agent.ip || ''
   logInstance.value = ''
   logFrom.value = ''
   logTo.value = ''
@@ -542,6 +657,7 @@ async function readLogOnce() {
           logFrom.value,
           logTo.value,
           hasRange ? undefined : LOG_TAIL_LINES,
+          logIp.value || undefined,
         )
       : await readAgentLog(
           logAgent.value,
@@ -549,6 +665,7 @@ async function readLogOnce() {
           logFrom.value,
           logTo.value,
           hasRange ? undefined : LOG_TAIL_LINES,
+          logIp.value || undefined,
         )
     applyWindow(window)
   } catch (reason) {
@@ -571,7 +688,8 @@ function startFollowing() {
   logLoading.value = true
   logError.value = ''
   resetLogWindow()
-  const source = followAgentLog(logAgent.value, logInstance.value.trim(), LOG_TAIL_LINES)
+  const source = followAgentLog(logAgent.value, logInstance.value.trim(), LOG_TAIL_LINES,
+    logIp.value || undefined)
   logSource = source
 
   source.onopen = () => {
@@ -677,6 +795,43 @@ function clearLogView() {
   logLoaded.value = false
 }
 
+/** 复制当前窗口内的日志（不含行号，可直接贴到工单/聊天里）。 */
+async function copyLog() {
+  const text = logLines.value.join('\n')
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    MessagePlugin.success(`已复制 ${logLines.value.length} 行日志`)
+  } catch (error) {
+    MessagePlugin.error(errorText(error) || '复制失败，请检查浏览器剪贴板权限')
+  }
+}
+
+/** 下载当前窗口内的日志；文件名带 profile、实例与本地时间，便于区分多次抓取。 */
+function downloadLog() {
+  const text = logLines.value.join('\n')
+  if (!text) return
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = logFileName()
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  // 立即 revoke 在部分浏览器会取消下载，延后一拍再释放。
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  MessagePlugin.success('日志已下载')
+}
+
+function logFileName(): string {
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+    + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  const target = logTarget.value === 'agent' ? 'agent' : logInstance.value || 'instance'
+  return `${logAgent.value || 'basctl'}-${target}-${stamp}.log`
+}
+
 function nearBottom(): boolean {
   const element = logRef.value
   if (!element) return true
@@ -701,16 +856,15 @@ function resetLog() {
   resetLogWindow()
 }
 
-function instancesOf(agent: AgentSummary): AgentInstance[] {
-  const detail = detailFor(agent)
-  if (!detail) {
+function instancesOf(agent: AgentStatus): AgentInstance[] {
+  const running = agent.basReport?.instances ?? []
+  const declared = agent.basReport?.declared ?? []
+  if (running.length === 0 && declared.length === 0) {
     return (agent.health ?? []).map((item) => ({
       id: item.id,
       state: item.state,
     }))
   }
-  const running = detail.basReport?.instances ?? []
-  const declared = detail.basReport?.declared ?? []
   const runningById = new Map<string, AgentInstance>()
   for (const instance of running) {
     if (instance.id) runningById.set(instance.id, instance)
@@ -761,14 +915,14 @@ function webappText(instance: AgentInstance): string {
   return labels.join(' · ')
 }
 
-function systemText(agent: AgentSummary): string {
-  const os = detailFor(agent)?.os?.os
+function systemText(agent: AgentStatus): string {
+  const os = agent.os?.os
   if (!os) return '点击“刷新”加载'
   return [os.name, os.kernel, os.arch].filter(Boolean).join(' · ') || '不可用'
 }
 
-function cpuText(agent: AgentSummary): string {
-  const cpu = detailFor(agent)?.os?.cpu
+function cpuText(agent: AgentStatus): string {
+  const cpu = agent.os?.cpu
   if (!cpu) return '详情未加载'
   const loads = [cpu.load1, cpu.load5, cpu.load15]
     .filter((value): value is number => typeof value === 'number')
@@ -777,16 +931,16 @@ function cpuText(agent: AgentSummary): string {
   return loads ? `${cores} · load ${loads}` : cores
 }
 
-function memoryText(agent: AgentSummary): string {
-  const mem = detailFor(agent)?.os?.mem
+function memoryText(agent: AgentStatus): string {
+  const mem = agent.os?.mem
   if (!mem || typeof mem.total !== 'number') return '详情未加载'
   if (typeof mem.available !== 'number') return formatBytes(mem.total)
   const used = mem.total - mem.available
   return `${formatBytes(used)} / ${formatBytes(mem.total)}`
 }
 
-function diskCountText(agent: AgentSummary): string {
-  const disks = detailFor(agent)?.os?.disk ?? []
+function diskCountText(agent: AgentStatus): string {
+  const disks = agent.os?.disk ?? []
   if (disks.length === 0) return '详情未加载'
   const root = disks.find((disk) => disk.mount === '/') ?? disks[0]
   return `${disks.length} 个挂载点 · ${diskText(root)}`
@@ -973,7 +1127,7 @@ function stateTheme(state: AgentHealth['state'] | ''): 'success' | 'warning' | '
   return 'default'
 }
 
-async function openHistory(agent: AgentSummary) {
+async function openHistory(agent: AgentStatus) {
   historyAgent.value = agent.profile
   historyServer.value = ''
   history.value = null
@@ -1061,6 +1215,15 @@ onBeforeUnmount(() => {
   font-size: 17px;
 }
 
+/* 机构 Logo：固定方形，长宽比不一致时留白而不是拉伸。 */
+.agent-org-logo {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
 .agent-profile {
   margin: 2px 0 0;
   color: var(--td-text-color-placeholder);
@@ -1144,6 +1307,51 @@ onBeforeUnmount(() => {
 
 .agent-section {
   min-width: 0;
+}
+
+/* 右侧：每台 agent 一张连接卡片；实例表在左侧合并展示。 */
+.agent-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.agent-conn {
+  padding: 10px 12px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: var(--td-bg-color-container-hover);
+}
+
+.agent-conn-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.agent-conn-line {
+  margin: 2px 0;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.agent-conn-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.instance-col-node,
+.instance-node {
+  width: 120px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-section-title {

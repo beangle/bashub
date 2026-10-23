@@ -57,10 +57,21 @@ export interface AgentBasSnapshot {
   declared?: AgentInstance[]
 }
 
+/** Profile 所属机构的展示信息（监控卡片用它当大标题与 Logo）。 */
+export interface AgentOrganization {
+  name?: string
+  title?: string
+  shortTitle?: string
+  logoUrl?: string
+}
+
 /** `GET /api/bashub/monitor/agents/status` 里的一项：一台在线节点此刻的样子。 */
 export interface AgentStatus {
   profile: string
+  /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
+  ip?: string
   host?: string
+  org?: AgentOrganization
   basctl?: string
   bas?: string
   basHome?: string
@@ -83,7 +94,10 @@ export interface AgentHealth {
 /** `GET /api/bashub/monitor/agents/summary`：在线列表轮询用的轻量摘要。 */
 export interface AgentSummary {
   profile: string
+  /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
+  ip?: string
   host?: string
+  org?: AgentOrganization
   basctl?: string
   bas?: string
   supports?: string[]
@@ -133,12 +147,6 @@ export async function listAgents(): Promise<AgentStatus[]> {
   return result.agents ?? []
 }
 
-/** 在线页高频轮询只取摘要，完整 OS/webapps 由 `listAgents()` 按需读取。 */
-export async function listAgentSummaries(): Promise<AgentSummary[]> {
-  const result = await apiClient.getPlain<{ agents?: AgentSummary[] }>(apiPath('monitor', '/agents/summary'))
-  return result.agents ?? []
-}
-
 /** 读取节点的半年运行历史：一次取回 profile 的原始采样，按 server 聚合由页面完成。 */
 export async function readAgentHistory(
   profile: string,
@@ -151,9 +159,17 @@ export async function readAgentHistory(
   )
 }
 
+/** 目标 agent 的查询参数：同一 profile 有多台在线 agent 时必填（值为 `/agents/status` 里的 `ip`）。 */
+function agentQuery(agent?: string): string {
+  return agent ? `?agent=${encodeURIComponent(agent)}` : ''
+}
+
 /** 要求在线节点立刻上报一次；202 只表示指令已入队，快照随后到达。 */
-export async function requestAgentReport(profile: string): Promise<void> {
-  await apiClient.post(apiPath('monitor', `/agents/${encodeURIComponent(profile)}/report`), {})
+export async function requestAgentReport(profile: string, agent?: string): Promise<void> {
+  await apiClient.post(
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/report`) + agentQuery(agent),
+    {},
+  )
 }
 
 /** 让节点启停一个实例；接口等到 agent 执行完才返回最终状态。 */
@@ -161,9 +177,10 @@ export async function serviceAgentInstance(
   profile: string,
   instance: string,
   action: AgentServiceAction,
+  agent?: string,
 ): Promise<AgentServiceResult> {
   const document = await apiClient.post<AgentServiceResult>(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/service/${action}`),
+    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/service/${action}`) + agentQuery(agent),
     { instance },
   )
   if (!document.data) throw new Error('节点未返回服务状态')
@@ -176,11 +193,13 @@ export function readAgentLog(
   from?: string,
   to?: string,
   tail?: number,
+  agent?: string,
 ): Promise<AgentLogWindow> {
   const query: Record<string, string> = { instance }
   if (from?.trim()) query.from = from.trim()
   if (to?.trim()) query.to = to.trim()
   if (tail && tail > 0) query.tail = String(tail)
+  if (agent) query.agent = agent
   return apiClient.getPlain<AgentLogWindow>(
     apiPath('monitor', `/agents/${encodeURIComponent(profile)}/log`),
     { query },
@@ -191,10 +210,17 @@ export function readAgentLog(
  * 打开日志跟随流。认证靠同源 cookie；`resolveUrl` 仍会在跨域部署时追加 `URP_SID`。
  * 事件由浏览器自动重连，并带上 `Last-Event-ID`，服务端会从下一条继续。
  */
-export function followAgentLog(profile: string, instance: string, tail = 200): EventSource {
+export function followAgentLog(
+  profile: string,
+  instance: string,
+  tail = 200,
+  agent?: string,
+): EventSource {
+  const query: Record<string, string> = { instance, tail: String(tail) }
+  if (agent) query.agent = agent
   const url = apiClient.resolveUrl(
     apiPath('monitor', `/agents/${encodeURIComponent(profile)}/log/follow`),
-    { query: { instance, tail: String(tail) } },
+    { query },
   )
   return new EventSource(url, { withCredentials: true })
 }
@@ -205,11 +231,13 @@ export function readAgentOwnLog(
   from?: string,
   to?: string,
   tail?: number,
+  agent?: string,
 ): Promise<AgentLogWindow> {
   const query: Record<string, string> = {}
   if (from?.trim()) query.from = from.trim()
   if (to?.trim()) query.to = to.trim()
   if (tail && tail > 0) query.tail = String(tail)
+  if (agent) query.agent = agent
   return apiClient.getPlain<AgentLogWindow>(
     apiPath('monitor', `/agents/${encodeURIComponent(profile)}/agent-log`),
     { query },
