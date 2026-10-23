@@ -55,13 +55,13 @@ import vibe.http.server : HTTPServerRequest, HTTPServerRequestHandler, HTTPServe
 import beangle.security.web : SecurityContext, requestOrigin;
 import beangle.web.http : withWebAccess;
 
-import std.algorithm : canFind, sort;
+import std.algorithm : canFind, endsWith, sort;
 import std.array : appender, join;
 import std.base64 : Base64;
 import std.conv : ConvException, to;
 import std.file : read;
 import std.functional : toDelegate;
-import std.string : indexOf, startsWith, strip, toLower;
+import std.string : indexOf, replace, split, startsWith, strip, toLower;
 
 /// `log/follow` 的轮询节拍与窗口。agent 侧仍是普通 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
 private enum int LogFollowIntervalSeconds = 3;
@@ -816,14 +816,148 @@ class HubService {
   }
 
   /// 给在线节点补 `org`：profile 名是 `org.name`，取第一个 `.` 之前的部分查机构。
-  private Json withOrganization(Json agentsJson) {
+  /// 配置里的 webapp 标题索引：agent 只报 context/uri，标题由 bashub 反查，不扩协议。
+  private static struct WebappTitles {
+    string[string] byContext;
+    string[string] byGav;
+  }
+
+  /// `gav://group:artifact[:classifier]:version` → `group:artifact`（版本/分类不参与匹配）。
+  private static string gavKey(string uri) {
+    if (!uri.startsWith("gav://"))
+      return "";
+    auto parts = uri["gav://".length .. $].split(":");
+    return parts.length >= 2 ? parts[0] ~ ":" ~ parts[1] : "";
+  }
+
+  private static string normalizeWebappContext(string context) {
+    auto value = context.strip;
+    if (value.length == 0)
+      return "/";
+    if (!value.startsWith("/"))
+      value = "/" ~ value;
+    if (value.length > 1 && value.endsWith("/"))
+      value = value[0 .. $ - 1];
+    return value;
+  }
+
+  /// 读该 profile 的 webapp 配置：context / artifact(gav) → artifact.title。
+  private WebappTitles webappTitles(string profileId) {
+    WebappTitles index;
+    Query q;
+    q.pageSize = 100000;
+    q.addFilter("profile", profileId);
+    q.includes = ["artifact"];
+    auto document = store.search(reg.find("webapps"), q);
+
+    string[string] artifactTitles;
+    string[string] artifactGavs;
+    foreach (ref item; document["included"]) {
+      if (jsonText(item["type"]) != "artifacts")
+        continue;
+      auto id = jsonText(item["id"]);
+      auto attrs = item["attributes"];
+      artifactTitles[id] = jsonText(attrs["title"]);
+      auto group = jsonText(attrs["groupId"]);
+      auto name = jsonText(attrs["artifactId"]);
+      if (group.length > 0 && name.length > 0)
+        artifactGavs[id] = group ~ ":" ~ name;
+    }
+
+    foreach (ref row; document["data"]) {
+      if (row.type != Json.Type.object)
+        continue;
+      auto artifactData = jsonGet(jsonGet(jsonGet(row, "relationships"), "artifact"), "data");
+      auto artifactId = artifactData.type == Json.Type.object ? jsonText(artifactData["id"]) : "";
+      auto title = "";
+      if (auto found = artifactId in artifactTitles)
+        title = *found;
+      auto context = jsonText(jsonGet(jsonGet(row, "attributes"), "contextPath"));
+      if (context.length > 0)
+        index.byContext[normalizeWebappContext(context)] = title;
+      if (auto gav = artifactId in artifactGavs)
+        index.byGav[*gav] = title;
+    }
+    return index;
+  }
+
+  private static string webappTitleOf(const WebappTitles titles, string context, string uri) {
+    auto gav = gavKey(uri);
+    if (gav.length > 0) {
+      if (auto found = gav in titles.byGav) {
+        if ((*found).length > 0)
+          return *found;
+      }
+    }
+    if (auto found = normalizeWebappContext(context) in titles.byContext)
+      return *found;
+    return "";
+  }
+
+  /// 给 agent 上报的每个 webapp 补 `title`：先按运行中的 gav 反查，再按 context。
+  private Json withWebappTitles(Json agentsJson) {
+    WebappTitles[string] cache;
+    foreach (ref item; agentsJson) {
+      if (item.type != Json.Type.object)
+        continue;
+      auto report = item["basReport"];
+      if (report.type != Json.Type.object)
+        continue;
+      auto instances = jsonGet(report, "instances");
+      bool hasWebapps = false;
+      foreach (ref instance; instances) {
+        if (jsonGet(instance, "webapps").type == Json.Type.array) {
+          hasWebapps = true;
+          break;
+        }
+      }
+      if (!hasWebapps)
+        continue;
+      auto profileId = jsonText(item["profileId"]);
+      if (profileId.length == 0)
+        continue;
+      if (profileId !in cache)
+        cache[profileId] = webappTitles(profileId);
+      auto titles = profileId in cache;
+      foreach (ref instance; instances) {
+        if (instance.type != Json.Type.object)
+          continue;
+        auto webapps = instance["webapps"];
+        if (webapps.type != Json.Type.array)
+          continue;
+        foreach (ref webapp; webapps) {
+          if (webapp.type != Json.Type.object)
+            continue;
+          auto title = webappTitleOf(*titles, jsonText(webapp["context"]), jsonText(webapp["uri"]));
+          if (title.length > 0)
+            webapp["title"] = Json(title);
+        }
+      }
+    }
+    return agentsJson;
+  }
+
+  /// 监控卡片的大标题用 profile 的说明（title）；机构信息只留给 Logo。
+  private Json withProfileInfo(Json agentsJson) {
     auto index = organizationIndex();
+    string[string] titles;
     foreach (ref item; agentsJson) {
       auto profileName = jsonText(item["profile"]);
       auto dot = profileName.indexOf('.');
       auto orgName = dot > 0 ? profileName[0 .. dot] : "";
       if (auto found = orgName in index)
         item["org"] = *found;
+      auto profileId = jsonText(item["profileId"]);
+      if (profileId.length == 0)
+        continue;
+      if (profileId !in titles) {
+        ProfileContext context;
+        titles[profileId] = findProfileById(reg, store, profileId, context)
+            ? attributeText(context.data, "title") : "";
+      }
+      auto title = profileId in titles;
+      if ((*title).length > 0)
+        item["profileTitle"] = Json(*title);
     }
     return agentsJson;
   }
@@ -833,7 +967,7 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
     auto doc = Json.emptyObject;
-    doc["agents"] = withOrganization(agents.status);
+    doc["agents"] = withWebappTitles(withProfileInfo(agents.status));
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -842,7 +976,7 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
     auto doc = Json.emptyObject;
-    doc["agents"] = withOrganization(agents.summary);
+    doc["agents"] = withProfileInfo(agents.summary);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 

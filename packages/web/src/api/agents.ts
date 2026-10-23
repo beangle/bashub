@@ -37,6 +37,8 @@ export interface AgentWebapp {
   uri?: string
   context?: string
   urls?: string[]
+  /** 展示标题：hub 按配置里的 webapp → artifact.title 反查后补上，agent 不上报。 */
+  title?: string
 }
 
 export interface AgentInstance {
@@ -70,6 +72,8 @@ export interface AgentStatus {
   profile: string
   /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
   profileId?: string
+  /** profile 的说明（title），监控卡片的大标题。 */
+  profileTitle?: string
   /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
   ip?: string
   host?: string
@@ -98,6 +102,8 @@ export interface AgentSummary {
   profile: string
   /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
   profileId?: string
+  /** profile 的说明（title），监控卡片的大标题。 */
+  profileTitle?: string
   /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
   ip?: string
   host?: string
@@ -123,6 +129,8 @@ export interface AgentHistory {
   profile: string
   /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
   profileId?: string
+  /** profile 的说明（title），监控卡片的大标题。 */
+  profileTitle?: string
   from: string
   to: string
   days: number

@@ -253,7 +253,16 @@ unittest {
   assert(ex.status == 200);
   assert(parseJson(ex.body)["agents"].get!(Json[]).length == 0);
 
-  agents.attach("openurp.prod", "1002").host = "app1";
+  auto prod = agents.attach("openurp.prod", "1002");
+  prod.host = "app1";
+  // agent 只上报 gav/context；标题由 hub 按配置里的 webapp → artifact 反查补上
+  prod.basReport = parseJsonString(`{
+    "instances":[{"id":"prod-farm.app1","pid":100,"http.port":8080,"webapps":[
+      {"id":"bas","uri":"gav://org.beangle.bashub:bas-web:0.0.8","context":"/bas"},
+      {"id":"otk","uri":"gav://org.beangle.otk:beangle-otk-ws:war:0.0.30","context":"/api/tools"}
+    ]}],
+    "declared":[{"id":"prod-farm.app1","http.port":8080}]
+  }`);
   agents.attach("openurp.demo").host = "app0";
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/status");
   assert(ex.status == 200);
@@ -262,10 +271,15 @@ unittest {
   assert(list[0]["profile"].get!string == "openurp.demo");
   assert(list[1]["host"].get!string == "app1");
   assert(list[1]["profileId"].get!string == "1002", "前端用 profileId 跳到配置详情");
+  assert(list[1]["profileTitle"].get!string == "生产配置", "卡片大标题用 profile 的说明");
   // 卡片大标题：按 profile 的 org 前缀补上机构展示信息
   assert(list[0]["org"]["name"].get!string == "openurp");
   assert(list[0]["org"]["title"].get!string == "OpenURP 高校教务");
   assert(list[1]["org"]["shortTitle"].get!string == "URP");
+  // webapp 标题按配置反查：/bas 命中 artifact 6001，未配置的 /api/tools 不加 title
+  auto webapps = list[1]["basReport"]["instances"][0]["webapps"].get!(Json[]);
+  assert(webapps[0]["title"].get!string == "BAS 控制台");
+  assert(webapps[1]["title"].type == Json.Type.undefined);
 }
 
 @("agents/summary returns health counts without full snapshots") unittest {

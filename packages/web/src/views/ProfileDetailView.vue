@@ -286,57 +286,57 @@
             <article class="detail-card">
               <header class="detail-card__head">
                 <div>
-                  <h4>在线节点与实例</h4>
-                  <p>只显示 profile 与当前配置一致的 basctl agent。</p>
+                  <h4>节点与服务</h4>
                 </div>
                 <router-link class="card-link" to="/monitor/agents">在线节点</router-link>
               </header>
-              <p v-if="warnings.agents" class="load-error">{{ warnings.agents }}</p>
-              <table v-else-if="instanceRows.length > 0" class="detail-table">
-                <thead>
-                  <tr><th>节点</th><th>实例</th><th>状态</th><th>端口</th><th>引擎</th></tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in instanceRows" :key="`${row.agent.profile}|${row.instance.id || row.instance.pid}`">
-                    <td>{{ row.agent.host || row.agent.profile }}</td>
-                    <td>{{ row.instance.id || '—' }}</td>
-                    <td>
-                      <t-tag size="small" :theme="row.running ? 'success' : 'warning'" variant="light">
-                        {{ row.running ? '运行中' : '已停止' }}
-                      </t-tag>
-                    </td>
-                    <td>{{ row.instance.httpPort || '—' }}</td>
-                    <td>{{ row.instance.engine || '—' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p v-else class="empty-text">当前没有匹配的在线节点或已声明实例。</p>
-            </article>
+              <p v-if="warnings.servers" class="load-error">{{ warnings.servers }}</p>
+              <template v-else-if="ipGroups.length > 0">
+                <p v-if="warnings.agents" class="load-error">{{ warnings.agents }}（以下只显示配置中的服务）</p>
+                <div class="ip-groups">
+                  <section v-for="group in ipGroups" :key="group.ip" class="ip-group">
+                    <header class="ip-group__head">
+                      <div class="ip-group__id">
+                        <strong class="ip-group__ip">{{ group.ip }}</strong>
+                        <span v-if="group.hostName" class="ip-group__host">{{ group.hostName }}</span>
+                        <t-tag size="small" :theme="group.online ? 'success' : 'default'" variant="light">
+                          {{ group.online ? '在线' : '离线' }}
+                        </t-tag>
+                      </div>
+                      <span class="ip-group__count">{{ group.running }} 运行 / {{ group.stopped }} 停止</span>
+                    </header>
 
-            <article class="detail-card">
-              <header class="detail-card__head">
-                <div>
-                  <h4>群集与服务</h4>
-                  <p>每个服务所属群集、主机与监听端口。</p>
+                    <div v-for="farm in group.farms" :key="farm.name" class="farm-group">
+                      <div class="farm-group__head">
+                        <span class="farm-group__name">{{ farm.name }}</span>
+                        <span class="farm-group__count">{{ farm.servers.length }} 个服务</span>
+                      </div>
+                      <div class="server-grid">
+                        <div
+                          v-for="item in farm.servers"
+                          :key="item.key"
+                          class="server-chip"
+                          :class="{ 'server-chip--offline': !item.running }"
+                        >
+                          <div class="server-chip__head">
+                            <strong :title="item.name">{{ item.name }}</strong>
+                            <t-tag size="small" :theme="item.running ? 'success' : 'warning'" variant="light">
+                              {{ item.running ? '运行中' : '已停止' }}
+                            </t-tag>
+                          </div>
+                          <div class="server-chip__meta">
+                            <span>HTTP {{ item.httpPort || '—' }}</span>
+                            <span>代理 {{ item.proxyPort || '—' }}</span>
+                            <span>堆 {{ item.heap || '—' }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <p v-if="group.farms.length === 0" class="empty-text">该节点没有已声明的服务。</p>
+                  </section>
                 </div>
-              </header>
-              <p v-if="warnings.farms || warnings.servers" class="load-error">{{ warnings.farms || warnings.servers }}</p>
-              <table v-else-if="serverRows.length > 0" class="detail-table">
-                <thead>
-                  <tr><th>服务</th><th>群集</th><th>主机</th><th>HTTP</th><th>代理端口</th><th>堆上限</th></tr>
-                </thead>
-                <tbody>
-                  <tr v-for="server in serverRows" :key="server.id">
-                    <td>{{ attrOf(server, 'name') || '—' }}</td>
-                    <td>{{ relatedName(server) }}</td>
-                    <td>{{ hostLabel(server) }}</td>
-                    <td>{{ attrOf(server, 'httpPort') || '—' }}</td>
-                    <td>{{ attrOf(server, 'proxyHttpPort') || '—' }}</td>
-                    <td>{{ heapText(server) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p v-else class="empty-text">当前 Profile 还没有服务。</p>
+              </template>
+              <p v-else class="empty-text">当前 Profile 还没有服务或在线节点。</p>
             </article>
 
             <article class="detail-card">
@@ -522,6 +522,31 @@ interface InstanceRow {
   running: boolean
 }
 
+/** 一台机器（IP）下按群集归拢的服务；在线状态来自该 IP 的 agent。 */
+interface ServerRunEntry {
+  key: string
+  name: string
+  farmName: string
+  httpPort: string
+  proxyPort: string
+  heap: string
+  running: boolean
+}
+
+interface FarmGroup {
+  name: string
+  servers: ServerRunEntry[]
+}
+
+interface IpGroup {
+  ip: string
+  hostName: string
+  online: boolean
+  running: number
+  stopped: number
+  farms: FarmGroup[]
+}
+
 const sectionItems: SectionItem[] = [
   { key: 'overview', label: '概览', hint: 'Profile 的归属、版本与部署概况', icon: DashboardIcon },
   { key: 'proxy', label: 'Haproxy / Nginx', hint: '负载均衡监听与渲染后的代理配置', icon: InternetIcon },
@@ -610,9 +635,101 @@ const instanceRows = computed<InstanceRow[]>(() =>
 const runningInstanceCount = computed(() => instanceRows.value.filter((row) => row.running).length)
 const stoppedInstanceCount = computed(() => instanceRows.value.filter((row) => !row.running).length)
 
-const serverRows = computed(() =>
-  [...servers.value].sort((a, b) => attrOf(a, 'name').localeCompare(attrOf(b, 'name'))),
-)
+/** 群集与服务 + 在线实例：按主机 IP 分组，组内按群集名、服务名升序。 */
+const ipGroups = computed<IpGroup[]>(() => {
+  const agentsByIp = new Map<string, AgentStatus>()
+  const instancesByAgent = new Map<AgentStatus, AgentInstance[]>()
+  for (const agent of onlineAgents.value) {
+    if (agent.ip) agentsByIp.set(agent.ip, agent)
+    instancesByAgent.set(agent, instancesOf(agent))
+  }
+
+  const entries: ServerRunEntry[] = []
+  const seen = new Set<string>()
+  const grouped = new Map<string, { ip: string; hostName: string; online: boolean; entries: ServerRunEntry[] }>()
+
+  const push = (ip: string, hostName: string, online: boolean, entry: ServerRunEntry) => {
+    let group = grouped.get(ip)
+    if (!group) {
+      group = { ip, hostName, online, entries: [] }
+      grouped.set(ip, group)
+    }
+    group.online ||= online
+    group.hostName ||= hostName
+    group.entries.push(entry)
+    entries.push(entry)
+  }
+
+  for (const server of servers.value) {
+    const host = related(server, 'host', 'hosts')
+    const hostIp = attrOf(host, 'ip') || '未分配 IP'
+    const hostName = attrOf(host, 'name')
+    const farmName = relatedName(server)
+    const serverName = attrOf(server, 'name')
+    const agent = agentsByIp.get(hostIp)
+    const instance = agent
+      ? (instancesByAgent.get(agent) ?? []).find(
+          (item) => item.id === `${farmName}.${serverName}` || item.id === serverName,
+        )
+      : undefined
+    if (agent && instance?.id) seen.add(`${agent.ip}|${instance.id}`)
+    push(hostIp, hostName, Boolean(agent), {
+      key: `server:${server.id}`,
+      name: serverName,
+      farmName,
+      httpPort: attrOf(server, 'httpPort'),
+      proxyPort: attrOf(server, 'proxyHttpPort'),
+      heap: heapText(server),
+      running: instance ? isRunning(instance) : false,
+    })
+  }
+
+  // agent 上报了配置里没有的实例时也展示出来，避免“在线却看不到”。
+  for (const agent of onlineAgents.value) {
+    for (const instance of instancesByAgent.get(agent) ?? []) {
+      const id = instance.id ?? ''
+      if (!id || seen.has(`${agent.ip}|${id}`)) continue
+      const dot = id.indexOf('.')
+      push(agent.ip || '未分配 IP', agent.host || '', true, {
+        key: `instance:${agent.ip}:${id}`,
+        name: id,
+        farmName: dot > 0 ? id.slice(0, dot) : '未分组',
+        httpPort: instance.httpPort ? String(instance.httpPort) : '',
+        proxyPort: '',
+        heap: '',
+        running: isRunning(instance),
+      })
+    }
+  }
+
+  const groups: IpGroup[] = []
+  for (const group of grouped.values()) {
+    const farms = new Map<string, FarmGroup>()
+    for (const entry of group.entries) {
+      let farm = farms.get(entry.farmName)
+      if (!farm) {
+        farm = { name: entry.farmName, servers: [] }
+        farms.set(entry.farmName, farm)
+      }
+      farm.servers.push(entry)
+    }
+    const farmGroups = [...farms.values()]
+    for (const farm of farmGroups) {
+      farm.servers.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
+    }
+    farmGroups.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
+    groups.push({
+      ip: group.ip,
+      hostName: group.hostName,
+      online: group.online,
+      running: group.entries.filter((entry) => entry.running).length,
+      stopped: group.entries.filter((entry) => !entry.running).length,
+      farms: farmGroups,
+    })
+  }
+  return groups.sort((a, b) => a.ip.localeCompare(b.ip, 'zh-CN', { numeric: true }))
+})
+
 const webappRows = computed(() =>
   [...webapps.value].sort((a, b) => attrOf(a, 'contextPath').localeCompare(attrOf(b, 'contextPath'))),
 )
@@ -658,13 +775,6 @@ function related(row: ResourceRow | undefined, key: string, type: string): Resou
 
 function relatedName(server: ResourceRow): string {
   return attrOf(related(server, 'farm', 'farms'), 'name') || '—'
-}
-
-function hostLabel(server: ResourceRow): string {
-  const host = related(server, 'host', 'hosts')
-  const hostName = attrOf(host, 'name')
-  const hostIp = attrOf(host, 'ip')
-  return [hostName, hostIp].filter(Boolean).join(' · ') || '—'
 }
 
 function heapText(server: ResourceRow): string {
@@ -1077,6 +1187,124 @@ onMounted(load)
   color: var(--td-text-color-placeholder);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.ip-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.ip-group {
+  overflow: hidden;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+}
+
+.ip-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--td-component-stroke);
+  background: var(--td-bg-color-container-hover);
+}
+
+.ip-group__id {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.ip-group__ip {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ip-group__host {
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ip-group__count {
+  flex: none;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.farm-group {
+  padding: 10px 12px;
+}
+
+.farm-group + .farm-group {
+  border-top: 1px dashed var(--td-component-stroke);
+}
+
+.farm-group__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.farm-group__name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.farm-group__count {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+/* 服务用紧凑卡片铺开，一行可以放多个，不强制一台一行。 */
+.server-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.server-chip {
+  padding: 8px 10px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+  background: var(--td-bg-color-container);
+}
+
+.server-chip--offline {
+  background: var(--td-bg-color-container-hover);
+}
+
+.server-chip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.server-chip__head strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-chip__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-table {

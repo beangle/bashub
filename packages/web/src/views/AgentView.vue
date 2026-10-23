@@ -22,7 +22,7 @@
     </div>
 
     <div v-else class="agent-grid">
-      <t-card v-for="group in visibleGroups" :key="group.profile" :bordered="true" class="agent-card">
+      <section v-for="group in visibleGroups" :key="group.profile" class="agent-group">
         <div class="agent-card-head">
           <div class="agent-identity">
             <div class="agent-title-row">
@@ -34,7 +34,7 @@
                   :alt="groupOrgTitle(group)"
                   @error="markLogoFailed(group.profile)"
                 />
-                <h3>{{ groupOrgTitle(group) }}</h3>
+                <h3>{{ groupTitle(group) }}</h3>
                 <t-tag theme="success" variant="light">{{ group.agents.length }} 个 agent</t-tag>
                 <span class="agent-profile">
                   {{ group.profile }}
@@ -59,153 +59,130 @@
           </div>
         </div>
 
-        <div class="agent-layout">
-          <div class="agent-section">
-            <div class="agent-section-title">
-              <span>实例（{{ group.agents.length }} 台 agent 合并）</span>
-              <span class="agent-muted">{{ mergedInstances(group).length }} 个</span>
+        <div class="ip-cards">
+          <article v-for="agent in group.agents" :key="agentKey(agent)" class="ip-card">
+            <header class="ip-card__head">
+              <div class="ip-card__id">
+                <div class="ip-card__title">
+                  <strong class="ip-card__ip">{{ agent.ip || agent.host || '-' }}</strong>
+                  <span v-if="agent.host" class="ip-card__host">{{ agent.host }}</span>
+                  <t-tag size="small" theme="success" variant="light">在线</t-tag>
+                </div>
+                <span class="ip-card__os">{{ osText(agent) }}</span>
+              </div>
+              <span class="ip-card__count">{{ runningOf(agent) }} 运行 / {{ stoppedOf(agent) }} 停止</span>
+            </header>
+
+            <div class="ip-card__body">
+              <div class="ip-card__servers">
+                <div v-if="agentInstances(agent).length === 0" class="agent-muted">暂无已声明实例</div>
+                <div v-else class="instance-table-wrap">
+                  <table class="instance-table">
+                    <thead>
+                      <tr>
+                        <th class="instance-col-index">序号</th>
+                        <th>Server</th>
+                        <th>状态</th>
+                        <th class="instance-col-port">端口</th>
+                        <th>应用标题</th>
+                        <th>上下文</th>
+                        <th class="instance-col-actions">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="(instance, index) in agentInstances(agent)"
+                        :key="instance.id || instance.pid"
+                      >
+                        <td class="instance-index">{{ index + 1 }}</td>
+                        <td class="instance-name" :title="instance.id || '-'">{{ instance.id || '-' }}</td>
+                        <td>
+                          <div class="instance-status">
+                            <t-tag size="small" variant="light" :theme="instanceStateTheme(instance)">
+                              {{ instanceStateLabel(instance) }}
+                            </t-tag>
+                            <span v-if="isRunning(instance)" class="instance-pid">
+                              PID {{ instance.pid ?? '-' }}
+                            </span>
+                          </div>
+                        </td>
+                        <td>{{ instance.httpPort ?? '-' }}</td>
+                        <td class="instance-apps" :title="appTitleText(instance)">{{ appTitleText(instance) || '—' }}</td>
+                        <td class="instance-apps" :title="webappText(instance)">{{ webappText(instance) || '—' }}</td>
+                        <td class="instance-actions">
+                          <template v-if="instance.id">
+                            <t-button size="small" variant="text" @click="openLog(agent, instance)">查看日志</t-button>
+                            <t-button
+                              v-if="!isRunning(instance) && canService(agent, 'start')"
+                              size="small"
+                              theme="primary"
+                              :loading="serviceLoading[serviceKey(agent, instance)] === true"
+                              @click="confirmService(agent, instance, 'start')"
+                            >
+                              启动
+                            </t-button>
+                            <t-button
+                              v-if="isRunning(instance) && canService(agent, 'restart')"
+                              size="small"
+                              variant="outline"
+                              :loading="serviceLoading[serviceKey(agent, instance)] === true"
+                              @click="confirmService(agent, instance, 'restart')"
+                            >
+                              重启
+                            </t-button>
+                            <t-button
+                              v-if="isRunning(instance) && canService(agent, 'stop')"
+                              size="small"
+                              theme="danger"
+                              variant="outline"
+                              :loading="serviceLoading[serviceKey(agent, instance)] === true"
+                              @click="confirmService(agent, instance, 'stop')"
+                            >
+                              停止
+                            </t-button>
+                          </template>
+                          <span v-else class="agent-muted">—</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <aside class="ip-card__agent">
+                <p class="agent-conn-home" :title="agent.basHome || ''">{{ agent.basHome || '-' }}</p>
+                <dl class="agent-conn-facts">
+                  <div class="agent-conn-row">
+                    <dt>连接</dt>
+                    <dd>{{ shortTime(agent.connectedAt) }}</dd>
+                  </div>
+                  <div class="agent-conn-row">
+                    <dt>心跳</dt>
+                    <dd>{{ shortTime(agent.lastSeenAt) }}</dd>
+                  </div>
+                </dl>
+                <dl class="agent-conn-metrics">
+                  <div class="agent-conn-row">
+                    <dt>CPU</dt>
+                    <dd>{{ cpuText(agent) }}</dd>
+                  </div>
+                  <div class="agent-conn-row">
+                    <dt>内存</dt>
+                    <dd>{{ memoryText(agent) }}</dd>
+                  </div>
+                  <div class="agent-conn-row">
+                    <dt>磁盘</dt>
+                    <dd>{{ diskCountText(agent) }}</dd>
+                  </div>
+                </dl>
+                <div v-if="agent.supports?.includes('agent:log')" class="agent-conn-actions">
+                  <t-button size="small" variant="outline" @click="openAgentLog(agent)">Agent 日志</t-button>
+                </div>
+              </aside>
             </div>
-            <div v-if="mergedInstances(group).length === 0" class="agent-muted">暂无已声明实例</div>
-            <div v-else class="instance-table-wrap">
-              <table class="instance-table">
-                <thead>
-                  <tr>
-                    <th class="instance-col-index">序号</th>
-                    <th class="instance-col-node">节点</th>
-                    <th>Server</th>
-                    <th>状态</th>
-                    <th class="instance-col-port">端口</th>
-                    <th>应用</th>
-                    <th class="instance-col-actions">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="(row, index) in mergedInstances(group)"
-                    :key="`${agentKey(row.agent)}:${row.instance.id || row.instance.pid}`"
-                  >
-                    <td class="instance-index">{{ index + 1 }}</td>
-                    <td class="instance-node" :title="row.agent.host || ''">
-                      {{ row.agent.ip || row.agent.host || '-' }}
-                    </td>
-                    <td class="instance-name" :title="row.instance.id || '-'">{{ row.instance.id || '-' }}</td>
-                    <td>
-                      <div class="instance-status">
-                        <t-tag
-                          size="small"
-                          variant="light"
-                          :theme="instanceStateTheme(row.instance)"
-                        >
-                          {{ instanceStateLabel(row.instance) }}
-                        </t-tag>
-                        <span v-if="isRunning(row.instance)" class="instance-pid">
-                          PID {{ row.instance.pid ?? '-' }}
-                        </span>
-                      </div>
-                    </td>
-                    <td>{{ row.instance.httpPort ?? '-' }}</td>
-                    <td class="instance-apps" :title="webappText(row.instance)">
-                      {{ webappText(row.instance) || '—' }}
-                    </td>
-                    <td class="instance-actions">
-                      <template v-if="row.instance.id">
-                        <t-button
-                          size="small"
-                          variant="text"
-                          @click="openLog(row.agent, row.instance)"
-                        >
-                          查看日志
-                        </t-button>
-                        <t-button
-                          v-if="!isRunning(row.instance) && canService(row.agent, 'start')"
-                          size="small"
-                          theme="primary"
-                          :loading="serviceLoading[serviceKey(row.agent, row.instance)] === true"
-                          @click="confirmService(row.agent, row.instance, 'start')"
-                        >
-                          启动
-                        </t-button>
-                        <t-button
-                          v-if="isRunning(row.instance) && canService(row.agent, 'restart')"
-                          size="small"
-                          variant="outline"
-                          :loading="serviceLoading[serviceKey(row.agent, row.instance)] === true"
-                          @click="confirmService(row.agent, row.instance, 'restart')"
-                        >
-                          重启
-                        </t-button>
-                        <t-button
-                          v-if="isRunning(row.instance) && canService(row.agent, 'stop')"
-                          size="small"
-                          theme="danger"
-                          variant="outline"
-                          :loading="serviceLoading[serviceKey(row.agent, row.instance)] === true"
-                          @click="confirmService(row.agent, row.instance, 'stop')"
-                        >
-                          停止
-                        </t-button>
-                      </template>
-                      <span v-else class="agent-muted">—</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="agent-agents">
-            <div class="agent-section-title">
-              <span>Agent 连接</span>
-              <span class="agent-muted">{{ group.agents.length }} 台</span>
-            </div>
-            <article v-for="agent in group.agents" :key="agentKey(agent)" class="agent-conn">
-              <header class="agent-conn-head">
-                <div class="agent-conn-id">
-                  <strong class="agent-conn-ip">{{ agent.ip || agent.host || '-' }}</strong>
-                  <span class="agent-conn-os">{{ osText(agent) }}</span>
-                </div>
-                <t-tag size="small" theme="success" variant="light">在线</t-tag>
-              </header>
-
-              <p class="agent-conn-home" :title="agent.basHome || ''">{{ agent.basHome || '-' }}</p>
-
-              <dl class="agent-conn-facts">
-                <div class="agent-conn-row">
-                  <dt>连接</dt>
-                  <dd>{{ shortTime(agent.connectedAt) }}</dd>
-                </div>
-                <div class="agent-conn-row">
-                  <dt>心跳</dt>
-                  <dd>{{ shortTime(agent.lastSeenAt) }}</dd>
-                </div>
-                <div class="agent-conn-row">
-                  <dt>实例</dt>
-                  <dd>{{ runningOf(agent) }} 运行 / {{ stoppedOf(agent) }} 停止</dd>
-                </div>
-              </dl>
-
-              <dl class="agent-conn-metrics">
-                <div class="agent-conn-row">
-                  <dt>CPU</dt>
-                  <dd>{{ cpuText(agent) }}</dd>
-                </div>
-                <div class="agent-conn-row">
-                  <dt>内存</dt>
-                  <dd>{{ memoryText(agent) }}</dd>
-                </div>
-                <div class="agent-conn-row">
-                  <dt>磁盘</dt>
-                  <dd>{{ diskCountText(agent) }}</dd>
-                </div>
-              </dl>
-
-              <footer v-if="agent.supports?.includes('agent:log')" class="agent-conn-actions">
-                <t-button size="small" variant="outline" @click="openAgentLog(agent)">Agent 日志</t-button>
-              </footer>
-            </article>
-          </div>
+          </article>
         </div>
-      </t-card>
+      </section>
     </div>
 
 
@@ -319,12 +296,6 @@ interface AgentGroup {
   agents: AgentStatus[]
 }
 
-/** 合并实例表的一行：记住所属 agent，启停/日志要按 `?agent=` 路由过去。 */
-interface MergedInstance {
-  agent: AgentStatus
-  instance: AgentInstance
-}
-
 const agents = ref<AgentStatus[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -415,7 +386,7 @@ function readSelectedProfile(): string {
 const selectedProfile = ref(readSelectedProfile())
 
 function profileLabel(group: AgentGroup): string {
-  const title = groupOrgTitle(group)
+  const title = groupTitle(group)
   return title === group.profile ? group.profile : `${title}（${group.profile}）`
 }
 
@@ -488,13 +459,17 @@ function agentGroupStopped(group: AgentGroup): number {
   return group.agents.reduce((sum, agent) => sum + stoppedOf(agent), 0)
 }
 
-/** 合并后的实例行：每行记住所属 agent，操作按 `?agent=` 路由过去。 */
-function mergedInstances(group: AgentGroup): MergedInstance[] {
-  const rows: MergedInstance[] = []
-  for (const agent of group.agents) {
-    for (const instance of instancesOf(agent)) rows.push({ agent, instance })
-  }
-  return rows
+/** 单台 agent 的实例，按 server 名升序；卡片只展示这台机器的服务，不做跨 agent 合并。 */
+function agentInstances(agent: AgentStatus): AgentInstance[] {
+  return instancesOf(agent).sort((a, b) => (a.id || '').localeCompare(b.id || '', 'zh-CN', { numeric: true }))
+}
+
+/** 应用标题由 hub 按配置反查后放进每个 webapp（agent 只报 context/uri）。 */
+function appTitleText(instance: AgentInstance): string {
+  const titles = (instance.webapps ?? [])
+    .map((app) => app.title)
+    .filter((title): title is string => Boolean(title))
+  return titles.join(' · ')
 }
 
 /**
@@ -531,6 +506,11 @@ const failedLogos = ref<Record<string, boolean>>({})
 /** 卡片大标题：机构标题优先；没有机构信息时退回 profile。 */
 function groupOrgTitle(group: AgentGroup): string {
   return group.org?.title || group.org?.shortTitle || group.profile
+}
+
+/** 卡片大标题：优先 profile 的说明（title），没有时回退机构标题 / profile 名。 */
+function groupTitle(group: AgentGroup): string {
+  return group.agents[0]?.profileTitle || groupOrgTitle(group)
 }
 
 function groupLogo(group: AgentGroup): string {
@@ -1038,14 +1018,20 @@ onBeforeUnmount(() => {
 }
 
 .agent-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 12px 16px;
+}
+
+/* profile 不再套卡片：标题直接落在页面上，IP 卡片占满整宽。 */
+.agent-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .agent-card-head,
-.agent-section-title,
 .agent-title-row,
 .agent-name,
 .log-toolbar {
@@ -1098,14 +1084,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.agent-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
-  align-items: start;
-  gap: 16px;
-  margin-top: 12px;
 }
 
 .server-card {
@@ -1169,50 +1147,56 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-.agent-section {
-  min-width: 0;
-}
-
-/* 右侧：每台 agent 一张连接卡片；实例表在左侧合并展示。 */
-.agent-agents {
+/* 每台 agent（IP）一张卡片：左侧该机器的 server 表，右侧连接信息。 */
+.ip-cards {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 0;
+  gap: 12px;
 }
 
-/* 连接卡片分四层：IP/系统 → BAS_HOME → 事实行 → 指标行 → 操作行。 */
-.agent-conn {
-  display: flex;
-  flex-direction: column;
+.ip-card {
   overflow: hidden;
   border: 1px solid var(--td-component-stroke);
   border-radius: 8px;
   background: var(--td-bg-color-container);
 }
 
-.agent-conn-head {
+.ip-card__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px 8px;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--td-component-stroke);
+  background: var(--td-bg-color-container-hover);
 }
 
-.agent-conn-id {
+.ip-card__id {
   min-width: 0;
 }
 
-.agent-conn-ip {
-  display: block;
-  overflow-wrap: anywhere;
-  color: var(--td-text-color-primary);
+.ip-card__title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.ip-card__ip {
   font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.agent-conn-os {
+.ip-card__host {
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ip-card__os {
   display: block;
   margin-top: 2px;
   overflow: hidden;
@@ -1222,10 +1206,51 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.ip-card__count {
+  flex: none;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ip-card__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: start;
+}
+
+.ip-card__servers {
+  min-width: 0;
+}
+
+.ip-card__servers .instance-table-wrap {
+  margin-top: 0;
+}
+
+.ip-card__agent {
+  padding: 10px 14px;
+  border-left: 1px solid var(--td-component-stroke);
+}
+
+.ip-card__agent .agent-conn-home {
+  padding: 0 0 8px;
+}
+
+.ip-card__agent .agent-conn-facts,
+.ip-card__agent .agent-conn-metrics {
+  padding: 8px 0;
+}
+
+.ip-card__agent .agent-conn-actions {
+  padding: 8px 0 0;
+  border-top: 0;
+  background: none;
+}
+
 /* BAS_HOME 只给值，不做标签；等宽字体便于辨认路径。 */
 .agent-conn-home {
-  margin: 0;
-  padding: 0 12px 10px;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   color: var(--td-text-color-secondary);
   font-family: 'Andale Mono', ui-monospace, monospace;
@@ -1270,21 +1295,6 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   border-top: 1px solid var(--td-component-stroke);
   background: var(--td-bg-color-container-hover);
-}
-
-.instance-col-node,
-.instance-node {
-  width: 120px;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-section-title {
-  justify-content: space-between;
-  margin-bottom: 4px;
-  font-weight: 600;
 }
 
 .instance-table-wrap {
@@ -1422,8 +1432,13 @@ onBeforeUnmount(() => {
 
 
 @media (max-width: 760px) {
-  .agent-layout {
+  .ip-card__body {
     grid-template-columns: 1fr;
+  }
+
+  .ip-card__agent {
+    border-top: 1px solid var(--td-component-stroke);
+    border-left: 0;
   }
 
   .agent-card-head,

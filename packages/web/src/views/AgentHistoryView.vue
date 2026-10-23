@@ -52,7 +52,7 @@
           <div class="history-summary">
             <span>可用率 {{ row.availability.toFixed(1) }}%</span>
             <span>采样 {{ row.sampledDays }} 天</span>
-            <span v-if="row.lastAt">最近 {{ row.lastAt }}</span>
+            <span v-if="row.lastAt">最近 {{ displayTime(row.lastAt) }}</span>
           </div>
         </div>
         <div class="history-strip" :aria-label="`最近 ${days} 天运行状态`">
@@ -72,7 +72,7 @@
             :key="`${change.at}-${change.state}`"
             class="history-change"
           >
-            {{ change.at }} {{ stateLabel(change.state) }}
+            {{ displayTime(change.at) }} {{ stateLabel(change.state) }}
           </span>
         </div>
       </article>
@@ -127,10 +127,11 @@ const serverIds = computed<string[]>(() => {
 const rows = computed<HistoryRow[]>(() => {
   const data = history.value
   if (!data) return []
-  const dates = recentDateKeys(data.days)
+  const dates = recentDateKeys(data.days, historyAnchor(data))
   const samplesByServer = new Map<string, { at: string; state: AgentHealth['state'] }[]>()
   for (const sample of data.samples) {
-    if (Number.isNaN(new Date(sample.at).getTime())) continue
+    const date = sampleDateKey(sample.at)
+    if (!date) continue
     for (const [id, state] of Object.entries(sample.servers ?? {})) {
       if (!isHealthState(state)) continue
       let items = samplesByServer.get(id)
@@ -152,7 +153,7 @@ const rows = computed<HistoryRow[]>(() => {
     let lastState: AgentHealth['state'] | '' = ''
     const changes: { at: string; state: AgentHealth['state'] }[] = []
     for (const sample of samples) {
-      const date = localDateKey(new Date(sample.at))
+      const date = sampleDateKey(sample.at)
       let day = byDate.get(date)
       if (!day) {
         day = { running: 0, stopped: 0, error: 0 }
@@ -209,22 +210,48 @@ function isHealthState(value: unknown): value is AgentHealth['state'] {
   return value === 'running' || value === 'stopped' || value === 'error'
 }
 
-function recentDateKeys(count: number): string[] {
-  const dates: string[] = []
-  const end = new Date()
-  end.setHours(12, 0, 0, 0)
-  for (let offset = count - 1; offset >= 0; offset--) {
-    const day = new Date(end)
-    day.setDate(end.getDate() - offset)
-    dates.push(localDateKey(day))
-  }
-  return dates
+/**
+ * 时间按采样串里带的服务器本地时间展示：去掉 `+08:00` 之类的偏移，日期与时间之间用空格。
+ * 不做浏览器时区换算——采样的 `at` 已经是服务器本地时间。
+ */
+function displayTime(value?: string): string {
+  if (!value) return ''
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(value)
+  return match ? `${match[1]} ${match[2]}` : value
 }
 
-function localDateKey(value: Date): string {
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${value.getFullYear()}-${month}-${day}`
+/** 采样点的服务器本地日期；直接取串里的日期，避免浏览器时区把日期挪一天。 */
+function sampleDateKey(value: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value)
+  return match ? match[1] : ''
+}
+
+/** 色带以服务器当前日期（`to`）为基准；缺失时退回最新采样日期。 */
+function historyAnchor(data: AgentHistory): string {
+  const today = sampleDateKey(data.to)
+  if (today) return today
+  let latest = ''
+  for (const sample of data.samples) {
+    const date = sampleDateKey(sample.at)
+    if (date > latest) latest = date
+  }
+  return latest
+}
+
+function recentDateKeys(count: number, anchor: string): string[] {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(anchor)
+  // 用 UTC 日历做“减一天”，避免浏览器时区/夏令时把日期算偏。
+  const end = match
+    ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : Date.now()
+  const dates: string[] = []
+  for (let offset = count - 1; offset >= 0; offset--) {
+    const day = new Date(end - offset * 86_400_000)
+    const month = String(day.getUTCMonth() + 1).padStart(2, '0')
+    const date = String(day.getUTCDate()).padStart(2, '0')
+    dates.push(`${day.getUTCFullYear()}-${month}-${date}`)
+  }
+  return dates
 }
 
 function stateLabel(state: AgentHealth['state'] | ''): string {
