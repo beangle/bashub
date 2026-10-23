@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<db engine="PostgreSQL" version="UNDEFINED">
+<db engine="PostgreSQL" version="0.0.8">
   <schemas>
     <schema name="bas">
       <tables>
@@ -17,6 +17,22 @@
             <unique-key name="uq_cdn_components_kind_name" columns="kind,name"/>
             <unique-key name="uq_cdn_components_kind_mount_name" columns="kind,mount_name"/>
           </constraints>
+        </table>
+        <table name="mon_server_samples" comment="节点运行状态采样">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="sampled_at" type="timestamp with time zone" nullable="false" comment="采样时刻"/>
+            <column name="servers" type="jsonb" nullable="false" comment="server 状态: id -> running/stopped/error"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_mon_server_samples" columns="id"/>
+            <unique-key name="uq_mon_server_samples_point" columns="profile_id,sampled_at"/>
+            <foreign-key name="fk_mon_server_samples_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_mon_server_samples_profile_time" columns="profile_id,sampled_at"/>
+          </indexes>
         </table>
         <table name="cfg_artifacts" comment="Artifact?">
           <columns>
@@ -124,6 +140,8 @@
             <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
             <column name="platform_version" type="varchar(255)" nullable="false" comment="platformVersion?"/>
             <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="setline_listen_port" type="integer" comment="setlineListenPort?"/>
+            <column name="setline_admin_port" type="integer" comment="setlineAdminPort?"/>
           </columns>
           <constraints>
             <primary-key name="pk_pxfg014nyayvye1gd3xih526i" columns="id"/>
@@ -237,12 +255,24 @@
             <index name="idx_cfg_profile_micdn_components_component" columns="component_id"/>
           </indexes>
         </table>
+        <table name="cfg_profile_certificates" comment="Profile 的 HTTPS 证书">
+          <columns>
+            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="certificate" type="text" comment="公钥证书(PEM)"/>
+            <column name="private_key" type="text" comment="私钥(PEM)"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_profile_certificates" columns="profile_id"/>
+            <foreign-key name="fk_cfg_profile_certificates_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+          </constraints>
+        </table>
         <table name="cfg_profiles" comment="Profile?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
             <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="enableHttps?"/>
             <column name="force_https" type="boolean" nullable="false" defaultValue="true" comment="forceHttps?"/>
             <column name="hostname" type="varchar(255)" comment="hostname?"/>
+            <column name="proxy_by_hostname" type="boolean" nullable="false" defaultValue="false" comment="proxyByHostname?"/>
             <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="httpPort?"/>
             <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="httpsPort?"/>
             <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>
@@ -256,8 +286,6 @@
             <column name="bas_version" type="varchar(255)" nullable="false" comment="basVersion?"/>
             <column name="ssl_ciphers" type="varchar(255)" comment="sslCiphers?"/>
             <column name="ssl_protocols" type="varchar(255)" comment="sslProtocols?"/>
-            <column name="ssl_certificate" type="text" comment="sslCertificate?"/>
-            <column name="ssl_certificate_key" type="text" comment="sslCertificateKey?"/>
             <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
           </columns>
           <constraints>

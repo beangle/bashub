@@ -138,8 +138,8 @@
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
-| 管理台 18 个资源的表映射 | ✅ | 与 `db-0.0.8.xml` 对齐 |
-| `0.0.8` 增量迁移 | ✅ | `cfg_webapps.urls` 已应用；setline 端口迁移到 `cfg_hosts.setline_listen_port` / `cfg_hosts.setline_admin_port`，旧 `cfg_profiles.setline_port` 已移除 |
+| 管理台 18 个资源的表映射 | ✅ | 与 `db/postgresql/db.xml` 对齐 |
+| `0.0.8` schema 收尾 | ✅ | 增量脚本已归档；`init/` 与 `db.xml` 是当前全量；`cfg_webapps.urls`、`cfg_hosts.setline_listen_port` / `setline_admin_port` 已就位，旧 `cfg_profiles.setline_port` 已移除 |
 | D 侧 schema 漂移检查 | ✅ | 启动时告警；`--check-schema` 只检查并返回退出码 3 |
 | 约束冲突错误映射 | ✅ | 唯一键、外键转为 409，非空、检查约束转为 400 |
 

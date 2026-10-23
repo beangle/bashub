@@ -14,7 +14,7 @@ import beangle.data.resource : Column, Derived, Kind, ManyRelation, Registry, Re
 
 import std.string : endsWith;
 
-/// 管理台资源：与前端 `packages/web/src/resources/index.ts` 及 `db-0.0.8.xml` 对齐。
+/// 管理台资源：与前端 `packages/web/src/resources/index.ts` 及 `db/postgresql/db.xml` 对齐。
 /// 自定义动作（版本刷新、菜单导入导出、静态包 gav/location 拆分）仍由应用端点承担。
 Registry hubRegistry() {
   auto items = [

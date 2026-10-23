@@ -307,9 +307,9 @@ basagent 不需要采样间隔或时间窗口配置。
 # 全部存在 → "schema ok"；漂移 → 逐条列出并以退出码 3 结束
 ```
 
-已有 0.0.8 数据库升级时，先停旧后端，再执行
-`src/main/resources/db/postgresql/migrate/0.0.8-15-agent-status-history.sql`。该脚本可重复执行，
-创建节点运行历史表 `bas.mon_server_samples`；全新安装直接执行 `init/*.sql` 即可。
+数据库脚本在仓库根目录 `db/postgresql/`：`db.xml` 是当前 schema，`init/*.sql` 用于全新安装
+（按文件名序号执行）。0.0.8 起不再提供增量迁移脚本；已有旧库需要历史迁移时，从 git 历史取回原
+`migrate/0.0.8-*.sql`。详见 [db/postgresql/README.md](db/postgresql/README.md)。
 
 systemd 服务默认不传 `--listen`，因此读取应用文件的 `listen`，再没有才使用内置
 `127.0.0.1:8080`。如果要在 systemd 层覆盖应用文件，用 drop-in 重写 `ExecStart`：
