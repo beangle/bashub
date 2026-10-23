@@ -58,7 +58,7 @@ unittest {
   assert(emsFromEnvironment(["HOME": "/root"]) is null);
   assert(emsFromEnvironment(["ems.home": ""]) is null);
 
-  auto ems = emsFromEnvironment(["ems.base": "/data/ems", "ems.profile": "bas"]);
+  auto ems = emsFromEnvironment(["ems.home": "/data/ems", "ems.profile": "bas"]);
   assert(ems !is null);
   assert(ems.base == "http://localhost"); // 那个目录下没有 conf.properties，全走缺省
   assert(ems.sid.name == "EMS_SID");

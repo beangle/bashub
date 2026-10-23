@@ -68,33 +68,28 @@ HubArgs parseArgs(string[] args) {
   HubArgs parsed;
   string emsProfile;
   string emsHome;
-  string emsBase;
   getopt(args,
       "check-schema", &parsed.checkSchema,
       "h|help", &parsed.help,
       "listen", &parsed.listen,
       "ems.profile", &emsProfile,
-      "ems.home", &emsHome,
-      "ems.base", &emsBase);
+      "ems.home", &emsHome);
   if (emsProfile.length)
     parsed.options["ems.profile"] = emsProfile;
   if (emsHome.length)
     parsed.options["ems.home"] = emsHome;
-  if (emsBase.length)
-    parsed.options["ems.base"] = emsBase;
   parsed.rest = args;
   return parsed;
 }
 
 private void printUsage() {
-  writeln("Usage: bashub [--ems.profile=<name>] [--ems.home=<dir>] [--ems.base=<dir>]");
+  writeln("Usage: bashub [--ems.home=<dir>] [--ems.profile=<name>]");
   writeln("              [--listen=<host:port>] [--check-schema]");
   writeln();
   writeln("  --check-schema       只检查库表/列是否与资源定义一致，然后退出");
   writeln("  --listen=<host:port> 覆盖应用文件中的监听地址；内置缺省 127.0.0.1:8080");
-  writeln("  --ems.profile=<name> 指定 ems 部署 profile，如 --ems.profile=bas");
-  writeln("  --ems.home=<dir>     直接指定 ems home，如 --ems.home=/data/ems/bas");
-  writeln("  --ems.base=<dir>     指定 ems base，缺省 ~/.ems");
+  writeln("  --ems.home=<dir>     ems 根目录（缺省 ~/.ems），profile 在它下面");
+  writeln("  --ems.profile=<name> 选择 ems 根目录下的 profile，如 --ems.profile=bas");
   writeln("  -h, --help           显示帮助");
 }
 

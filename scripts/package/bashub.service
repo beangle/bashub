@@ -5,12 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ems
+User=bas
 Group=beangle
-Environment=HOME=/var/lib/beangle-ems
-WorkingDirectory=/var/lib/beangle-ems
-# profile 定位到 /var/lib/beangle-ems/<profile>
-ExecStart=/usr/bin/bashub --ems.profile=bas --ems.base=/var/lib/beangle-ems
+Environment=HOME=/var/lib/bas
+WorkingDirectory=/var/lib/bas
+# profile 定位到 /var/lib/bas/.ems/<profile>
+ExecStart=/usr/bin/bashub --ems.home=/var/lib/bas/.ems --ems.profile=bas
 Restart=on-failure
 # 配置或数据库初始化失败时 exit 2，不进行无意义的重启。
 RestartPreventExitStatus=2

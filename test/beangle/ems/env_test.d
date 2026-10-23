@@ -69,20 +69,19 @@ unittest {
   assert(readConfig(buildPath(dir, "nope")).length == 0);
 }
 
-@("findHome：ems.home 优先，其次 ems.base + profile 目录")
+@("findHome：ems.home 是根目录（缺省 ~/.ems），ems.profile 选择其下目录")
 unittest {
-  assert(findHome(["ems.home": "/data/ems/bas"]) == "/data/ems/bas");
-  assert(findHome(["ems.home": "", "ems.base": "/data/ems", "ems.profile": "bas"]) == "/data/ems/bas");
-  assert(findHome(["ems.base": "/var/lib/beangle-ems", "ems.profile": "bas"]) ==
-      "/var/lib/beangle-ems/bas");
+  assert(findHome(["ems.home": "/data/ems", "ems.profile": "bas"]) == "/data/ems/bas");
+  assert(findHome(["ems.home": "/srv/ems", "ems.profile": "bas"]) == "/srv/ems/bas");
   assert(findHome(["HOME": "/root", "ems.profile": "x"]) == "/root/.ems/x");
+  assert(findHome(["HOME": "/root"]) == "/root/.ems/local");
 
   auto base = uniqueTempDir("bashub-ems-home-");
   scope (exit) rmdirRecurse(base);
   mkdir(buildPath(base, "bas"));
-  assert(findHome(["ems.base": base]) == buildPath(base, "bas"));
+  assert(findHome(["ems.home": base]) == buildPath(base, "bas"));
 
   auto empty = uniqueTempDir("bashub-ems-empty-");
   scope (exit) rmdirRecurse(empty);
-  assert(findHome(["ems.base": empty]) == buildPath(empty, "local"));
+  assert(findHome(["ems.home": empty]) == buildPath(empty, "local"));
 }

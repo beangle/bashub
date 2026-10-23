@@ -28,12 +28,11 @@ import std.getopt : GetOptException;
 
 @("D-style command line options are parsed and removed from vibe arguments") unittest {
   auto parsed = parseArgs(["bashub", "--check-schema",
-      "--listen=0.0.0.0:8888", "--ems.profile=bas", "--ems.home", "/data/ems/bas", "--ems.base=/tmp/ems"]);
+      "--listen=0.0.0.0:8888", "--ems.profile=bas", "--ems.home", "/data/ems/bas"]);
   assert(parsed.checkSchema);
   assert(parsed.listen == "0.0.0.0:8888");
   assert(parsed.options["ems.profile"] == "bas");
   assert(parsed.options["ems.home"] == "/data/ems/bas");
-  assert(parsed.options["ems.base"] == "/tmp/ems");
   assert(parsed.rest == ["bashub"]);
 }
 

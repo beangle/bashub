@@ -106,14 +106,14 @@ Ems loadEms(string home, string[string] properties) {
   return new Ems(loadEnv(home, properties));
 }
 
-/** 按环境变量建 Ems；`ems.home`/`ems.base`/`ems.profile` 一个都没配就返回 null。
+/** 按环境变量建 Ems；`ems.home`/`ems.profile` 一个都没配就返回 null。
  *
  * 返回 null 而不是「凭空造一套缺省」：宿主没跑在 ems 部署下时，不该被悄悄换掉缺省行为。
  */
 Ems emsFromEnvironment(string[string] vars = null) {
   if (vars is null)
     vars = processEnv();
-  if (!hasValue(vars, "ems.home") && !hasValue(vars, "ems.base") && !hasValue(vars, "ems.profile"))
+  if (!hasValue(vars, "ems.home") && !hasValue(vars, "ems.profile"))
     return null;
   auto home = findHome(vars);
   return loadEms(home, readConfig(home));

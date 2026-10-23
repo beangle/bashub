@@ -48,14 +48,10 @@ string[string] processEnv() {
   return environment.toAA();
 }
 
-/// 定位 `ems.home`：优先同名环境变量，其次 `ems.base`（缺省 `~/.ems`）下的一个 profile 目录。
-/// profile 用 `ems.profile` 指定；没指定就取第一个，一个都没有就退回 `local`（与 scala `findHome` 同规则）。
+/// 定位 ems home：`ems.home` 是根目录（缺省当前用户主目录下的 `.ems`），`ems.profile` 选择其下的
+/// profile 目录。profile 没指定就取第一个，一个都没有就退回 `local`。
 string findHome(string[string] vars) {
-  auto home = vars.get("ems.home", null);
-  if (home !is null && home.length > 0)
-    return home;
-
-  auto base = vars.get("ems.base", null);
+  auto base = vars.get("ems.home", null);
   if (base is null || base.length == 0) {
     auto userHome = vars.get("HOME", null);
     if (userHome is null || userHome.length == 0)

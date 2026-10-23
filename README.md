@@ -181,9 +181,9 @@ src/bashub/                 业务：BAS 控制台这一份
   按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/bashub/micdn/{profile}/micdn.xml` 输出
   Profile 的完整 micdn 配置；`GET /api/bashub/config/{profile}/script/{host}` 按 Host 平台与
   特性依赖生成检查脚本。真实库的 server.xml 已通过 basctl 的 `bas-1.0.0.xsd`。
-- **ems 部署常量**（`beangle.ems`）：宿主配了 `ems.home`（或 `ems.base`/`ems.profile`）就按
-  ems 规则读 `home/conf.properties`，推出 base/cas/portal/api/`inner_base` 与两个会话
-  cookie 常量，直接用于运行时配置——所以「换一套 ems 部署」= 换一个 `ems.home`，
+- **ems 部署常量**（`beangle.ems`）：宿主配了 `ems.home`（根目录，缺省 `~/.ems`）和
+  `ems.profile` 就按 ems 规则读 `home/conf.properties`，推出 base/cas/portal/api/`inner_base` 与两个
+  会话 cookie 常量，直接用于运行时配置——所以「换一套 ems 部署」= 换 `ems.home`/`ems.profile`，
   `session_id_name` 这类量不会被另一份 XML 覆盖。
   `EmsApp` 的清单解析（`<ems app-name>` → `/platform/testwebapp`）也一并移植了，供将来用。
 - **数据源取自 ems**（`beangle.ems.datasource`）：按 ems 数据源顺序读
@@ -245,8 +245,9 @@ dub test --compiler=ldc2                 # 跑单测
 ```
 
 bashub 没有独立的运行配置文件，也不会从固定路径读取文件。启动时必须提供
-`--ems.profile` 或 `--ems.home`；`--ems.base` 用于指定 profile 根。命令行采用
-D/POSIX 风格的长选项，`--key=value` 与 `--key value` 两种写法都支持：
+`--ems.profile` 或 `--ems.home`：`--ems.home` 是 ems 根目录（缺省当前用户主目录下的 `.ems`），
+`--ems.profile` 选择其下的 profile。命令行采用 D/POSIX 风格的长选项，`--key=value` 与
+`--key value` 两种写法都支持：
 
 ```bash
 ./target/d/bashub --ems.profile=bas
@@ -258,7 +259,7 @@ D/POSIX 风格的长选项，`--key=value` 与 `--key value` 两种写法都支�
 日志、API 前缀、授权刷新与组件版本刷新间隔使用内置缺省；监听可由应用文件或命令行覆盖；
 数据库、CAS、EMS 地址与会话 cookie 全部从 ems profile 推导。没有 EMS profile 时 bashub 直接拒绝启动。
 缺省监听 `127.0.0.1:8080`，`--listen` 可用 `host:port` 覆盖绑定地址和端口。
-`--ems.profile`、`--ems.home`、`--ems.base` 覆盖同名环境变量。
+`--ems.profile`、`--ems.home` 覆盖同名环境变量。
 JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报错退出，不会忽略或透传给 vibe。
 
 **为什么还要自己接管 argv**：bashub 需要先消费自己的选项，再把剩余参数交给 vibe。编译期开
@@ -311,7 +312,7 @@ systemd 服务默认不传 `--listen`，因此读取应用文件的 `listen`，�
 # /etc/systemd/system/bashub.service.d/listen.conf
 [Service]
 ExecStart=
-ExecStart=/usr/bin/bashub --ems.profile=bas --ems.base=/var/lib/beangle-ems --listen=0.0.0.0:8888
+ExecStart=/usr/bin/bashub --ems.home=/var/lib/bas/.ems --ems.profile=bas --listen=0.0.0.0:8888
 ```
 
 然后执行：
@@ -358,17 +359,17 @@ scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revisio
 两个脚本都接受一个可选的 revision 参数。安装布局：
 
 - `/usr/bin/bashub`
-- `/var/lib/beangle-ems/`：ems 根目录
-- `/var/log/beangle-ems/bashub`：bashub 日志目录
+- `/var/lib/bas/.ems/`：ems 根目录（profile 在其下，如 `/var/lib/bas/.ems/bas`）
+- `/var/log/bas/bashub`：bashub 日志目录
 - `/usr/lib/systemd/system/bashub.service`
 
-服务固定以 `--ems.profile=bas --ems.base=/var/lib/beangle-ems` 启动，监听地址优先取应用文件的
+服务固定以 `--ems.home=/var/lib/bas/.ems --ems.profile=bas` 启动，监听地址优先取应用文件的
 `listen`，最后才用内置 `127.0.0.1:8080`；systemd drop-in 仍可用 `--listen` 强制覆盖。
-ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `/var/lib/beangle-ems/bas`；
-数据库、CAS 等来自该 profile 的应用文件；监听地址也可由命令行覆盖。前端 SPA 按 `packages/web`
-自己的发布流程单独部署，并把 `/api/` 反代到 bashub。准备好 profile 后启动
-`systemctl enable --now bashub`。包安装的服务以 `ems:beangle` 运行；RPM/DEB 只会在
-系统缺少该用户时创建它，不会覆盖已有的 `ems` 用户。
+ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.ems/bas`，数据库、CAS 等
+来自该目录的应用文件；前端 SPA 按
+`packages/web` 自己的发布流程单独部署，并把 `/api/` 反代到 bashub。准备好 ems home 后启动
+`systemctl enable --now bashub`。包安装的服务以 `bas:beangle` 运行；RPM/DEB 只会在
+系统缺少该用户时创建它，不会覆盖已有的 `bas` 用户（与 basctl 共用同一账号）。
 
 ## 功能边界（尚未实现与已补齐）
 
@@ -446,10 +447,9 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   （`cas` 缺省 = `base + "/cas"`，配了 `ems.home` 就等于打开 CAS 会话）。
   读的是 `ems.home/conf.properties`，按 **JDK Properties 口径**解析（每个字节当 Latin-1 字符 +
   `\uXXXX` + `\` 续行 + `#`/`!` 注释）——解析口径与 JVM 一致，差一个转义就会配错。
-  `ems.home` 优先，其次 `ems.base`（缺省 `~/.ems`）下的一个 profile 目录（`ems.profile` 指定或取
-  第一个，只认目录）；命令行没有 JVM 系统属性，改用**同名环境变量 +
-  `--ems.home`/`--ems.base`/`--ems.profile` 命令行覆盖**（命令行优先）。
-  三个 `ems.*` 都没配时 `emsFromEnvironment` 返回 null，bashub 拒绝启动。
+  `ems.home` 是根目录（缺省 `~/.ems`），其下用 `ems.profile` 选一个 profile 目录（未指定取第一个，
+  只认目录）；命令行没有 JVM 系统属性，改用**同名环境变量 + `--ems.home`/`--ems.profile`
+  命令行覆盖**（命令行优先）。两个 `ems.*` 都没配时 `emsFromEnvironment` 返回 null，bashub 拒绝启动。
 - **库连接也是「一处定义」**：ems 应用文件 `${home}${path}.xml` 的
   `<datasource name="default">` > `${home}/resources.xml` > 没有（启动失败，不再退回内存演示数据）。
   解析口径：`<driver>` 空就从 `jdbc:` url 里推 driver 名、
