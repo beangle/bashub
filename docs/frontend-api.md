@@ -220,18 +220,19 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   本仓库 D 侧的 `bashub.agent.*` 是服务端实现（信封编解码 + 现状快照 + 内存登记册 + 握手鉴权），
   行为以同一份协议文档为准。
 - 读完整现状：`GET /api/bashub/monitor/agents/status` → `{"agents":[…]}`，**每台机器一项**（同一 profile
-  可能有多项，按 `ip` 区分）：profile / ip / host / org / basctl / bas / basHome / supports /
-  connectedAt / lastSeenAt / os / basReport / health。只在线的、只留最近一次；断连即摘除。`basReport.instances` 只含运行中实例；
+  可能有多项，按 `ip` 区分）：profile / profileId / ip / host / org / basctl / bas / basHome /
+  supports / connectedAt / lastSeenAt / os / basReport / health。`profileId` 供前端跳到配置详情。
+  只在线的、只留最近一次；断连即摘除。`basReport.instances` 只含运行中实例；
   `basReport.declared` 是本机 `server.xml` 声明的实例，控制台按 `id` 合并两者，停止后仍保留实例行并
   提供启动入口。`org` 是 profile 所属机构的展示信息 `{name,title,shortTitle,logoUrl}`（按 profile
   名的 `org.` 前缀从 `organizations` 查得），SPA 用它当卡片大标题与 Logo；查不到就省略该字段。
 - 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，每台机器一项，只含
-  profile / ip / host / org / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health
+  profile / profileId / ip / host / org / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health
   以及 `running` / `stopped` 计数，不携带 OS 与 webapps，供不需要实例明细的调用方使用。SPA 的实例表
   要显示 pid / 端口 / webapps，因此每 30 秒轮询的是完整 `/agents/status`；点节点的“刷新”会先让 agent
   重报再取一次。
 - 读运行历史：`GET /api/bashub/monitor/agents/{profile}/history?days=180`。`days` 取 1–180，
-  缺省调用方传 180。返回 `{profile, from, to, days, samples:[{at, servers:{id:state}}]}`，
+  缺省调用方传 180。返回 `{profile, profileId, from, to, days, samples:[{at, servers:{id:state}}]}`，
   `samples` 按时间升序；页面一次取回整个 profile 的所有 server 状态，再在 SPA 本地计算
   每个 server 的每日运行/停止/异常计数、可用率、最近状态和状态变化。单 server 视图直接复用
   这份数据，不再按 `instance` 单独请求。
@@ -275,4 +276,5 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   webapps 明细按需加载。支持刷新节点快照（先下发 `report:now`，再读 `/agents/status`）、按区间读实例
   或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；节点快照每 30 秒自动刷新一次。
   多个 profile 同时在线时**一次只展示一个**：右上角下拉切换，选择记在浏览器 localStorage，当前 profile
-  离线后自动退回列表里的第一个。
+  离线后自动退回列表里的第一个。运行历史是独立页面 `/monitor/agents/:profile/history`；卡片头部的
+  “配置”按 `profileId` 跳到该 profile 的配置详情。

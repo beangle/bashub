@@ -248,6 +248,7 @@ final class AgentSession {
   Json status() {
     auto item = Json.emptyObject;
     item["profile"] = Json(profile);
+    item["profileId"] = Json(profileId);
     item["ip"] = Json(ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
@@ -272,6 +273,7 @@ final class AgentSession {
   Json summary() {
     auto item = Json.emptyObject;
     item["profile"] = Json(profile);
+    item["profileId"] = Json(profileId);
     item["ip"] = Json(ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);

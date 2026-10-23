@@ -68,6 +68,8 @@ export interface AgentOrganization {
 /** `GET /api/bashub/monitor/agents/status` 里的一项：一台在线节点此刻的样子。 */
 export interface AgentStatus {
   profile: string
+  /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
+  profileId?: string
   /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
   ip?: string
   host?: string
@@ -94,6 +96,8 @@ export interface AgentHealth {
 /** `GET /api/bashub/monitor/agents/summary`：在线列表轮询用的轻量摘要。 */
 export interface AgentSummary {
   profile: string
+  /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
+  profileId?: string
   /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
   ip?: string
   host?: string
@@ -117,6 +121,8 @@ export interface AgentHistorySample {
 
 export interface AgentHistory {
   profile: string
+  /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
+  profileId?: string
   from: string
   to: string
   days: number

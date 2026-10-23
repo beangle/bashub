@@ -181,6 +181,7 @@ unittest {
   assert(status.length == 2);
   assert(status[0]["ip"].get!string == "10.0.0.10");
   assert(status[1]["ip"].get!string == "10.0.0.11");
+  assert(status[0]["profileId"].get!string == "1001");
 
   // 同一 IP 重连只顶掉自己，另一台不受影响
   auto a2 = registry.attach("openurp.prod", "1001", "10.0.0.10");

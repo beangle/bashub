@@ -119,6 +119,7 @@ final class PostgresAgentHistoryStore : AgentHistoryStore {
     auto now = Clock.currTime();
     auto since = now - days(cast(long) boundedDays);
     auto doc = Json.emptyObject;
+    doc["profileId"] = Json(pid);
     doc["profile"] = Json(profileName);
     doc["from"] = Json(since.toISOExtString);
     doc["to"] = Json(now.toISOExtString);

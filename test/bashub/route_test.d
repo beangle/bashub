@@ -253,7 +253,7 @@ unittest {
   assert(ex.status == 200);
   assert(parseJson(ex.body)["agents"].get!(Json[]).length == 0);
 
-  agents.attach("openurp.prod").host = "app1";
+  agents.attach("openurp.prod", "1002").host = "app1";
   agents.attach("openurp.demo").host = "app0";
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/monitor/agents/status");
   assert(ex.status == 200);
@@ -261,6 +261,7 @@ unittest {
   assert(list.length == 2);
   assert(list[0]["profile"].get!string == "openurp.demo");
   assert(list[1]["host"].get!string == "app1");
+  assert(list[1]["profileId"].get!string == "1002", "前端用 profileId 跳到配置详情");
   // 卡片大标题：按 profile 的 org 前缀补上机构展示信息
   assert(list[0]["org"]["name"].get!string == "openurp");
   assert(list[0]["org"]["title"].get!string == "OpenURP 高校教务");
