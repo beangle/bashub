@@ -337,7 +337,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'version', label: '版本', required: true, width: '12%', cell: { type: 'updatable' } },
       { key: 'contextPath', label: '上下文', required: true },
       { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，反代与 setline 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
-      { key: 'unpack', label: '解压执行', type: 'boolean' },
+      { key: 'unpack', label: '解压执行', type: 'boolean', width: 70 },
       { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, help: '只能选择配置了 Setline 监听端口的主机上的服务' },
       { key: 'libs', label: '扩展库', type: 'textarea', rows: 6, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
     ],
