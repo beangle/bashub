@@ -261,6 +261,10 @@ unittest {
   assert(list.length == 2);
   assert(list[0]["profile"].get!string == "openurp.demo");
   assert(list[1]["host"].get!string == "app1");
+  // 卡片大标题：按 profile 的 org 前缀补上机构展示信息
+  assert(list[0]["org"]["name"].get!string == "openurp");
+  assert(list[0]["org"]["title"].get!string == "OpenURP 高校教务");
+  assert(list[1]["org"]["shortTitle"].get!string == "URP");
 }
 
 @("agents/summary returns health counts without full snapshots") unittest {
@@ -422,6 +426,37 @@ unittest {
   auto messages = session.takeOutbound();
   assert(messages.length == 1);
   assert(parseJson(messages[0])["type"].get!string == "report:now");
+}
+
+
+@("agent commands need ?agent= when one profile has several agents") unittest {
+  auto agents = new AgentRegistry();
+  auto router = newRouter(false, agents);
+
+  auto a = agents.attach("openurp.prod", "1002", "10.0.0.10");
+  auto b = agents.attach("openurp.prod", "1002", "10.0.0.11");
+  Envelope hello;
+  assert(parse(`{"type":"hello","at":"2026-10-16T10:00:00+08:00",
+      "body":{"host":"app1","supports":["hello","report:now"]}}`, hello));
+  a.accept(hello);
+  assert(parse(`{"type":"hello","at":"2026-10-16T10:00:00+08:00",
+      "body":{"host":"app2","supports":["hello","report:now"]}}`, hello));
+  b.accept(hello);
+
+  auto ex = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report");
+  assert(ex.status == 409, ex.body);
+  assert(parseJson(ex.body)["errors"][0]["detail"].get!string.canFind("?agent="));
+
+  ex = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report?agent=10.0.0.11");
+  assert(ex.status == 202, ex.body);
+  assert(a.takeOutbound().length == 0);
+  assert(b.takeOutbound().length == 1);
+
+  ex = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report?agent=10.0.0.99");
+  assert(ex.status == 404, ex.body);
 }
 
 @("agents/service validates the action, instance and agent capability")

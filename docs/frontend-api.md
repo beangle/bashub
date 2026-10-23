@@ -209,52 +209,59 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   `{profile}` 同时参与校验；仍兼容只发 `<Profile.key>` 的旧客户端。
   未通过的连接在握手阶段被关掉，拿不到一个字节的协议。因此这一段路径**必须放行**（不能挂 CAS
   拦截器，升级请求不能被 302）。
-- 端点：`ws(s)://<host>/api/bashub/monitor/agents/{profile}/channel`；一个 profile 一条连接，重复登录踢掉旧连接
-  （旧连接收到 1008 `superseded`）。正常重连时旧连接常常还没超时，这一次顶替不告警；同一 profile 在
-  60 秒内被反复顶掉，才说明两个 agent 共用一个 profile 在互相踢，hub 会记一条 WARN
-  （`agent replaced again …; two basagents may share this profile`），同一 profile 每分钟最多一条。
+- 端点：`ws(s)://<host>/api/bashub/monitor/agents/{profile}/channel`；**一个 profile 可以有多条连接**
+  （多台机器共用一个 profile），按握手头 `ip: <addr>[,<addr>…]` 区分：hub 过滤掉非法地址，只保留与
+  profile/hosts 配置命中的那个作为 `profile@ip` 身份。不同 IP 的连接并存，只有同一 IP 重新登录才顶替
+  旧连接（1008 `superseded`）。头里没有合法 IP 返回 400，合法但不在该 profile 的 `ip` / `hosts.ip`
+  里返回 403（不做“没配置就放行”的兜底）——不把多台机器折叠成一条连接。同一 `profile@ip` 60 秒内
+  反复被顶掉时记一条 WARN（`agent reconnected again …`），每分钟最多一条。
 - 消息协议、原语表、节拍：**唯一权威在 basctl 仓库**
   （[docs/channel-protocol.md](https://github.com/beangle/basctl/blob/main/docs/channel-protocol.md)），
   本仓库 D 侧的 `bashub.agent.*` 是服务端实现（信封编解码 + 现状快照 + 内存登记册 + 握手鉴权），
   行为以同一份协议文档为准。
-- 读完整现状：`GET /api/bashub/monitor/agents/status` → `{"agents":[…]}`，每项是「这台机器此刻的样子」
-  （profile / host / basctl / bas / basHome / supports / connectedAt / lastSeenAt / os / basReport /
-  health）。只在线的、只留最近一次；断连即摘除。`basReport.instances` 只含运行中实例；
+- 读完整现状：`GET /api/bashub/monitor/agents/status` → `{"agents":[…]}`，**每台机器一项**（同一 profile
+  可能有多项，按 `ip` 区分）：profile / ip / host / org / basctl / bas / basHome / supports /
+  connectedAt / lastSeenAt / os / basReport / health。只在线的、只留最近一次；断连即摘除。`basReport.instances` 只含运行中实例；
   `basReport.declared` 是本机 `server.xml` 声明的实例，控制台按 `id` 合并两者，停止后仍保留实例行并
-  提供启动入口。
-- 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，只含
-  profile / host / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health 以及
-  `running` / `stopped` 计数，不携带 OS 与 webapps。SPA 在线列表每 30 秒轮询此接口，点节点的“刷新”
-  时才读取完整 `/agents/status`。
+  提供启动入口。`org` 是 profile 所属机构的展示信息 `{name,title,shortTitle,logoUrl}`（按 profile
+  名的 `org.` 前缀从 `organizations` 查得），SPA 用它当卡片大标题与 Logo；查不到就省略该字段。
+- 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，每台机器一项，只含
+  profile / ip / host / org / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health
+  以及 `running` / `stopped` 计数，不携带 OS 与 webapps，供不需要实例明细的调用方使用。SPA 的实例表
+  要显示 pid / 端口 / webapps，因此每 30 秒轮询的是完整 `/agents/status`；点节点的“刷新”会先让 agent
+  重报再取一次。
 - 读运行历史：`GET /api/bashub/monitor/agents/{profile}/history?days=180`。`days` 取 1–180，
   缺省调用方传 180。返回 `{profile, from, to, days, samples:[{at, servers:{id:state}}]}`，
   `samples` 按时间升序；页面一次取回整个 profile 的所有 server 状态，再在 SPA 本地计算
   每个 server 的每日运行/停止/异常计数、可用率、最近状态和状态变化。单 server 视图直接复用
   这份数据，不再按 `instance` 单独请求。
   历史来自 `bas.mon_server_samples`，每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`），
-  只在 hub 的 `agent-health-*` 采样窗口内由 `report:health` 触发写入，保留 180 天；历史存储未启用时
-  返回 503，profile 不存在返回 404，表未迁移或其他数据库查询失败返回 500。
+  只在 hub 的 `agent-health-*` 采样窗口内由 `report:health` 触发写入：同一 profile 下所有 agent 的
+  health 先合并成一份（按 server id 取并集），同一分钟重复触发用最新合并结果覆盖，保留 180 天；
+  历史存储未启用时返回 503，profile 不存在返回 404，表未迁移或其他数据库查询失败返回 500。
 - 授权：`/api/bashub/monitor/agents/*` 的 GET（在线状态、历史、日志）允许已登录用户查看；
   立即上报、启停实例等写操作要求 EMS 中 `bas-hub` 的 `/monitor/agents` 资源为 **Private**
   且已授权当前用户的角色。EMS 会话的 `authorities` 是角色 ID（如 `"42"`），JSON 会话也没有
   `isRoot`，因此不能按 `ROLE_ADMIN` 或 root 配置。资源未登记、资源不是 Private 或角色不命中时，
   写操作一律 403；资源授权缓存最长 300 秒刷新。其它 CAS 来源若在 `permissions` 中提供
   `/monitor/agents:*`，也可作为显式授权。
-- 立即刷新：`POST /api/bashub/monitor/agents/{profile}/report` → 202 表示 `report:now` 已入队；节点离线 404，
-  agent 未申报该能力 409。随后到达的 `report:os` / `report:bas` 会覆盖现状。
-- 读日志：`GET /api/bashub/monitor/agents/{profile}/log?instance={farm.server}&from={from}&to={to}&tail={n}`。
+- 选 agent：同一 profile 有多台在线 agent 时，写操作和日志类接口用 `?agent=<ip>` 指定目标
+  （`ip` 取自 `/agents/status`）；只有一台时可以省略；多台且省略返回 409，附带可选地址列表。
+- 立即刷新：`POST /api/bashub/monitor/agents/{profile}/report[?agent=<ip>]` → 202 表示 `report:now`
+  已入队；节点离线 404，agent 未申报该能力 409。随后到达的 `report:os` / `report:bas` 会覆盖现状。
+- 读日志：`GET /api/bashub/monitor/agents/{profile}/log?instance={farm.server}&from={from}&to={to}&tail={n}[&agent=<ip>]`。
   `instance` 必填且只能是一层普通目录名；`from` / `to` 可省略，省略时交给 agent 取默认窗口；
   `tail` 只在 `from` / `to` 都省略时生效，取最后 N 行。
   成功返回 `{total, from, to, lines:[…]}`；节点离线 404、5 秒无应答 504、agent 返回失败 502。
-- 读 agent 日志：`GET /api/bashub/monitor/agents/{profile}/agent-log?from={from}&to={to}&tail={n}`。
+- 读 agent 日志：`GET /api/bashub/monitor/agents/{profile}/agent-log?from={from}&to={to}&tail={n}[&agent=<ip>]`。
   窗口参数与实例日志相同，但没有 `instance`；返回同样的 `{total, from, to, lines:[…]}`。
-- 启停实例：`POST /api/bashub/monitor/agents/{profile}/service/{action}`，`action` 取 `start` / `stop` /
+- 启停实例：`POST /api/bashub/monitor/agents/{profile}/service/{action}[?agent=<ip>]`，`action` 取 `start` / `stop` /
   `restart`，body 为 `{"instance":"{farm.server}"}`。接口等到 agent 执行完才返回，成功为
   `{"data":{"state":"running"|"stopped","pid":123}}`；节点离线 404、未申报能力 409、
   2 分钟无应答 504、agent 执行失败 502。`stop` / `restart` 是破坏性动作，前端二次确认。
 - 启停失败详情：502 错误文档的 `errors[0].meta` 可带 `{detail?, logTail?, truncated?}`。`detail`
   最多 8 KiB，`logTail` 最多 100 行；完整内容继续通过实例日志接口读取。
-- 跟随日志：`GET /api/bashub/monitor/agents/{profile}/log/follow?instance={farm.server}&tail={n}`，
+- 跟随日志：`GET /api/bashub/monitor/agents/{profile}/log/follow?instance={farm.server}&tail={n}[&agent=<ip>]`，
   响应 `text/event-stream`。首次取最后 `tail` 行（缺省 200、上限 2000），之后 hub 每 3 秒向 agent
   发一次 `log:read`，增量用 `from=上次 to + 1`；浏览器侧只维持一条 SSE 连接。
   - `event: lines`，`data` 为 `{total, from, to, lines, reset}`。`reset=true` 表示首次尾部或
@@ -266,4 +273,4 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   - agent 侧协议不变：仍是普通区间 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
 - SPA 页面：`/monitor/agents` 展示在线节点、实例状态、运行历史与 `hello.supports`；操作系统指标与
   webapps 明细按需加载。支持刷新节点快照（先下发 `report:now`，再读 `/agents/status`）、按区间读实例
-  或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；轻量摘要每 30 秒刷新一次。
+  或 agent 日志、SSE 跟随与实例重启 / 停止。跟随断线由 `EventSource` 自动重连；节点快照每 30 秒自动刷新一次。

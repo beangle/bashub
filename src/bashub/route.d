@@ -25,7 +25,7 @@ import beangle.security.session : Session, SessionRepo, nowSeconds;
 
 import bashub.artifactversion : refreshArtifactVersions;
 import bashub.agent.channel : bearer;
-import bashub.agent.registry : AgentRegistry, RequestOutcome;
+import bashub.agent.registry : AgentRegistry, AgentSession, RequestOutcome;
 import bashub.agent.socket : HealthSchedule, serveAgentSocket;
 import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
@@ -36,7 +36,8 @@ import bashub.profile.micdnconfig : MicdnConfigException, MicdnProfileView, Micd
   micdnProfileDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProfile,
   validateComponentName, validateMountName;
 import bashub.profile.proxy : renderProxy;
-import bashub.profile.resolver : ProfileContext, dataOf, findProfile, findProfileById, loadAll, resolveProfile;
+import bashub.profile.resolver : ProfileContext, dataOf, findProfile, findProfileById, ipHeaderAddresses,
+  loadAll, matchProfileIp, resolveProfile;
 import bashub.profile.script : renderHostScript;
 import bashub.profile.server : renderServerXml;
 import bashub.profile.peers : renderPeers;
@@ -47,7 +48,7 @@ import core.time : seconds;
 import vibe.data.json : Json;
 import vibe.core.core : sleep;
 import vibe.core.path : toNativeString;
-import vibe.core.log : logDebug, logError;
+import vibe.core.log : logDebug, logError, logWarn;
 import vibe.http.common : HTTPStatus;
 import vibe.http.router : URLRouter;
 import vibe.http.server : HTTPServerRequest, HTTPServerRequestHandler, HTTPServerResponse;
@@ -55,7 +56,7 @@ import beangle.security.web : SecurityContext, requestOrigin;
 import beangle.web.http : withWebAccess;
 
 import std.algorithm : canFind, sort;
-import std.array : appender;
+import std.array : appender, join;
 import std.base64 : Base64;
 import std.conv : ConvException, to;
 import std.file : read;
@@ -769,9 +770,62 @@ class HubService {
       res.writeBody("", HTTPStatus.unauthorized);
       return;
     }
+    // 身份 = profile + agent 上报的服务器 IP：同一 profile 的多台机器各占一条连接。
+    // 头里可以带多个地址（多网卡）；只接受 profile / hosts 里声明过的那个，命中才放行。
+    auto reportedIps = ipHeaderAddresses(req.headers.get("ip", ""));
+    if (reportedIps.length == 0) {
+      writeJsonApi(res, errorDocument(400, "请求参数非法",
+          "agent must report a valid ip in the `ip` header; got: " ~ req.headers.get("ip", ""), "ip"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    string agentIp;
+    if (!matchProfileIp(reg, store, profile, reportedIps, agentIp)) {
+      writeJsonApi(res, errorDocument(403, "来源 IP 未授权",
+          "agent ip is not declared for profile " ~ name ~ ": " ~ reportedIps.join(","), "ip"),
+          HTTPStatus.forbidden);
+      return;
+    }
     auto health = HealthSchedule(cfg.agentHealthIntervalSeconds, cfg.agentHealthStartMinute,
         cfg.agentHealthEndMinute);
-    serveAgentSocket(agents, name, profile.id, req, res, health);
+    serveAgentSocket(agents, name, profile.id, agentIp, req, res, health);
+  }
+
+  /// `org.name` → 机构展示信息（标题/简称/Logo）；监控卡片用它替掉主机名当大标题。
+  private Json[string] organizationIndex() {
+    Json[string] index;
+    try {
+      Query q;
+      q.pageSize = 100000;
+      foreach (org; dataOf(store.search(reg.find("organizations"), q))) {
+        auto name = attributeText(org, "name");
+        if (!name.length)
+          continue;
+        index[name] = Json([
+            "name": Json(name),
+            "title": Json(attributeText(org, "title")),
+            "shortTitle": Json(attributeText(org, "shortTitle")),
+            "logoUrl": Json(attributeText(org, "logoUrl")),
+          ]);
+      }
+    } catch (Exception e) {
+      // 机构信息只是展示增强，查不到不能把在线状态一起弄挂
+      logWarn("Load organizations for agent cards failed: %s", e.msg);
+    }
+    return index;
+  }
+
+  /// 给在线节点补 `org`：profile 名是 `org.name`，取第一个 `.` 之前的部分查机构。
+  private Json withOrganization(Json agentsJson) {
+    auto index = organizationIndex();
+    foreach (ref item; agentsJson) {
+      auto profileName = jsonText(item["profile"]);
+      auto dot = profileName.indexOf('.');
+      auto orgName = dot > 0 ? profileName[0 .. dot] : "";
+      if (auto found = orgName in index)
+        item["org"] = *found;
+    }
+    return agentsJson;
   }
 
   /// `GET /api/bashub/monitor/agents/status`：在线节点现状，只在线的、只留最近一次。
@@ -779,7 +833,7 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
     auto doc = Json.emptyObject;
-    doc["agents"] = agents.status;
+    doc["agents"] = withOrganization(agents.status);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -788,7 +842,7 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
     auto doc = Json.emptyObject;
-    doc["agents"] = agents.summary;
+    doc["agents"] = withOrganization(agents.summary);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -824,6 +878,36 @@ class HubService {
     }
   }
 
+  /**
+   * 选一台在线 agent：`?agent=<ip>` 精确指定；只有一台时省略即可；多台且没指定返回 409。
+   *
+   * 返回 null 时响应已经写好（404 离线 / 409 需要指定）。
+   */
+  private AgentSession pickAgent(HTTPServerRequest req, HTTPServerResponse res, string profile) {
+    auto ip = req.query.get("agent", "").strip;
+    if (ip.length) {
+      auto session = agents.find(profile, ip);
+      if (session is null)
+        writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ profile ~ "@" ~ ip),
+            HTTPStatus.notFound);
+      return session;
+    }
+    auto sessions = agents.sessionsOf(profile);
+    if (sessions.length == 0) {
+      writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ profile), HTTPStatus.notFound);
+      return null;
+    }
+    if (sessions.length == 1)
+      return sessions[0];
+    string[] ips;
+    foreach (session; sessions)
+      ips ~= session.ip;
+    writeJsonApi(res, errorDocument(409, "请指定 agent",
+        "multiple agents online for " ~ profile ~ " (" ~ ips.join(",") ~ "); pass ?agent=<ip>", "agent"),
+        HTTPStatus.conflict);
+    return null;
+  }
+
   /// `POST /api/bashub/monitor/agents/{profile}/report`：要求在线 agent 立即上报一次。
   ///
   /// `report:now` 没有 body 回执，真正的 `report:os` / `report:bas` 会随后到达并覆盖快照；
@@ -833,17 +917,15 @@ class HubService {
       return;
 
     auto profile = req.params.get("profile", "");
-    auto session = agents.find(profile);
-    if (session is null) {
-      writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ profile), HTTPStatus.notFound);
+    auto session = pickAgent(req, res, profile);
+    if (session is null)
       return;
-    }
     if (!session.supportsPrimitive("report:now")) {
       writeJsonApi(res, errorDocument(409, "节点不支持该指令", "unsupported:report:now"),
           HTTPStatus.conflict);
       return;
     }
-    agents.reportNow(profile);
+    agents.reportNow(profile, session.ip);
     writeJsonApi(res, okDocument(), HTTPStatus.accepted);
   }
 
@@ -874,7 +956,10 @@ class HubService {
     }
 
     auto profile = req.params.get("profile", "");
-    auto reply = agents.service(profile, action, instance, ServiceTimeoutSeconds.seconds);
+    auto session = pickAgent(req, res, profile);
+    if (session is null)
+      return;
+    auto reply = agents.service(profile, action, instance, ServiceTimeoutSeconds.seconds, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok: {
       auto doc = Json.emptyObject;
@@ -936,7 +1021,10 @@ class HubService {
     }
 
     auto profile = req.params.get("profile", "");
-    auto reply = agents.logRead(profile, instance, from, to, 5.seconds, tail);
+    auto session = pickAgent(req, res, profile);
+    if (session is null)
+      return;
+    auto reply = agents.logRead(profile, instance, from, to, 5.seconds, tail, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok:
       writeJsonApi(res, reply.data, HTTPStatus.ok);
@@ -969,7 +1057,10 @@ class HubService {
     }
 
     auto profile = req.params.get("profile", "");
-    auto reply = agents.agentLog(profile, from, to, 5.seconds, tail);
+    auto session = pickAgent(req, res, profile);
+    if (session is null)
+      return;
+    auto reply = agents.agentLog(profile, from, to, 5.seconds, tail, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok:
       writeJsonApi(res, reply.data, HTTPStatus.ok);
@@ -1015,11 +1106,9 @@ class HubService {
     }
 
     auto profile = req.params.get("profile", "");
-    auto session = agents.find(profile);
-    if (session is null) {
-      writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ profile), HTTPStatus.notFound);
+    auto session = pickAgent(req, res, profile);
+    if (session is null)
       return;
-    }
     if (!session.supportsPrimitive("log:read")) {
       writeJsonApi(res, errorDocument(409, "节点不支持该指令", "unsupported:log:read"), HTTPStatus.conflict);
       return;
@@ -1063,7 +1152,8 @@ class HubService {
         if (!first && !res.connected)
           break;
 
-        auto reply = agents.logRead(profile, instance, cursor, 0, LogReadTimeoutSeconds.seconds, tailWindow);
+        auto reply = agents.logRead(profile, instance, cursor, 0, LogReadTimeoutSeconds.seconds,
+            tailWindow, session.ip);
         if (reply.outcome != RequestOutcome.ok) {
           final switch (reply.outcome) {
           case RequestOutcome.offline:

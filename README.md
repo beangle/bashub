@@ -397,16 +397,20 @@ ems 根目录固定为 `/var/lib/beangle-ems`，指派 profile 后实际读取 `
   `result`、超时与断连唤醒；`GET .../log/follow` 用 SSE 持续跟随，首次取尾部后按游标增量拉取，
   轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/monitor/agents/{profile}/report`
   要求节点立即刷新快照。`POST /api/bashub/monitor/agents/{profile}/service/{action}`（`start` / `stop` /
-  `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。
+  `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。同一个 profile 可以有多台
+  在线 agent（按握手 `ip` 头区分，同 IP 重连才顶替），上面这些按机器执行的接口在多台时用
+  `?agent=<ip>` 指定目标；`/agents/status` 与 `/agents/summary` 每台机器一项。
   SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持刷新节点快照、区间读实例或
   agent 日志、SSE 跟随，以及实例的重启 / 停止（带二次确认）。启停失败时错误文档的
   `errors[0].meta` 会带上 agent 返回的限长 `detail` / `logTail` / `truncated`。
-- **在线摘要与运行历史**：`GET /api/bashub/monitor/agents/summary` 只返回在线节点的轻量实例状态，
-  供 SPA 每 30 秒轮询；完整 OS/webapps 快照仍由 `/agents/status` 和页面上的节点“刷新”按需读取。
+- **节点快照与运行历史**：SPA 每 30 秒读取 `GET /api/bashub/monitor/agents/status`（实例表要显示 pid、
+  端口与 webapps），页面上的节点“刷新”会先让 agent 重报再取一次；`GET /api/bashub/monitor/agents/summary`
+  仍保留为只含计数的轻量接口，适合不需要 OS/webapps 的调用方。
   `GET /api/bashub/monitor/agents/{profile}/history?days=180` 一次返回该 profile 的原始采样
   `samples:[{at, servers:{id:state}}]`，按 server/天聚合、可用率与单 server 视图都由 SPA 本地计算。
   `bas.mon_server_samples` 每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`）；
-  采样由 hub 在 `agent-health-*` 窗口内主动触发，数据保留 180 天。
+  采样由 hub 在 `agent-health-*` 窗口内主动触发，同一 profile 下多台 agent 的 health 先合并成一份
+  再入库（同一分钟重复触发用最新合并结果覆盖），数据保留 180 天。
 - **`/api/bashub/config|ems|micdn/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。
 - **其余定制动作**：`profiles/{id}/reset-key`、`webapps/upgrade`、`hosts/{id}/webapps`、

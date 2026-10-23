@@ -53,34 +53,35 @@ struct HealthSchedule {
   }
 }
 
-/// 完成 HTTP → WebSocket 升级并跑连接循环。调用方必须已经验证过 Bearer。
-void serveAgentSocket(AgentRegistry registry, string profile, string profileId, HTTPServerRequest req,
-    HTTPServerResponse res, HealthSchedule health = HealthSchedule.init,
+/// 完成 HTTP → WebSocket 升级并跑连接循环。调用方必须已经验证过 Bearer 与 `ip` 头。
+void serveAgentSocket(AgentRegistry registry, string profile, string profileId, string ip,
+    HTTPServerRequest req, HTTPServerResponse res, HealthSchedule health = HealthSchedule.init,
     Duration heartbeatInterval = HeartbeatInterval) {
   auto name = profile.idup;
   auto id = profileId.idup;
+  auto agentIp = ip.idup;
   auto handler = handleWebSockets((scope WebSocket socket) nothrow {
-      runAgentLoop(registry, name, id, socket, health, heartbeatInterval);
+      runAgentLoop(registry, name, id, agentIp, socket, health, heartbeatInterval);
   });
   handler(req, res);
 }
 
 /// 一条连接的生命周期：登记、读消息、发队列、按期 ping、离开时摘除。
-void runAgentLoop(AgentRegistry registry, string profile, string profileId, scope WebSocket socket,
-    HealthSchedule health = HealthSchedule.init,
+void runAgentLoop(AgentRegistry registry, string profile, string profileId, string ip,
+    scope WebSocket socket, HealthSchedule health = HealthSchedule.init,
     Duration heartbeatInterval = HeartbeatInterval) nothrow {
   AgentSession session;
   scope (exit) {
     if (session !is null)
-      registry.detach(profile, session);
+      registry.detach(profile, ip, session);
     closeQuietly(profile, socket);
   }
 
   try {
-    session = registry.attach(profile, profileId);
+    session = registry.attach(profile, profileId, ip);
     // 每次重连都会走到这里；稳定连接只应出现一次，周期重复说明 agent 在反复重连。
     // 属于排错信息，放 debug 级（log-level=debug 时才出现），默认 info 不刷日志。
-    logDebug("%s: agent connected", profile);
+    logDebug("%s@%s: agent connected", profile, ip);
 
     auto lastPing = MonoTime.currTime;
     auto lastHealth = lastPing;
@@ -114,7 +115,7 @@ void runAgentLoop(AgentRegistry registry, string profile, string profileId, scop
       if (parse(socket.receiveText(), message)) {
         session.accept(message);
         if (message.typ == "report:health" && session.healthKnown)
-          registry.recordHealth(session.profileId, session.health);
+          registry.recordProfileHealth(session.profile, session.profileId);
       } else
         logWarn("%s: unreadable message dropped", profile);
     }

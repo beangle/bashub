@@ -20,7 +20,7 @@ import beangle.jsonapi.store : Store;
 
 import vibe.data.json : Json;
 
-import std.algorithm : canFind;
+import std.algorithm : canFind, sort;
 import std.array : split;
 import std.string : indexOf, strip;
 
@@ -129,4 +129,80 @@ private string[] splitIps(string header) {
       ips ~= ip;
   }
   return ips;
+}
+
+/**
+ * 从 agent 上报的地址里挑出属于该 Profile 的那个，作为「profile + server ip」身份。
+ *
+ * 先看 Profile 自己的 `ip`，再按 `hosts.ip` 排序后逐个比对；命中的才算数。**不做
+ * “没配置就放行”的兜底**：profile 必须声明自己的 `ip` 或至少一个 host，否则任何
+ * 上报地址都无法验证，连接一律拒绝。
+ */
+bool matchProfileIp(Registry reg, Store store, ProfileContext profile, const(string)[] candidates,
+    out string matched) {
+  if (candidates.length == 0)
+    return false;
+
+  auto own = attributeText(profile.data, "ip").strip;
+  if (own.length && candidates.canFind(own)) {
+    matched = own;
+    return true;
+  }
+
+  Query hq;
+  hq.pageSize = 100000;
+  hq.addFilter("profile", profile.id);
+  string[] allowed;
+  foreach (host; dataOf(store.search(reg.find("hosts"), hq))) {
+    auto ip = attributeText(host, "ip").strip;
+    if (ip.length)
+      allowed ~= ip;
+  }
+  // DB 不保证顺序；同一台机器多个地址都命中时取排序后的第一个，身份才稳定。
+  allowed.sort;
+  foreach (ip; allowed) {
+    if (candidates.canFind(ip)) {
+      matched = ip;
+      return true;
+    }
+  }
+  return false;
+}
+
+/// `ip` 头里的合法地址字面量，保持上报顺序。
+string[] ipHeaderAddresses(string header) {
+  string[] ips;
+  foreach (part; header.split(',')) {
+    auto ip = part.strip;
+    if (ip.length && isIpLiteral(ip))
+      ips ~= ip;
+  }
+  return ips;
+}
+
+/// 只接受 IP 字面量：既避免把主机名当身份，也不触发 DNS 解析。
+bool isIpLiteral(string text) {
+  if (text.indexOf(':') >= 0) {
+    foreach (c; text) {
+      auto hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+      if (!hex && c != ':' && c != '.')
+        return false;
+    }
+    return true;
+  }
+  auto parts = text.split('.');
+  if (parts.length != 4)
+    return false;
+  foreach (part; parts) {
+    if (part.length == 0 || part.length > 3)
+      return false;
+    foreach (c; part)
+      if (c < '0' || c > '9')
+        return false;
+    if (part.length > 1 && part[0] == '0')
+      return false;
+    if (part.length == 3 && part > "255")
+      return false;
+  }
+  return true;
 }

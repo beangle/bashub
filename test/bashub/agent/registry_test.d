@@ -17,6 +17,7 @@ import core.time : seconds;
 import vibe.data.json : Json, parseJsonString;
 
 import std.algorithm.searching : canFind;
+import std.algorithm.sorting : sort;
 
 private Envelope envelope(string typ, string at, string body) {
   Envelope message;
@@ -162,10 +163,56 @@ unittest {
   assert(registry.online.length == 1);
 
   // 旧连接迟到的关闭不能把新连接摘掉
-  registry.detach("demo", first);
+  registry.detach("demo", first.ip, first);
   assert(registry.find("demo") is second);
-  registry.detach("demo", second);
+  registry.detach("demo", second.ip, second);
   assert(registry.find("demo") is null);
+}
+
+@("one profile keeps one session per server ip") unittest {
+  auto registry = new AgentRegistry();
+  auto a = registry.attach("openurp.prod", "1001", "10.0.0.10");
+  auto b = registry.attach("openurp.prod", "1001", "10.0.0.11");
+  assert(registry.online.length == 2);
+  assert(!a.superseded && !b.superseded);
+  assert(registry.find("openurp.prod", "10.0.0.10") is a);
+  assert(registry.find("openurp.prod") is null, "多台时不能只按 profile 选");
+  auto status = registry.status.get!(Json[]);
+  assert(status.length == 2);
+  assert(status[0]["ip"].get!string == "10.0.0.10");
+  assert(status[1]["ip"].get!string == "10.0.0.11");
+
+  // 同一 IP 重连只顶掉自己，另一台不受影响
+  auto a2 = registry.attach("openurp.prod", "1001", "10.0.0.10");
+  assert(a.superseded);
+  assert(!b.superseded);
+  assert(registry.online.length == 2);
+  assert(registry.find("openurp.prod", "10.0.0.10") is a2);
+
+  // 旧连接迟到的关闭不能摘掉新连接
+  registry.detach("openurp.prod", "10.0.0.10", a);
+  assert(registry.find("openurp.prod", "10.0.0.10") is a2);
+  registry.detach("openurp.prod", "10.0.0.11", b);
+  assert(registry.online.length == 1);
+}
+
+@("profile health merges every online agent before recording") unittest {
+  auto history = new RecordingHistory();
+  auto registry = new AgentRegistry(history);
+  auto a = registry.attach("openurp.prod", "1001", "10.0.0.10");
+  a.accept(envelope("report:health", "2026-10-16T10:00:02+08:00",
+      `{"servers":[{"id":"portal.server1","state":"running"}]}`));
+  auto b = registry.attach("openurp.prod", "1001", "10.0.0.11");
+  b.accept(envelope("report:health", "2026-10-16T10:00:03+08:00",
+      `{"servers":[{"id":"tools.server1","state":"stopped"}]}`));
+
+  registry.recordProfileHealth("openurp.prod", "1001");
+  assert(history.samples.length == 2, "合并两台 agent 的 server");
+  string[] ids;
+  foreach (sample; history.samples)
+    ids ~= sample.id;
+  ids.sort;
+  assert(ids == ["portal.server1", "tools.server1"]);
 }
 
 @("status is sorted and reportNow queues a notice")

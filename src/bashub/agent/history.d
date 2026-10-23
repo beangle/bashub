@@ -31,7 +31,7 @@ struct AgentSample {
 
 /// 历史存储接口；测试与没有启用数据库的场景可以注入空实现或 null。
 interface AgentHistoryStore {
-  /// 写入一个 profile 的一次快照；同一 profile/分钟重复上报会由唯一索引合并。
+  /// 写入一个 profile 的一次快照；同一 profile/分钟重复上报会用最新合并结果覆盖。
   void record(string profileId, const(AgentSample)[] samples);
 
   /// 读取最近 `days` 天的原始采样；返回 `{profile, from, to, days, samples:[{at, servers}]}`。
@@ -78,9 +78,12 @@ final class PostgresAgentHistoryStore : AgentHistoryStore {
     if (seen.length == 0)
       return;
 
+    // 同一 profile 的多台 agent 会分别触发采样：同一分钟的行用最新合并结果覆盖，
+    // 这样每个采样点都是「该 profile 所有 server 此刻的状态」。
     exec(db, "insert into bas.mon_server_samples (id, profile_id, sampled_at, servers) values "
         ~ "(public.next_id('bas.mon_server_samples'), $1, date_trunc('minute', now()), $2::jsonb) "
-        ~ "on conflict (profile_id, sampled_at) do nothing", [pid, servers.toString]);
+        ~ "on conflict (profile_id, sampled_at) do update set servers = excluded.servers",
+        [pid, servers.toString]);
 
     // 清理是低频维护，不跟每次采样绑定；按 UTC 日只做一次。失败只记录，不影响本次采样。
     auto today = Clock.currTime().toUnixTime / 86400;

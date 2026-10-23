@@ -14,7 +14,8 @@ import bashub.profile.distribution : loadProfileData;
 import bashub.profile.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
 import bashub.profile.proxy : renderProxy;
-import bashub.profile.resolver : ProfileContext, resolveProfile;
+import bashub.profile.resolver : ProfileContext, findProfile, ipHeaderAddresses, matchProfileIp,
+  resolveProfile;
 import bashub.profile.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
   renderBashScript, renderHostScript;
 import bashub.profile.server : renderServerXml;
@@ -62,6 +63,34 @@ unittest {
   assert(!resolveProfile(reg, store, "openurp.prod", "", profile));
   assert(!resolveProfile(reg, store, "prod", "10.0.0.10", profile));
   assert(!resolveProfile(reg, store, "openurp.missing", "10.0.0.10", profile));
+}
+
+@("agent ip header matches profile or host ips and returns the canonical address") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  ProfileContext profile;
+  assert(findProfile(reg, store, "openurp.prod", profile));
+
+  string matched;
+  assert(matchProfileIp(reg, store, profile, ipHeaderAddresses("10.0.0.10"), matched));
+  assert(matched == "10.0.0.10");
+  // 多网卡全部上报：取配置里命中的那个
+  assert(matchProfileIp(reg, store, profile, ipHeaderAddresses("127.0.0.1, 10.0.0.11"), matched));
+  assert(matched == "10.0.0.11");
+  assert(!matchProfileIp(reg, store, profile, ipHeaderAddresses("192.168.1.1"), matched));
+  assert(ipHeaderAddresses("localhost").length == 0, "主机名不是身份");
+  assert(ipHeaderAddresses("").length == 0);
+}
+
+@("agent ip must be declared by the profile or one of its hosts") unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  // profile 没有任何 ip / host 时不做兜底：无法验证的地址一律拒绝
+  ProfileContext unknown;
+  unknown.id = "999999";
+  unknown.data = parseJsonString(`{"id":"999999","attributes":{}}`);
+  string matched;
+  assert(!matchProfileIp(reg, store, unknown, ["10.0.0.10"], matched));
 }
 
 @("server.xml keeps the basctl contract")

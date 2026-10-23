@@ -68,6 +68,8 @@ private final class PendingRequest {
 final class AgentSession {
   immutable string profile;
   immutable string profileId;
+  /// agent 上报的服务器 IP；同一 profile 下按它区分多台机器（`profile@ip`）。
+  immutable string ip;
   immutable string connectedAt;
   /// 建立连接的本地时刻：只用来算在线时长，对外展示仍用 `connectedAt`。
   immutable MonoTime startedAt;
@@ -102,9 +104,10 @@ final class AgentSession {
   short closeCode;
   string closeReason;
 
-  this(string profile, string profileId = "") {
+  this(string profile, string profileId = "", string ip = "") {
     this.profile = profile;
     this.profileId = profileId;
+    this.ip = ip;
     this.connectedAt = channel.now();
     this.startedAt = MonoTime.currTime;
     this.lastSeenAt = connectedAt;
@@ -245,6 +248,7 @@ final class AgentSession {
   Json status() {
     auto item = Json.emptyObject;
     item["profile"] = Json(profile);
+    item["ip"] = Json(ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
     item["bas"] = Json(basVersion);
@@ -268,6 +272,7 @@ final class AgentSession {
   Json summary() {
     auto item = Json.emptyObject;
     item["profile"] = Json(profile);
+    item["ip"] = Json(ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
     item["bas"] = Json(basVersion);
@@ -437,89 +442,123 @@ final class AgentSession {
   }
 }
 
-/// 同一个 profile 在 60 秒内又一次被新连接顶掉：多半是两个 agent 共用一个 profile，在互相踢。
+/// 同一 `profile@ip` 在 60 秒内又一次被新连接顶掉：说明这台 agent 在反复重连。
 private enum SupersedeChurnSeconds = 60;
-/// 「互相踢」告警的间隔：同一 profile 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
+/// 重连告警的间隔：同一 `profile@ip` 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
 private enum SupersedeWarnSeconds = 60;
 
-/// 每个 profile 一条在线连接。
+/// 在线 agent 登记册：一个 profile 可以有多台机器，按上报的 `ip` 区分；
+/// 同一个 `profile@ip` 只保留最新一条连接（旧连接被顶掉），不同 IP 的连接互不影响。
 final class AgentRegistry {
-  private AgentSession[string] sessions;
+  /// profile → (server ip → session)。
+  private AgentSession[string][string] sessions;
   private AgentHistoryStore historyStore;
-  /// profile → 上次被新连接顶掉的时刻，用于识别「互相踢」而不是一次正常重连。
+  /// `profile@ip` → 上次被新连接顶掉的时刻，用于识别同一台机器反复重连。
   private MonoTime[string] lastSupersedeAt;
-  /// profile → 上次「互相踢」告警的时刻，用于限流。
+  /// `profile@ip` → 上次重连告警的时刻，用于限流。
   private MonoTime[string] lastSupersedeWarnAt;
 
   this(AgentHistoryStore historyStore = null) {
     this.historyStore = historyStore;
   }
 
-  /// 登记新连接；同一 profile 的旧连接被标记为 `superseded`。
-  AgentSession attach(string profile, string profileId = "") {
-    auto session = new AgentSession(profile, profileId);
-    if (auto previous = profile in sessions) {
-      (*previous).supersede();
-      noteSupersede(profile, *previous);
+  /// 登记新连接；同一 `profile@ip` 的旧连接被标记为 `superseded`，其它 IP 的连接不受影响。
+  AgentSession attach(string profile, string profileId = "", string ip = "") {
+    auto session = new AgentSession(profile, profileId, ip);
+    auto byIp = profile in sessions;
+    if (byIp is null) {
+      sessions[profile] = [ip: session];
+      return session;
     }
-    sessions[profile] = session;
+    if (auto previous = ip in *byIp) {
+      (*previous).supersede();
+      noteSupersede(profile, ip, *previous);
+    }
+    (*byIp)[ip] = session;
     return session;
   }
 
   /**
-   * 记录一次「新连接顶掉在线旧连接」。
+   * 记录一次「同一台机器的新连接顶掉旧连接」。
    *
-   * 正常重连时旧连接往往还没超时，这一次顶替不值得告警；只有同一 profile 在
-   * {@link SupersedeChurnSeconds} 内被顶掉多次，才说明两个 agent 在互相踢
-   * （各自按 10 秒的 `reconnectDelay` 重连、再踢回对方）。告警带旧连接的 host
-   * 与在线时长，按 profile 每分钟最多一条。
+   * 正常重连时旧连接往往还没超时，这一次顶替不值得告警；只有同一 `profile@ip` 在
+   * {@link SupersedeChurnSeconds} 内被反复顶掉，才说明这台 agent 在反复重连（网络抖动、
+   * 进程崩溃重启等）。告警带旧连接的 host 与在线时长，按 `profile@ip` 每分钟最多一条。
    */
-  private void noteSupersede(string profile, AgentSession previous) {
+  private void noteSupersede(string profile, string ip, AgentSession previous) {
+    auto key = profile ~ "@" ~ ip;
     auto now = MonoTime.currTime;
     bool churn;
-    if (auto last = profile in lastSupersedeAt)
+    if (auto last = key in lastSupersedeAt)
       churn = now - *last < seconds(SupersedeChurnSeconds);
-    lastSupersedeAt[profile] = now;
+    lastSupersedeAt[key] = now;
     if (!churn)
       return;
-    if (auto warned = profile in lastSupersedeWarnAt) {
+    if (auto warned = key in lastSupersedeWarnAt) {
       if (now - *warned < seconds(SupersedeWarnSeconds))
         return;
     }
-    lastSupersedeWarnAt[profile] = now;
-    logWarn("%s: agent replaced again within %d s (previous host=%s, online %d s); "
-        ~ "two basagents may share this profile and keep kicking each other", profile,
-        SupersedeChurnSeconds, previous.host.length ? previous.host : "unknown",
+    lastSupersedeWarnAt[key] = now;
+    logWarn("%s: agent reconnected again within %d s (host=%s, online %d s); "
+        ~ "check the agent or the network", key, SupersedeChurnSeconds,
+        previous.host.length ? previous.host : "unknown",
         (now - previous.startedAt).total!"seconds");
   }
 
   /// 摘除一条连接；只摘自己那条，旧连接迟到的关闭不能把新连接挤掉。
-  void detach(string profile, AgentSession session) nothrow {
-    if (auto found = profile in sessions) {
-      if (*found is session)
-        sessions.remove(profile);
+  void detach(string profile, string ip, AgentSession session) nothrow {
+    if (auto byIp = profile in sessions) {
+      if (auto found = ip in *byIp) {
+        if (*found is session) {
+          (*byIp).remove(ip);
+          if ((*byIp).length == 0)
+            sessions.remove(profile);
+        }
+      }
     }
     session.disconnect();
   }
 
-  /// 主动作废旧连接；下一次握手会因 key 已重置而失败。
+  /// 主动作废该 profile 的全部连接（例如重置 Profile.key 之后）。
   void supersede(string profile) {
-    if (auto found = profile in sessions)
-      (*found).supersede();
+    if (auto byIp = profile in sessions)
+      foreach (_, session; *byIp)
+        session.supersede();
   }
 
-  AgentSession find(string profile) {
-    if (auto found = profile in sessions)
-      return *found;
+  /// 按 `profile@ip` 找连接。
+  AgentSession find(string profile, string ip) {
+    if (auto byIp = profile in sessions) {
+      if (auto found = ip in *byIp)
+        return *found;
+    }
     return null;
   }
 
-  /// 在线连接，按 profile 排序。
+  /// 该 profile 下唯一的连接；0 条或多条时返回 null（调用方按 ip 指定）。
+  AgentSession find(string profile) {
+    auto list = sessionsOf(profile);
+    return list.length == 1 ? list[0] : null;
+  }
+
+  /// 该 profile 下的全部连接，按 ip 排序。
+  AgentSession[] sessionsOf(string profile) {
+    AgentSession[] list;
+    if (auto byIp = profile in sessions)
+      foreach (_, session; *byIp)
+        list ~= session;
+    list.sort!((left, right) => left.ip < right.ip);
+    return list;
+  }
+
+  /// 在线连接，先按 profile、再按 ip 排序。
   AgentSession[] online() {
     AgentSession[] list;
-    foreach (_, session; sessions)
-      list ~= session;
-    list.sort!((left, right) => left.profile < right.profile);
+    foreach (profileKey, byIp; sessions)
+      foreach (sessionIp, session; byIp)
+        list ~= session;
+    list.sort!((left, right) => left.profile == right.profile
+        ? left.ip < right.ip : left.profile < right.profile);
     return list;
   }
 
@@ -549,6 +588,33 @@ final class AgentRegistry {
       logWarn("%s: record health history failed: %s", profileId, e.msg);
   }
 
+  /**
+   * 合并该 profile 下所有在线 agent 的最新 health 后写一条采样。
+   *
+   * 同一 profile 的多台 agent 各报各的 server；入库前按 server id 合并（先到先得，
+   * 正常情况下 id 跨机器唯一），表里就是「这个 profile 此刻所有 server 的状态」。
+   */
+  void recordProfileHealth(string profile, string profileId) nothrow {
+    if (historyStore is null || profileId.length == 0)
+      return;
+    try {
+      AgentSample[] merged;
+      bool[string] seen;
+      foreach (session; sessionsOf(profile)) {
+        foreach (sample; session.effectiveHealth) {
+          if ((sample.id in seen) !is null)
+            continue;
+          seen[sample.id] = true;
+          merged ~= sample;
+        }
+      }
+      if (merged.length > 0)
+        historyStore.record(profileId, merged);
+    } catch (Exception e) {
+      logWarn("%s: record health history failed: %s", profileId, e.msg);
+    }
+  }
+
   /// 是否有可用的历史存储；路由据此区分「没有历史」与「查询失败」。
   bool hasHistory() const {
     return historyStore !is null;
@@ -562,8 +628,8 @@ final class AgentRegistry {
   }
 
   /// 请某个在线 agent 立即上报；不在线返回 false。
-  bool reportNow(string profile) {
-    auto session = find(profile);
+  bool reportNow(string profile, string ip = "") {
+    auto session = resolve(profile, ip);
     if (session is null || !session.supportsPrimitive("report:now"))
       return false;
     return session.offer(channel.reportNow());
@@ -571,8 +637,8 @@ final class AgentRegistry {
 
   /// 下发 `log:read` 并等待 agent 的 `result`。
   AgentReply logRead(string profile, string instance, long from, long to,
-      Duration timeout = 5.seconds, long tail = 0) {
-    auto session = find(profile);
+      Duration timeout = 5.seconds, long tail = 0, string ip = "") {
+    auto session = resolve(profile, ip);
     if (session is null)
       return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
     if (!session.supportsPrimitive("log:read"))
@@ -588,8 +654,8 @@ final class AgentRegistry {
 
   /// 下发 `agent:log` 并等待 agent 的 `result`；用于查 agent 自身日志。
   AgentReply agentLog(string profile, long from, long to,
-      Duration timeout = 5.seconds, long tail = 0) {
-    auto session = find(profile);
+      Duration timeout = 5.seconds, long tail = 0, string ip = "") {
+    auto session = resolve(profile, ip);
     if (session is null)
       return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
     if (!session.supportsPrimitive("agent:log"))
@@ -604,10 +670,10 @@ final class AgentRegistry {
 
   /// 下发 `service:start|stop|restart` 并等待 agent 的 `result`。
   AgentReply service(string profile, string action, string instance,
-      Duration timeout = 120.seconds) {
+      Duration timeout = 120.seconds, string ip = "") {
     if (action != "start" && action != "stop" && action != "restart")
       return AgentReply.failure(RequestOutcome.failed, "bad-request");
-    auto session = find(profile);
+    auto session = resolve(profile, ip);
     if (session is null)
       return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
     auto primitive = "service:" ~ action;
@@ -616,6 +682,13 @@ final class AgentRegistry {
     auto body = Json.emptyObject;
     body["instance"] = Json(instance);
     return session.request(primitive, body, timeout);
+  }
+
+  /// 动作的目标连接：给了 ip 就精确找；没给时只有唯一连接才可用。
+  private AgentSession resolve(string profile, string ip) {
+    if (ip.length > 0)
+      return find(profile, ip);
+    return find(profile);
   }
 
   /// 给所有在线连接投递一条保活；没有连接时什么也不做。
