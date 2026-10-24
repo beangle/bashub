@@ -91,7 +91,7 @@ unittest {
   auto store = newStore(reg);
   auto doc = store.create(reg.find("projects"),
       parseJsonString(`{"data":{"type":"projects","attributes":{"name":"test","title":"测试",
-      "basVersion":"0.0.9"},
+      "basVersion":"0.0.8"},
       "relationships":{"org":{"data":{"type":"organizations","id":"2"}}}}}`));
   assert(doc["data"]["attributes"]["name"].get!string == "test");
   auto key = doc["data"]["attributes"]["key"].get!string;
@@ -109,7 +109,7 @@ unittest {
   auto store = newStore(reg);
   auto doc = store.create(reg.find("projects"),
       parseJsonString(`{"data":{"type":"projects","attributes":{"name":"test","title":"测试",
-      "basVersion":"0.0.9",
+      "basVersion":"0.0.8",
       "key":"ffffffffffffffffffffffffffffffff"}}}`));
   // 与 Scala 侧 fillDefaults 同口径：只在为空时生成，显式给的就留着
   assert(doc["data"]["attributes"]["key"].get!string == "ffffffffffffffffffffffffffffffff");

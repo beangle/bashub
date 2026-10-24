@@ -1,4 +1,4 @@
--- 0.0.8 -> 0.0.9：profile 改名 project，代理字段拆到 cfg_proxy_settings。
+-- 0.0.8 项目/代理结构变更：profile 改名 project，代理字段拆到 cfg_proxy_settings。
 -- 只支持从 0.0.8 直接升级；执行前备份数据库。
 begin;
 

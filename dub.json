@@ -1,6 +1,6 @@
 {
   "name": "beangle-bashub",
-  "version": "0.0.9",
+  "version": "0.0.8",
   "description": "The BAS console backend, written in D.",
   "authors": ["chaostone"],
   "license": "GPLv3",

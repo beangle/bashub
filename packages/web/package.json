@@ -1,6 +1,6 @@
 {
   "name": "@beangle/bashub-web",
-  "version": "0.0.9",
+  "version": "0.0.8",
   "license": "GPL-3.0-or-later",
   "publishConfig": {
     "access": "public",
