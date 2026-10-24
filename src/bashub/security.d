@@ -7,7 +7,7 @@
  */
 
 module bashub.security;
-/// BAS Hub 的安全装配：CAS 会话/票据 + ems 远程授权域 + Profile 选择。
+/// BAS Hub 的安全装配：CAS 会话/票据 + ems 远程授权域 + Project 选择。
 ///
 /// 路由层只拿到 `guard` 回调：是否放行、401 文档怎么写、是否 302 到 CAS，
 /// 全部在这一层收口。`configs` 不调用 guard，保持登录前可读。
@@ -123,7 +123,7 @@ class HubSecurity {
         sessions.evict(sid);
     }
     res.setCookie(cfg.sessionIdName, null, "/");
-    res.setCookie("beangle.security.profileId", null, "/");
+    res.setCookie("beangle.security.projectId", null, "/");
     res.setCookie("beangle.security.runAs", null, "/");
     return casConfig.casServer.length > 0 ? casConfig.logoutUrl : cfg.emsBase ~ "/cas/logout";
   }

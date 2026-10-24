@@ -71,7 +71,7 @@ string renderMenusXml(Registry reg, Store store, string appId) {
       jsonText(field(field(b, "attributes", "resource"), "name", "resource.attributes")));
 
   auto xml = appender!string;
-  xml.put("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<profile>\n  <resources>\n");
+  xml.put("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n  <resources>\n");
   foreach (ref resource; sortedResources) {
     auto attrs = field(resource, "attributes", "resource");
     auto name = jsonText(field(attrs, "name", "resource.attributes"));
@@ -90,7 +90,7 @@ string renderMenusXml(Registry reg, Store store, string appId) {
     roots = *found;
   foreach (id; roots)
     appendMenu(xml, byId, childrenByParent, resourceNames, id, "  ");
-  xml.put("</profile>");
+  xml.put("</project>");
   return xml.data;
 }
 

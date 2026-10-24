@@ -19,6 +19,7 @@ import beangle.jsonapi.store : Store, StoreException;
 import beangle.data.value : Row, isBlank, jsonGet, jsonText, rowGet;
 
 import bashub.present : decorateHub;
+import bashub.project.resolver : dataOf;
 
 import vibe.data.json : Json;
 
@@ -44,7 +45,7 @@ Store createHubStore(Registry reg, Dao dao) {
   return store;
 }
 
-/// 新建时的默认值（对应 Scala 侧 `ProfileWS.fillDefaults`）：凭证与仓库地址由服务端给，
+/// 新建时的默认值（对应 Scala 侧 `ProjectWS.fillDefaults`）：凭证与仓库地址由服务端给，
 /// key 之后不再随请求改写——重置要显式走 `reset-key`。
 void fillHubDefaults(const Resource res, ref Row values) {
   if (res.path == "resources") {
@@ -75,15 +76,23 @@ void fillHubDefaults(const Resource res, ref Row values) {
     values["resolve_support"] = Json(true);
     return;
   }
-  if (res.path != "profiles")
+  if (res.path == "proxy-settings") {
+    setDefault(values, "proxy_engine", "haproxy");
+    setDefault(values, "maxconn", 30000);
+    setDefault(values, "http_port", 80);
+    setDefault(values, "https_port", 443);
+    setDefault(values, "enable_https", false);
+    setDefault(values, "force_https", false);
+    setDefault(values, "proxy_by_hostname", false);
+    return;
+  }
+  if (res.path != "projects")
     return;
   if (isBlank(rowGet(values, "key")))
-    values["key"] = Json(profileKey());
+    values["key"] = Json(projectKey());
   // 行键是列名（`local_repo`），不是 JSON:API 属性名（`localRepo`）
   setDefault(values, "local_repo", "~/.m2/repository");
   setDefault(values, "remote_repo", "https://maven.aliyun.com/nexus/content/groups/public");
-  setDefault(values, "enable_https", false);
-  setDefault(values, "force_https", false);
 }
 
 /// 写入前的 BAS 特化：白名单枚举、唯一性、脚本文本规范化。
@@ -136,17 +145,22 @@ private void normalizeHostSetlinePorts(Store store, Registry reg, string id, ref
     throw new StoreException("setlineAdminPort", "Setline 监听端口和管理口端口必须同时填写或同时留空");
 
   if (listen.length > 0) {
-    auto profileId = effectiveHostProfileId(store, reg, id, values);
-    Json profileDoc;
-    if (profileId.length == 0 ||
-        !store.fetch(reg.find("profiles"), profileId, Query.init, profileDoc))
-      throw new StoreException("profile", "启用 Setline 的主机必须属于一个存在的配置");
-    auto profile = jsonGet(profileDoc, "data");
-    if (attributeBool(profile, "proxyByHostname")) {
-      auto hostname = attributeText(profile, "hostname").strip;
+    auto projectId = effectiveHostProjectId(store, reg, id, values);
+    Json projectDoc;
+    if (projectId.length == 0 ||
+        !store.fetch(reg.find("projects"), projectId, Query.init, projectDoc))
+      throw new StoreException("project", "启用 Setline 的主机必须属于一个存在的项目");
+    Query proxyQuery;
+    proxyQuery.pageSize = 1;
+    proxyQuery.addFilter("project", projectId);
+    auto proxies = dataOf(store.search(reg.find("proxy-settings"), proxyQuery));
+    if (proxies.length == 0)
+      throw new StoreException("project", "启用 Setline 的主机所属项目必须先配置代理设置");
+    if (attributeBool(proxies[0], "proxyByHostname")) {
+      auto hostname = attributeText(jsonGet(projectDoc, "data"), "hostname").strip;
       if (hostname.length == 0)
         throw new StoreException("setlineListenPort",
-            "按域名分组时必须在所属配置中填写域名");
+            "按域名分组时必须在所属项目中填写域名");
     }
   }
 
@@ -188,15 +202,15 @@ private string effectiveHostPort(Store store, Registry reg, string id, ref Row v
   return attributeText(jsonGet(document, "data"), attribute).strip;
 }
 
-private string effectiveHostProfileId(Store store, Registry reg, string id, ref Row values) {
-  if (auto value = "profile_id" in values)
+private string effectiveHostProjectId(Store store, Registry reg, string id, ref Row values) {
+  if (auto value = "project_id" in values)
     return isBlank(*value) ? "" : jsonText(*value).strip;
   if (id.length == 0)
     return "";
   Json document;
   if (!store.fetch(reg.find("hosts"), id, Query.init, document))
     return "";
-  return relationshipId(jsonGet(document, "data"), "profile");
+  return relationshipId(jsonGet(document, "data"), "project");
 }
 
 /// server 换主机时，如果它已经被 Webapp 选中，新主机也必须部署 setline。
@@ -338,6 +352,11 @@ private void setDefault(ref Row values, string column, string text) {
     values[column] = Json(text);
 }
 
+private void setDefault(ref Row values, string column, long value) {
+  if (isBlank(rowGet(values, column)))
+    values[column] = Json(value);
+}
+
 private void setDefault(ref Row values, string column, bool flag) {
   if (isBlank(rowGet(values, column)))
     values[column] = Json(flag);
@@ -345,9 +364,9 @@ private void setDefault(ref Row values, string column, bool flag) {
 
 /** 生成一台机器的通道凭证：16 字节随机数的十六进制（32 字符）。
  *
- * 与 Scala 侧 `Profile.newKey()` 同形——格式一变等于吊销所有已下发的配置，别轻易动。
+ * 与 Scala 侧 `Project.newKey()` 同形——格式一变等于吊销所有已下发的配置，别轻易动。
  */
-string profileKey() {
+string projectKey() {
   ubyte[16] bytes;
   static foreach (i; 0 .. 16)
     bytes[i] = uniform!ubyte;

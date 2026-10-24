@@ -47,7 +47,7 @@ unittest {
   assert(session.basReport["instances"].get!(Json[]).length == 1);
 
   auto status = session.status;
-  assert(status["profile"].get!string == "openurp.prod");
+  assert(status["project"].get!string == "openurp.prod");
   assert(status["os"]["os"]["name"].get!string == "Fedora");
   assert(status["osAt"].get!string == "2026-10-16T10:00:02+08:00");
 }
@@ -115,19 +115,19 @@ unittest {
 }
 
 private final class RecordingHistory : AgentHistoryStore {
-  string profileId;
-  string profile;
+  string projectId;
+  string project;
   AgentSample[] samples;
 
-  void record(string profileId, const(AgentSample)[] samples) {
-    this.profileId = profileId;
+  void record(string projectId, const(AgentSample)[] samples) {
+    this.projectId = projectId;
     this.samples = samples.dup;
   }
 
-  Json query(string profileId, string profile, int daysCount) {
-    this.profileId = profileId;
-    this.profile = profile;
-    return Json(["profile": Json(profile), "days": Json(cast(long) daysCount)]);
+  Json query(string projectId, string project, int daysCount) {
+    this.projectId = projectId;
+    this.project = project;
+    return Json(["project": Json(project), "days": Json(cast(long) daysCount)]);
   }
 }
 
@@ -139,13 +139,13 @@ private final class RecordingHistory : AgentHistoryStore {
       `{"servers":[{"id":"platform.server1","state":"running"}]}`));
 
   assert(registry.hasHistory);
-  registry.recordHealth(session.profileId, session.health);
-  assert(history.profileId == "1001");
+  registry.recordHealth(session.projectId, session.health);
+  assert(history.projectId == "1001");
   assert(history.samples.length == 1);
   assert(history.samples[0].state == "running");
   auto doc = registry.history("1001", "demo", 180);
-  assert(history.profileId == "1001");
-  assert(history.profile == "demo");
+  assert(history.projectId == "1001");
+  assert(history.project == "demo");
   assert(doc["days"].get!long == 180);
 }
 
@@ -169,19 +169,19 @@ unittest {
   assert(registry.find("demo") is null);
 }
 
-@("one profile keeps one session per server ip") unittest {
+@("one project keeps one session per server ip") unittest {
   auto registry = new AgentRegistry();
   auto a = registry.attach("openurp.prod", "1001", "10.0.0.10");
   auto b = registry.attach("openurp.prod", "1001", "10.0.0.11");
   assert(registry.online.length == 2);
   assert(!a.superseded && !b.superseded);
   assert(registry.find("openurp.prod", "10.0.0.10") is a);
-  assert(registry.find("openurp.prod") is null, "多台时不能只按 profile 选");
+  assert(registry.find("openurp.prod") is null, "多台时不能只按 project 选");
   auto status = registry.status.get!(Json[]);
   assert(status.length == 2);
   assert(status[0]["ip"].get!string == "10.0.0.10");
   assert(status[1]["ip"].get!string == "10.0.0.11");
-  assert(status[0]["profileId"].get!string == "1001");
+  assert(status[0]["projectId"].get!string == "1001");
 
   // 同一 IP 重连只顶掉自己，另一台不受影响
   auto a2 = registry.attach("openurp.prod", "1001", "10.0.0.10");
@@ -197,7 +197,7 @@ unittest {
   assert(registry.online.length == 1);
 }
 
-@("profile health merges every online agent before recording") unittest {
+@("project health merges every online agent before recording") unittest {
   auto history = new RecordingHistory();
   auto registry = new AgentRegistry(history);
   auto a = registry.attach("openurp.prod", "1001", "10.0.0.10");
@@ -207,7 +207,7 @@ unittest {
   b.accept(envelope("report:health", "2026-10-16T10:00:03+08:00",
       `{"servers":[{"id":"tools.server1","state":"stopped"}]}`));
 
-  registry.recordProfileHealth("openurp.prod", "1001");
+  registry.recordProjectHealth("openurp.prod", "1001");
   assert(history.samples.length == 2, "合并两台 agent 的 server");
   string[] ids;
   foreach (sample; history.samples)
@@ -226,8 +226,8 @@ unittest {
 
   auto status = registry.status;
   assert(status.get!(Json[]).length == 2);
-  assert(status[0]["profile"].get!string == "demo");
-  assert(status[1]["profile"].get!string == "openurp.prod");
+  assert(status[0]["project"].get!string == "demo");
+  assert(status[1]["project"].get!string == "openurp.prod");
 
   assert(registry.reportNow("openurp.prod"));
   assert(!registry.reportNow("missing"));

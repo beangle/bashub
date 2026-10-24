@@ -137,13 +137,13 @@ const platformText = computed(() => {
   return `${attributeText(platform.value.attributes.name)}(${version})`
 })
 
-const profileName = computed(() =>
-  attributeText(related(host.value, 'profile', 'profiles')?.attributes.qualifiedName),
+const projectName = computed(() =>
+  attributeText(related(host.value, 'project', 'projects')?.attributes.qualifiedName),
 )
 
 const scriptUrl = computed(() =>
-  profileName.value && hostIp.value
-    ? runtimeConfig.getApiUrl(apiRootPath('config', `/${profileName.value}/script/${hostIp.value}.sh`))
+  projectName.value && hostIp.value
+    ? runtimeConfig.getApiUrl(apiRootPath('config', `/${projectName.value}/script/${hostIp.value}.sh`))
     : '',
 )
 
@@ -203,7 +203,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const [hostDetail, serverPage, webappDoc] = await Promise.all([
-      getResourceDetail(HOSTS_PATH, hostId, ['profile', 'profile.org', 'platform', 'features']),
+      getResourceDetail(HOSTS_PATH, hostId, ['project', 'project.org', 'platform', 'features']),
       listResource(SERVERS_PATH, {
         filters: { 'server.host.id': hostId },
         include: ['farm'],

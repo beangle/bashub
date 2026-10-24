@@ -6,14 +6,14 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.server;
-/// `GET /api/bashub/config/{profile}/server`：把 Profile 的服务器、主机、webapp 与引擎
+module bashub.project.server;
+/// `GET /api/bashub/config/{project}/server`：把 Project 的服务器、主机、webapp 与引擎
 /// 渲染成 basctl 使用的 server.xml。原 Scala 版是 Freemarker 模板；这里没有模板运行时，
 /// 但输出结构保持一致。
 
-import bashub.profile.distribution : ProfileData, artifactGav, loadProfileData, webappGav;
-import bashub.profile.micdnconfig : micdnDownloadKey;
-import bashub.profile.resolver : ProfileContext;
+import bashub.project.distribution : ProjectData, artifactGav, loadProjectData, webappGav;
+import bashub.project.micdnconfig : micdnDownloadKey;
+import bashub.project.resolver : ProjectContext;
 
 import beangle.commons.xml : escapeXml;
 import beangle.data.resource : Registry, Resource;
@@ -31,12 +31,12 @@ import std.string : strip;
 
 /// 渲染 server.xml；返回内容只依赖数据库，不读请求上下文。
 ///
-/// SNAPSHOT 上游的令牌优先取 Profile 的 micdn `<auth download-key>`，为空时回退 `fallbackToken`
+/// SNAPSHOT 上游的令牌优先取 Project 的 micdn `<auth download-key>`，为空时回退 `fallbackToken`
 /// （hub.xml 的 `maven-download-token`）：有值才写 `token`，空值即匿名下载。`maskSecrets` 只用于
 /// SPA 预览，机器下载端点必须传 false。
-string renderServerXml(Store store, Registry reg, const ProfileContext context,
+string renderServerXml(Store store, Registry reg, const ProjectContext context,
     bool maskSecrets = false, string fallbackToken = "") {
-  auto data = loadProfileData(store, reg, context);
+  auto data = loadProjectData(store, reg, context);
   auto farms = data.farms.dup;
   auto hosts = data.hosts.dup;
   auto webapps = data.webapps.dup;
@@ -58,10 +58,10 @@ string renderServerXml(Store store, Registry reg, const ProfileContext context,
   xml.put("xsi:noNamespaceSchemaLocation=\"http://beangle.github.io/schema/bas-1.0.0.xsd\" version=\"");
   xml.put(escapeXml(attributeText(context.data, "basVersion")));
   xml.put("\"");
-  if (setlineEnabled && attributeBool(context.data, "proxyByHostname")) {
+  if (setlineEnabled && attributeBool(data.proxy, "proxyByHostname")) {
     auto hostname = attributeText(context.data, "hostname").strip;
     if (hostname.length == 0)
-      throw new Exception("Profile.hostname is required when proxyByHostname is enabled");
+      throw new Exception("Project.hostname is required when proxyByHostname is enabled");
     putAttr(xml, "setline-hostname", hostname);
   }
   xml.put(">\n");

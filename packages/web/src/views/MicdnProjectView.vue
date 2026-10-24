@@ -2,9 +2,9 @@
   <section class="page-panel">
     <div class="page-head">
       <div>
-        <router-link class="detail-back" to="/config/org-config?tab=profiles">← 返回配置管理</router-link>
-        <h2 class="page-title">{{ profileTitle }}</h2>
-        <p class="page-subtitle">{{ doc?.profile.title || 'Micdn 部署配置' }}</p>
+        <router-link class="detail-back" to="/config/org-config?tab=projects">← 返回配置管理</router-link>
+        <h2 class="page-title">{{ projectTitle }}</h2>
+        <p class="page-subtitle">{{ doc?.project.title || 'Micdn 部署配置' }}</p>
       </div>
       <div class="page-actions">
         <t-button variant="outline" @click="router.push('/micdn/components')">组件目录</t-button>
@@ -220,20 +220,20 @@
             <header class="config-card__head">
               <div>
                 <h3>Blob 存储</h3>
-                <p>Profile 有 key 时自动生成唯一的 <code>&lt;bucket&gt;</code>；没有 key 时不生成 Blob。</p>
+                <p>Project 有 key 时自动生成唯一的 <code>&lt;bucket&gt;</code>；没有 key 时不生成 Blob。</p>
               </div>
             </header>
             <div class="form-grid">
               <div class="form-field">
                 <span>Bucket 名称</span>
-                <code class="readonly-value">{{ doc.profile.name }}</code>
-                <small>来自 Profile name，不能单独修改。</small>
+                <code class="readonly-value">{{ doc.project.name }}</code>
+                <small>来自 Project name，不能单独修改。</small>
               </div>
               <div class="form-field">
                 <span>Bucket Key</span>
-                <code class="readonly-value">{{ doc.profile.keyMasked || '未设置' }}</code>
-                <small v-if="doc.profile.keySet">来自 Profile key，仅显示首尾字符。</small>
-                <small v-else class="danger-text">当前 Profile 没有 key，不会生成 Blob。</small>
+                <code class="readonly-value">{{ doc.project.keyMasked || '未设置' }}</code>
+                <small v-if="doc.project.keySet">来自 Project key，仅显示首尾字符。</small>
+                <small v-else class="danger-text">当前 Project 没有 key，不会生成 Blob。</small>
               </div>
               <label class="form-field">
                 <span>Blob 本地目录</span>
@@ -279,19 +279,19 @@ import { useRoute, useRouter } from 'vue-router'
 import MicdnBindingEditor from '@/components/MicdnBindingEditor.vue'
 import {
   defaultMicdnConfig,
-  getMicdnProfile,
+  getMicdnProject,
   micdnXmlUrl,
-  saveMicdnProfile,
+  saveMicdnProject,
   type CdnComponent,
   type MicdnAuthConfig,
   type MicdnBinding,
   type MicdnConfig,
-  type MicdnProfileDocument,
+  type MicdnProjectDocument,
 } from '@/api/micdn'
 
 const route = useRoute()
 const router = useRouter()
-const profileId = String(route.params.id || '')
+const projectId = String(route.params.id || '')
 
 const tabs: UnderlineTabItem[] = [
   { value: 'base', label: '基础' },
@@ -309,7 +309,7 @@ const logLevelOptions = [
   'info', 'warn', 'warning', 'error', 'critical', 'fatal',
 ].map((value) => ({ value, label: value }))
 
-const doc = ref<MicdnProfileDocument>()
+const doc = ref<MicdnProjectDocument>()
 const config = ref<MicdnConfig>(defaultMicdnConfig())
 const bindings = ref<MicdnBinding[]>([])
 const components = ref<CdnComponent[]>([])
@@ -328,15 +328,15 @@ function initialTab(): string {
 }
 
 const activeTab = ref(initialTab())
-const profileTitle = computed(() => doc.value?.profile.qualifiedName || doc.value?.profile.name || 'Micdn 配置')
-const downloadUrl = computed(() => (profileId ? micdnXmlUrl(profileId) : '#'))
+const projectTitle = computed(() => doc.value?.project.qualifiedName || doc.value?.project.name || 'Micdn 配置')
+const downloadUrl = computed(() => (projectId ? micdnXmlUrl(projectId) : '#'))
 
 watch(activeTab, (value) => {
   if (route.query.tab === value) return
   void router.replace({ path: route.path, query: { ...route.query, tab: value } })
 })
 
-function applyDocument(payload: MicdnProfileDocument) {
+function applyDocument(payload: MicdnProjectDocument) {
   doc.value = payload
   config.value = structuredClone(payload.config)
   bindings.value = payload.bindings.map((binding) => ({ ...binding }))
@@ -352,7 +352,7 @@ function applyDocument(payload: MicdnProfileDocument) {
 async function load() {
   loading.value = true
   try {
-    applyDocument(await getMicdnProfile(profileId))
+    applyDocument(await getMicdnProject(projectId))
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '加载 Micdn 配置失败')
   } finally {
@@ -398,8 +398,8 @@ function outgoingConfig(): MicdnConfig {
 async function save() {
   saving.value = true
   try {
-    const payload = await saveMicdnProfile(
-      profileId,
+    const payload = await saveMicdnProject(
+      projectId,
       outgoingConfig(),
       bindings.value.map((binding) => ({
         componentId: binding.componentId,

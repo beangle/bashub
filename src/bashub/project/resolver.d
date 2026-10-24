@@ -6,10 +6,10 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.resolver;
-/// `/api/bashub/{group}/{profile}` 的共同入口：按 `org.name` 定位 Profile。鉴权由调用方决定：
-/// `config/server`、`micdn.xml`、节点通道走 `Profile.key`，proxy/menus/script 仍按 `ip` 头。
-/// 后续 server/proxy/menus/micdn/script 都从这里拿同一个 Profile 上下文，避免各端点
+module bashub.project.resolver;
+/// `/api/bashub/{group}/{project}` 的共同入口：按 `org.name` 定位 Project。鉴权由调用方决定：
+/// `config/server`、`micdn.xml`、节点通道走 `Project.key`，proxy/menus/script 仍按 `ip` 头。
+/// 后续 server/proxy/menus/micdn/script 都从这里拿同一个 Project 上下文，避免各端点
 /// 对「配置怎么找」出现不同口径。
 
 import beangle.data.query : Query;
@@ -22,42 +22,43 @@ import vibe.data.json : Json;
 
 import std.algorithm : canFind, sort;
 import std.array : split;
-import std.string : indexOf, strip;
+import std.string : indexOf, replace, strip;
 
-/// 已定位到配置记录（是否通过 IP / 会话校验由调用方决定）的 Profile。
-struct ProfileContext {
+/// 已定位到配置记录（是否通过 IP / 会话校验由调用方决定）的 Project。
+struct ProjectContext {
   string id;
   /// JSON:API 的 `data` 对象
   Json data;
 }
 
-/// 解析 `{org.name}` 并按 `ip` 请求头校验来源。
-///
-/// 与 Scala `ConfigWS.getProfile` 同口径：IP 必须命中 Profile 自身的 `ip`，或该 Profile
-/// 下任一 Host 的 `ip`。请求头为空、配置名没有 `org.` 前缀、找不到配置都返回 false。
-bool resolveProfile(Registry reg, Store store, string qualifiedName, string ipHeader,
-    out ProfileContext context) {
-  if (!findProfile(reg, store, qualifiedName, context))
+/// setline 下载配置：只匹配 proxy_setting.ip（内部地址），不回退 Host.ip。
+bool resolveSetlineProject(Registry reg, Store store, string qualifiedName, string ipHeader,
+    out ProjectContext context) {
+  if (!findProject(reg, store, qualifiedName, context))
     return false;
-
-  auto requested = splitIps(ipHeader);
+  auto requested = ipHeaderAddresses(ipHeader);
   if (requested.length == 0)
     return false;
-  if (requested.canFind(attributeText(context.data, "ip")))
-    return true;
-
-  Query hq;
-  hq.pageSize = 100000;
-  hq.addFilter("profile", context.id);
-  foreach (host; dataOf(store.search(reg.find("hosts"), hq))) {
-    if (requested.canFind(attributeText(host, "ip")))
+  auto proxies = loadAll(store, reg.find("proxy-settings"), ["project": context.id]);
+  if (proxies.length == 0)
+    return false;
+  auto configured = splitIps(attributeText(proxies[0], "ip"));
+  foreach (ip; requested)
+    if (configured.canFind(ip))
       return true;
-  }
   return false;
 }
 
-/// 只按配置名找 Profile，不校验来源；调用方自己决定用 Bearer 还是 `ip` 头鉴权。
-bool findProfile(Registry reg, Store store, string qualifiedName, out ProfileContext context) {
+/// agent / EMS 菜单：只按该 Project 下的 Host.ip 匹配，返回命中的 host ip。
+bool resolveHostProject(Registry reg, Store store, string qualifiedName, string ipHeader,
+    out ProjectContext context, out string matched) {
+  if (!findProject(reg, store, qualifiedName, context))
+    return false;
+  return matchHostIp(reg, store, context, ipHeaderAddresses(ipHeader), matched);
+}
+
+/// 只按配置名找 Project，不校验来源；调用方自己决定用 Bearer 还是 `ip` 头鉴权。
+bool findProject(Registry reg, Store store, string qualifiedName, out ProjectContext context) {
   auto dot = qualifiedName.indexOf('.');
   if (dot <= 0 || dot >= qualifiedName.length - 1)
     return false;
@@ -66,33 +67,33 @@ bool findProfile(Registry reg, Store store, string qualifiedName, out ProfileCon
   q.pageSize = 2;
   q.addFilter("org.name", qualifiedName[0 .. dot]);
   q.addFilter("name", qualifiedName[dot + 1 .. $]);
-  auto profiles = dataOf(store.search(reg.find("profiles"), q));
-  if (profiles.length == 0)
+  auto projects = dataOf(store.search(reg.find("projects"), q));
+  if (projects.length == 0)
     return false;
 
-  auto profile = profiles[0];
-  auto id = jsonText(profile["id"]);
+  auto project = projects[0];
+  auto id = jsonText(project["id"]);
   if (id.length == 0)
     return false;
 
-  return accept(id, profile, context);
+  return accept(id, project, context);
 }
 
-/// 只按 JSON:API 主键找 Profile；管理台查看配置用它，鉴权由会话负责。
-bool findProfileById(Registry reg, Store store, string id, out ProfileContext context) {
+/// 只按 JSON:API 主键找 Project；管理台查看配置用它，鉴权由会话负责。
+bool findProjectById(Registry reg, Store store, string id, out ProjectContext context) {
   if (!id.length)
     return false;
   Json document;
-  if (!store.fetch(reg.find("profiles"), id, Query.init, document))
+  if (!store.fetch(reg.find("projects"), id, Query.init, document))
     return false;
-  auto profile = document["data"];
-  auto actualId = jsonText(profile["id"]);
+  auto project = document["data"];
+  auto actualId = jsonText(project["id"]);
   if (actualId.length == 0)
     return false;
-  return accept(actualId, profile, context);
+  return accept(actualId, project, context);
 }
 
-/// 一次取完某个 Profile 下的资源。配置分发端点的数据量很小，不做分页与缓存。
+/// 一次取完某个 Project 下的资源。配置分发端点的数据量很小，不做分页与缓存。
 Json[] loadAll(Store store, const Resource res, string[string] filters = null) {
   Query q;
   q.pageSize = 100000;
@@ -114,16 +115,16 @@ Json[] dataOf(Json document) {
   return items;
 }
 
-private bool accept(string id, Json profile, out ProfileContext context) {
+private bool accept(string id, Json project, out ProjectContext context) {
   context.id = id;
-  context.data = profile;
+  context.data = project;
   return true;
 }
 
 /// Scala 侧 `Strings.split(ips, " ")` 的等价物：空白分隔，忽略空项。
-private string[] splitIps(string header) {
+private string[] splitIps(string text) {
   string[] ips;
-  foreach (part; header.split) {
+  foreach (part; text.replace(",", " ").split) {
     auto ip = part.strip;
     if (ip.length > 0)
       ips ~= ip;
@@ -132,26 +133,17 @@ private string[] splitIps(string header) {
 }
 
 /**
- * 从 agent 上报的地址里挑出属于该 Profile 的那个，作为「profile + server ip」身份。
- *
- * 先看 Profile 自己的 `ip`，再按 `hosts.ip` 排序后逐个比对；命中的才算数。**不做
- * “没配置就放行”的兜底**：profile 必须声明自己的 `ip` 或至少一个 host，否则任何
- * 上报地址都无法验证，连接一律拒绝。
+ * 从上报地址里挑出属于该 Project 的 Host，作为「project + host ip」身份。
+ * 只比较 Host.ip；Project/Proxy 的 ip 不参与 agent 身份。
  */
-bool matchProfileIp(Registry reg, Store store, ProfileContext profile, const(string)[] candidates,
+bool matchHostIp(Registry reg, Store store, ProjectContext project, const(string)[] candidates,
     out string matched) {
   if (candidates.length == 0)
     return false;
 
-  auto own = attributeText(profile.data, "ip").strip;
-  if (own.length && candidates.canFind(own)) {
-    matched = own;
-    return true;
-  }
-
   Query hq;
   hq.pageSize = 100000;
-  hq.addFilter("profile", profile.id);
+  hq.addFilter("project", project.id);
   string[] allowed;
   foreach (host; dataOf(store.search(reg.find("hosts"), hq))) {
     auto ip = attributeText(host, "ip").strip;

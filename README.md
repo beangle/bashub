@@ -24,11 +24,11 @@ dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
 |---|---|---|
 | EMS | `/api/bashub/ems` | 应用、应用分组、菜单、channel、菜单关联资源、登录前配置、会话 |
 | 平台配置与分发 | `/api/bashub/config` | 平台配置资源 CRUD、`server.xml`、代理、证书、setline peers/manifest、主机脚本 |
-| Micdn | `/api/bashub/micdn` | `micdn.xml`、Profile 聚合配置、组件目录 |
+| Micdn | `/api/bashub/micdn` | `micdn.xml`、Project 聚合配置、组件目录 |
 | 监控 | `/api/bashub/monitor` | 在线节点、日志、上报、实例启停与 WebSocket 通道 |
 
-不再注册无能力域的 `/api/bashub/{profile}` 或 `/api/bashub/{resource}` 兼容入口。EMS 鉴权资源名
-按应用内路径 `/{能力域}/{资源}` 收口，例如 `/ems/menus`、`/ems/apps`、`/config/profiles`，
+不再注册无能力域的 `/api/bashub/{project}` 或 `/api/bashub/{resource}` 兼容入口。EMS 鉴权资源名
+按应用内路径 `/{能力域}/{资源}` 收口，例如 `/ems/menus`、`/ems/apps`、`/config/projects`，
 不包含可部署变化的 `/api/bashub` 根前缀。
 前端常量集中在 `packages/web/src/api/prefix.ts`，路由装配集中在 `src/bashub/api.d` 与
 `src/bashub/route.d`。basctl、setline 等机器客户端需要与本次路径变更同步升级。
@@ -99,7 +99,7 @@ src/beangle/ems/            框架·部署面（与协议无关）
   datasource.d  从应用文件/`resources.xml` 读 `<datasource>` → libpq 连接串
 
 src/beangle/security/       框架·会话面（与协议无关）
-  session.d     Profile/DefaultAccount/Agent/Session + SessionRepo 契约（时间用 epoch 秒）
+  session.d     Project/DefaultAccount/Agent/Session + SessionRepo 契约（时间用 epoch 秒）
   sessionjson.d 会话 JSON 解码：CAS 会话的唯一报文格式
   sessioncache.d CacheSessionRepo：内存缓存 + 回源 + 访问心跳
   cas.d         CasConfig/CasSessionRepo：会话查询、续期、过期与登出的 URL 与语义
@@ -110,7 +110,7 @@ src/bashub/                 业务：BAS 控制台这一份
   resources.d   管理台资源的定义（表名/列/关系/集合/派生属性）
   demo.d        内存后端的演示数据（只供测试显式使用）
   store.d       服务层装配 + bashub 的 fillDefaults（配置的 key）
-  profile/      Profile 名称/IP 校验、配置分发共享快照、server.xml / haproxy / nginx /
+  project/      Project 名称/IP 校验、配置分发共享快照、server.xml / haproxy / nginx /
                 EMS 菜单 / micdn 资产清单 / 主机脚本
   menus.d       应用资源/菜单 XML 的导入导出
   route.d       bashub 自己的端点 configs/sessions + 把通用 CRUD 挂上同一张 router
@@ -131,7 +131,7 @@ src/bashub/                 业务：BAS 控制台这一份
 共 20 个模块，
 夹具在 `test/beangle/fixture.d`、`test/beangle/tempdir.d`（临时目录；这份 Phobos 没有
 `mkdirTempDir`）与 `test/beangle/security/fake_cas.d`（假 CAS，前后场共用）；
-`test/bashub/` 是业务的 11 个模块（配置解析、服务层装配、路由契约、会话端点、Profile 配置分发、
+`test/bashub/` 是业务的 11 个模块（配置解析、服务层装配、路由契约、会话端点、Project 配置分发、
 组件版本刷新、节点通道协议、在线登记册）。
 
 ## 已经做了什么
@@ -147,42 +147,42 @@ src/bashub/                 业务：BAS 控制台这一份
   字符串过滤的 `^`/`$`/`null` 锚点、非字符串走 `=`、关系过滤按 id 全等、未知键 400。
 - **关系与派生属性**：to-one、to-many、多值子表（`listeners`/`jars`）、`jsonb` 字符串数组
   （`webapps.urls`）、`include=servers.host` 嵌套展开，以及 `qualifiedName` / `qualifiedTitle`
-  这类 `{org.name}.{name}` 模板派生属性。前端查询串里的实体别名（`filter[profile.name]`）
-  与引用主键（`filter[webapp.profile.id]`）也按 she 的口径解析。
+  这类 `{org.name}.{name}` 模板派生属性。前端查询串里的实体别名（`filter[project.name]`）
+  与引用主键（`filter[webapp.project.id]`）也按 she 的口径解析。
 - **资源**：通用 CRUD 的能力域按主表前缀自动确定——`bas.ems_*` 走 `ems`，`bas.cfg_*`
   走 `config`。因此 apps、app-groups、channels、resources、menus 在 `ems` 域；
-  organizations、platforms、profiles、engines、farms、servers、hosts、artifacts、webapps、
+  organizations、platforms、projects、engines、farms、servers、hosts、artifacts、webapps、
   platform-features、platform-feature-scripts 在 `config` 域。Micdn 组件目录使用
   `micdn/components` 的专用端点。
 - **`configs` / `sessions`**：`GET /api/bashub/ems/configs`（免登录，前端据此知道 ems 地址）、
   `GET /api/bashub/ems/sessions`、`POST /api/bashub/ems/sessions/logout`。
-- **Profile 配置分发**：`GET /api/bashub/config/{profile}/server` 用
-  `Authorization: Bearer <profile>:<Profile.key>` 鉴权（也兼容只发 key 的旧客户端），
-  下载端点也接受用户名是 Profile 名的 HTTP Basic，不再依赖可伪造的 `ip` 头；server.xml 只收窄到
-  本 Profile 的 farms/hosts/webapps 及其引用到的 engines、servers、artifacts。管理台另用
-  `GET /api/bashub/config/profiles/{id}/server`（登录会话鉴权）查看同一份结果。
-  `GET /api/bashub/config/{profile}/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
+- **Project 配置分发**：`GET /api/bashub/config/{project}/server` 用
+  `Authorization: Bearer <project>:<Project.key>` 鉴权（也兼容只发 key 的旧客户端），
+  下载端点也接受用户名是 Project 名的 HTTP Basic，不再依赖可伪造的 `ip` 头；server.xml 只收窄到
+  本 Project 的 farms/hosts/webapps 及其引用到的 engines、servers、artifacts。管理台另用
+  `GET /api/bashub/config/projects/{id}/server`（登录会话鉴权）查看同一份结果。
+  `GET /api/bashub/config/{project}/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
   只按请求 `path` 做 `map_beg` 路由，只有带 targets 的 webapp 参与，按 farm + server 集合分组。
   proxy 下载使用同样的 Bearer 凭证。server.xml 里的
-  `<snapshot-repo remote=".../maven" token="...">` 优先取该 Profile 的 micdn
-  `<auth download-key>`；为空时回退 `hub.xml` 的 `maven-download-token`，用于多个 Profile
+  `<snapshot-repo remote=".../maven" token="...">` 优先取该 Project 的 micdn
+  `<auth download-key>`；为空时回退 `hub.xml` 的 `maven-download-token`，用于多个 Project
   共用同一个 micdn `/maven` 的场景。
-  PEM 公钥证书与私钥单独存放在 `cfg_profile_certificates`，profile 的列表/详情不再携带这两个大字段；
-  管理台通过 `GET/PATCH /api/bashub/config/profiles/{id}/certificate` 查看公钥、保存证书（私钥原文
-  永不回显，编辑时留空保持原值）。setline 用 Profile 凭证分别拉取
-  `GET /api/bashub/config/{profile}/certificate` 与
-  `GET /api/bashub/config/{profile}/certificate-key`，落成 `/etc/setline/certs/cert.pem`、`key.pem` 和 haproxy 的
+  PEM 公钥证书与私钥单独存放在 `cfg_project_certificates`，project 的列表/详情不再携带这两个大字段；
+  管理台通过 `GET/PATCH /api/bashub/config/projects/{id}/certificate` 查看公钥、保存证书（私钥原文
+  永不回显，编辑时留空保持原值）。setline 用 Project 凭证分别拉取
+  `GET /api/bashub/config/{project}/certificate` 与
+  `GET /api/bashub/config/{project}/certificate-key`，落成 `/etc/setline/certs/cert.pem`、`key.pem` 和 haproxy 的
   `bundle.pem`。未配置证书时两个端点返回空 Body。
-  `GET /api/bashub/config/{profile}/setline-peers` 输出 sidecar 的 peer 列表（JSON）：
-  `peers` 由 Profile 下的 web 节点以及 Micdn 配置中登记的服务器合并生成；Micdn 服务器
+  `GET /api/bashub/config/{project}/setline-peers` 输出 sidecar 的 peer 列表（JSON）：
+  `peers` 由 Project 下的 web 节点以及 Micdn 配置中登记的服务器合并生成；Micdn 服务器
   使用各自的 `adminListen`。没有节点时返回空数组。`setline pull` 直接把这组 peers 写回
   节点自己的 `setline.conf`，`setline.json` 仍只保存本机监听与路由。各节点自己的 setline
   仍需把读入口开到 sidecar 可达，并把 sidecar 主机 IP 写进 `peerReaders`。
-  `GET /api/bashub/config/{profile}/setline-manifest` 用同一凭证一次返回 peers、proxy、certificate、
+  `GET /api/bashub/config/{project}/setline-manifest` 用同一凭证一次返回 peers、proxy、certificate、
   certificate-key 四个资源的 SHA-256；setline agent 据此只下载变化项，不再每轮拉取全部配置。
-  `GET /api/bashub/ems/{profile}/menus/{appName}`
-  按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/bashub/micdn/{profile}/micdn.xml` 输出
-  Profile 的完整 micdn 配置；`GET /api/bashub/config/{profile}/script/{host}` 按 Host 平台与
+  `GET /api/bashub/ems/{project}/menus/{appName}`
+  按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/bashub/micdn/{project}/micdn.xml` 输出
+  Project 的完整 micdn 配置；`GET /api/bashub/config/{project}/script/{host}` 按 Host 平台与
   特性依赖生成检查脚本。真实库的 server.xml 已通过 basctl 的 `bas-1.0.0.xsd`。
 - **ems 部署常量**（`beangle.ems`）：宿主配了 `ems.home`（根目录，缺省 `~/.ems`）和
   `ems.profile` 就按 ems 规则读 `home/conf.properties`，推出 base/cas/portal/api/`inner_base` 与两个
@@ -218,11 +218,11 @@ src/bashub/                 业务：BAS 控制台这一份
   `<api cors-origins="https://hub.example.com,https://sas.openurp.net">` 可覆盖缺省的本机来源，
   ems base 的主机名会自动加入。API 响应带 `Cache-Control: no-store`，所有响应带
   `X-Content-Type-Options: nosniff` 与 `Referrer-Policy`；反代声明 HTTPS 时加 HSTS。
-- **定制动作 `POST /api/bashub/config/profiles/{id}/reset-key`**：重置通道凭证（重置即吊销），
+- **定制动作 `POST /api/bashub/config/projects/{id}/reset-key`**：重置通道凭证（重置即吊销），
   返回 `{"id":…,"key":"…"}`，找不到 404。这是「应用自定义端点」的样板：挂在同一张 router 上、
   复用框架的鉴权与错误文档，只改一列时用 `Store.updateColumns`。
 - **BAS 写入特化**：资源新建默认 `Private`/启用；通道默认 `pc`/`iframe`/启用并保证
-  「同应用 + 同端类型」唯一；平台特性脚本去掉 `\r`；`Profile.assetGroups` 保存后同步关联表
+  「同应用 + 同端类型」唯一；平台特性脚本去掉 `\r`；`Project.assetGroups` 保存后同步关联表
   的另一侧；菜单的 `indexno` 按位置重排整棵子树、入口资源自动并入 `resources`、禁用父菜单时
   级联禁用子孙。
 - **菜单 XML**：`GET /api/bashub/ems/menus/export?app={id}` 导出资源与递归菜单，
@@ -232,7 +232,7 @@ src/bashub/                 业务：BAS 控制台这一份
   `DbDao`：**没配数据库或连不上时启动失败**，不会自动退回内存把配置错误伪装成正常启动；
   `MemoryDao` 只供测试显式使用。
 - **测试**：业务与框架合计 32 个模块。业务覆盖配置解析、服务层装配、路由契约、会话端点、安全路由、
-  Profile 配置分发、组件版本刷新、节点通道协议与在线登记册；框架覆盖参数
+  Project 配置分发、组件版本刷新、节点通道协议与在线登记册；框架覆盖参数
   解析、计划、文档、服务层、路由、会话 JSON 报文兼容、会话语义、CAS 客户端、ems 环境
   推导与常量、应用清单、数据源、schema 漂移、properties 解析、XML 取值、环境变量合并、CAS XML、
   授权域、远程授权刷新、Web 安全上下文与测试夹具。全部都是
@@ -249,7 +249,7 @@ dub test --compiler=ldc2                 # 跑单测
 
 bashub 没有独立的运行配置文件，也不会从固定路径读取文件。启动时必须提供
 `--ems.profile` 或 `--ems.home`：`--ems.home` 是 ems 根目录（缺省当前用户主目录下的 `.ems`），
-`--ems.profile` 选择其下的 profile。命令行采用 D/POSIX 风格的长选项，`--key=value` 与
+`--ems.profile` 选择其下的 project。命令行采用 D/POSIX 风格的长选项，`--key=value` 与
 `--key value` 两种写法都支持：
 
 ```bash
@@ -273,7 +273,7 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 宿主需要 `curl`：会话服务是 https，而 D 侧按 Beangle D 路线的惯例关掉了 vibe 的 TLS
 （`dub.json` 的 `notls`），所以取会话走宿主 curl（与 micdn 同一个做法）。
 
-使用默认 profile 根 `~/.ems` 时，`--ems.profile=bas` 实际读取：
+使用默认 project 根 `~/.ems` 时，`--ems.profile=bas` 实际读取：
 
 ```text
 ~/.ems/bas/conf.properties       # base、CAS 与会话 cookie 名
@@ -293,7 +293,7 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 
 监听地址优先级为：命令行 `--listen` > `hub.xml` 的 `<app listen>` > 内置 `127.0.0.1:8080`。
 `<snapshot download-token>` 是共享 micdn 的 `/maven` 下载令牌（也兼容
-`<app maven-download-token="...">`），只在 Profile 未配置 micdn `<auth download-key>` 时写进
+`<app maven-download-token="...">`），只在 Project 未配置 micdn `<auth download-key>` 时写进
 server.xml；两边都没配时 server.xml 保持原样，不写 `token`。
 节点运行历史由 bashub 主动下发 `report:health` 采样：`<agent health-interval>` 是秒数，0 表示关闭；
 `health-start/end` 是 bashub 主机时区的窗口（含 start、不含 end，可跨午夜）。也兼容根元素上的旧写法
@@ -350,7 +350,7 @@ curl -s -i -H 'Accept: application/vnd.api+json' -H "Cookie: URP_SID=$SID" \
 
 ```bash
 curl -s -H 'Accept: application/vnd.api+json' \
-  'http://127.0.0.1:18080/api/bashub/config/profiles/search?filter%5Borg.name%5D=beangle&include=org'
+  'http://127.0.0.1:18080/api/bashub/config/projects/search?filter%5Borg.name%5D=beangle&include=org'
 ```
 
 ## 安装包
@@ -365,13 +365,13 @@ scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revisio
 两个脚本都接受一个可选的 revision 参数。安装布局：
 
 - `/usr/bin/bashub`
-- `/var/lib/bas/.ems/`：ems 根目录（profile 在其下，如 `/var/lib/bas/.ems/bas`）
+- `/var/lib/bas/.ems/`：ems 根目录（project 在其下，如 `/var/lib/bas/.ems/bas`）
 - `/var/log/bas/bashub`：bashub 日志目录
 - `/usr/lib/systemd/system/bashub.service`
 
 服务固定以 `--ems.home=/var/lib/bas/.ems --ems.profile=bas` 启动，监听地址优先取应用文件的
 `listen`，最后才用内置 `127.0.0.1:8080`；systemd drop-in 仍可用 `--listen` 强制覆盖。
-ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.ems/bas`，数据库、CAS 等
+ems 根目录固定为 `/var/lib/bas/.ems`，实际 project 是 `/var/lib/bas/.ems/bas`，数据库、CAS 等
 来自该目录的应用文件；前端 SPA 按
 `packages/web` 自己的发布流程单独部署，并把 `/api/` 反代到 bashub。准备好 ems home 后启动
 `systemctl enable --now bashub`。包安装的服务以 `bas:beangle` 运行；RPM/DEB 只会在
@@ -383,7 +383,7 @@ ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.e
 
 - **认证/授权边界**：默认要求登录；`auth="none"` 仅限回环监听。票据登录只在当次请求生效，不抢写 CAS 域的共享 cookie；退出登录清本地
   会话和 cookie，随后由前端重定向到 CAS `/logout?service=...`，不做后通道单点登出。选中的
-  Profile 参与安全上下文，但还没有把它用于列表/数据范围过滤。资源未在 ems 登记时只要求登录（与原后端
+  Project 参与安全上下文，但还没有把它用于列表/数据范围过滤。资源未在 ems 登记时只要求登录（与原后端
   `unknownIsProtected=true` 一致），不会因为远端资源表暂不可用而退回匿名可写。
 - **会话缓存的可换后端**：原 JVM 后端能换 Caffeine/Redis，这里只有进程内存一层
   （重启即失效，多实例不共享）；也没有容量上限与惰性淘汰。认不出的 sid 每次都回源一次
@@ -401,12 +401,12 @@ ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.e
   当作没有配置（原 JVM 后端借 JDBC 驱动还能吃 mysql/oracle/dm）；也没移植「应用文件与 `resources.xml`
   都没有时去问 `EmsApi.getDatasourceUrl`」那一步（要网络）；`<url>` 只认
   `jdbc:postgresql://host[:port]/db` 与现成的 `key=value` 串，JDBC 的查询参数不搬。
-- **节点通道的写指令**：`log:read` 已接到 `GET /api/bashub/monitor/agents/{profile}/log`，`agent:log`
-  接到 `GET /api/bashub/monitor/agents/{profile}/agent-log`，带请求号等待
+- **节点通道的写指令**：`log:read` 已接到 `GET /api/bashub/monitor/agents/{project}/log`，`agent:log`
+  接到 `GET /api/bashub/monitor/agents/{project}/agent-log`，带请求号等待
   `result`、超时与断连唤醒；`GET .../log/follow` 用 SSE 持续跟随，首次取尾部后按游标增量拉取，
-  轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/monitor/agents/{profile}/report`
-  要求节点立即刷新快照。`POST /api/bashub/monitor/agents/{profile}/service/{action}`（`start` / `stop` /
-  `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。同一个 profile 可以有多台
+  轮转时下发 `reset=true`，断线重连按 `Last-Event-ID` 续传；`POST /api/bashub/monitor/agents/{project}/report`
+  要求节点立即刷新快照。`POST /api/bashub/monitor/agents/{project}/service/{action}`（`start` / `stop` /
+  `restart`）按实例下发 `service:*`，等到 agent 回执后再返回最终状态。同一个 project 可以有多台
   在线 agent（按握手 `ip` 头区分，同 IP 重连才顶替），上面这些按机器执行的接口在多台时用
   `?agent=<ip>` 指定目标；`/agents/status` 与 `/agents/summary` 每台机器一项。
   SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持刷新节点快照、区间读实例或
@@ -415,14 +415,14 @@ ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.e
 - **节点快照与运行历史**：SPA 每 30 秒读取 `GET /api/bashub/monitor/agents/status`（实例表要显示 pid、
   端口与 webapps），页面上的节点“刷新”会先让 agent 重报再取一次；`GET /api/bashub/monitor/agents/summary`
   仍保留为只含计数的轻量接口，适合不需要 OS/webapps 的调用方。
-  `GET /api/bashub/monitor/agents/{profile}/history?days=180` 一次返回该 profile 的原始采样
+  `GET /api/bashub/monitor/agents/{project}/history?days=180` 一次返回该 project 的原始采样
   `samples:[{at, servers:{id:state}}]`，按 server/天聚合、可用率与单 server 视图都由 SPA 本地计算。
-  `bas.mon_server_samples` 每个 profile/采样点一行（`profile_id + sampled_at + servers JSONB`）；
-  采样由 hub 在 `<agent health-interval>` 窗口内主动触发，同一 profile 下多台 agent 的 health 先合并成一份
+  `bas.mon_server_samples` 每个 project/采样点一行（`project_id + sampled_at + servers JSONB`）；
+  采样由 hub 在 `<agent health-interval>` 窗口内主动触发，同一 project 下多台 agent 的 health 先合并成一份
   再入库（同一分钟重复触发用最新合并结果覆盖），数据保留 180 天。
-- **`/api/bashub/config|ems|micdn/{profile}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
+- **`/api/bashub/config|ems|micdn/{project}` 配置分发**：server.xml、反代配置、EMS 菜单、micdn 配置与主机脚本
   均已改为 D 侧直接渲染，不再依赖 Freemarker 模板运行时。
-- **其余定制动作**：`profiles/{id}/reset-key`、`webapps/upgrade`、`hosts/{id}/webapps`、
+- **其余定制动作**：`projects/{id}/reset-key`、`webapps/upgrade`、`hosts/{id}/webapps`、
   `artifacts/{id}/webapps`、`resources/{id}/menus`、`artifacts/update-version` 与
   `menus/export|import` 已做。
 - **查询语义**：多值过滤（`filter[x]=a,b` → `in (...)` / `or`）、
@@ -453,7 +453,7 @@ ems 根目录固定为 `/var/lib/bas/.ems`，实际 profile 是 `/var/lib/bas/.e
   （`cas` 缺省 = `base + "/cas"`，配了 `ems.home` 就等于打开 CAS 会话）。
   读的是 `ems.home/conf.properties`，按 **JDK Properties 口径**解析（每个字节当 Latin-1 字符 +
   `\uXXXX` + `\` 续行 + `#`/`!` 注释）——解析口径与 JVM 一致，差一个转义就会配错。
-  `ems.home` 是根目录（缺省 `~/.ems`），其下用 `ems.profile` 选一个 profile 目录（未指定取第一个，
+  `ems.home` 是根目录（缺省 `~/.ems`），其下用 `ems.profile` 选一个 project 目录（未指定取第一个，
   只认目录）；命令行没有 JVM 系统属性，改用**同名环境变量 + `--ems.home`/`--ems.profile`
   命令行覆盖**（命令行优先）。两个 `ems.*` 都没配时 `emsFromEnvironment` 返回 null，bashub 拒绝启动。
 - **库连接也是「一处定义」**：ems 应用文件 `${home}${path}.xml` 的

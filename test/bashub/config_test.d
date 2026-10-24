@@ -7,7 +7,7 @@
  */
 
 module test.bashub.config_test;
-/// 运行配置从 ems.home/profile 推导；不再读取独立的 bashub 配置文件。
+/// 运行配置从 ems.home/project 推导；不再读取独立的 bashub 配置文件。
 
 import bashub.config;
 

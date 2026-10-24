@@ -23,8 +23,10 @@ MemoryDao demoDao(Registry reg) {
     dao.seed(reg.find("organizations"), row);
   foreach (row; platformRows())
     dao.seed(reg.find("platforms"), row);
-  foreach (row; profileRows())
-    dao.seed(reg.find("profiles"), row);
+  foreach (row; projectRows())
+    dao.seed(reg.find("projects"), row);
+  foreach (row; proxyRows())
+    dao.seed(reg.find("proxy-settings"), row);
   foreach (row; hostRows())
     dao.seed(reg.find("hosts"), row);
   foreach (row; engineRows())
@@ -53,10 +55,10 @@ MemoryDao demoDao(Registry reg) {
     dao.seed(reg.find("menus"), row);
   foreach (row; componentRows())
     dao.seed(reg.find("cdn-components"), row);
-  foreach (row; profileMicdnRows())
-    dao.seed(reg.find("profile-micdn"), row);
-  foreach (row; profileMicdnComponentRows())
-    dao.seed(reg.find("profile-micdn-components"), row);
+  foreach (row; projectMicdnRows())
+    dao.seed(reg.find("project-micdn"), row);
+  foreach (row; projectMicdnComponentRows())
+    dao.seed(reg.find("project-micdn-components"), row);
 
   auto engines = reg.find("engines");
   dao.seedValues(engines, "listeners", "3001", ["org.beangle.bas.listener.StartupListener"]);
@@ -98,29 +100,40 @@ private Row[] platformRows() {
   ];
 }
 
-private Row[] profileRows() {
+private Row[] projectRows() {
   return [
     row("1001", [
       "name": Json("demo"), "title": Json("演示配置"), "bas_version": Json("6.0.0"),
-      "ip": Json("127.0.0.1"), "hostname": Json("demo.openurp.net"),
-      "proxy_by_hostname": Json(false),
-      "http_port": Json(80L), "https_port": Json(443L),
-      "enable_https": Json(true), "force_https": Json(false), "maxconn": Json(30000L),
-      "proxy_engine": Json("haproxy"),
+      "hostname": Json("demo.openurp.net"),
       "local_repo": Json("~/.m2/repository"), "remote_repo": Json("https://repo1.maven.org/maven2"),
-      "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
       "key": Json("0123456789abcdef0123456789abcdef"), "org": Json("1"),
     ]),
     row("1002", [
       "name": Json("prod"), "title": Json("生产配置"), "bas_version": Json("6.0.0"),
-      "ip": Json("10.0.0.10"), "hostname": Json("prod.openurp.net"),
+      "hostname": Json("prod.openurp.net"),
+      "local_repo": Json("/srv/m2"), "remote_repo": Json("https://repo.openurp.net/maven2"),
+      "key": Json("fedcba9876543210fedcba9876543210"), "org": Json("2"),
+    ]),
+  ];
+}
+
+private Row[] proxyRows() {
+  return [
+    row("9001", [
+      "project": Json("1001"), "ip": Json("127.0.0.1"),
+      "proxy_by_hostname": Json(false),
+      "http_port": Json(80L), "https_port": Json(443L),
+      "enable_https": Json(true), "force_https": Json(false), "maxconn": Json(30000L),
+      "proxy_engine": Json("haproxy"),
+      "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
+    ]),
+    row("9002", [
+      "project": Json("1002"), "ip": Json("10.0.0.10"),
       "proxy_by_hostname": Json(true),
       "http_port": Json(80L), "https_port": Json(443L),
       "enable_https": Json(true), "force_https": Json(true), "maxconn": Json(60000L),
       "proxy_engine": Json("nginx"),
-      "local_repo": Json("/srv/m2"), "remote_repo": Json("https://repo.openurp.net/maven2"),
       "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
-      "key": Json("fedcba9876543210fedcba9876543210"), "org": Json("2"),
     ]),
   ];
 }
@@ -131,13 +144,13 @@ private Row[] hostRows() {
       "name": Json("host01"), "ip": Json("10.0.0.11"), "memory": Json(32L), "cores": Json(8L),
       "cpu": Json("Xeon Gold 6248"), "platform_version": Json("9.2"), "arch": Json(2L),
       "setline_listen_port": Json(8080L), "setline_admin_port": Json(10080L),
-      "profile": Json("1002"), "platform": Json("1"),
+      "project": Json("1002"), "platform": Json("1"),
     ]),
     row("2002", [
       "name": Json("host02"), "ip": Json("10.0.0.12"), "memory": Json(16L), "cores": Json(4L),
       "cpu": Json("Xeon E5-2680"), "platform_version": Json("2022"), "arch": Json(2L),
       "setline_listen_port": Json(8082L), "setline_admin_port": Json(10081L),
-      "profile": Json("1002"), "platform": Json("2"),
+      "project": Json("1002"), "platform": Json("2"),
     ]),
   ];
 }
@@ -147,12 +160,12 @@ private Row[] engineRows() {
     row("3001", [
       "name": Json("tomcat"), "typ": Json("tomcat-server"), "version": Json("10.1.42"),
       "remark": Json("全量发行包"), "jsp_support": Json(true), "websocket_support": Json(true),
-      "profile": Json("1002"),
+      "project": Json("1002"),
     ]),
     row("3002", [
       "name": Json("undertow"), "typ": Json("undertow"), "version": Json("2.3.18"),
       "remark": Json("嵌入式单应用"), "jsp_support": Json(false), "websocket_support": Json(true),
-      "profile": Json("1002"),
+      "project": Json("1002"),
     ]),
   ];
 }
@@ -160,7 +173,7 @@ private Row[] engineRows() {
 private Row[] farmRows() {
   return [
     row("4001", [
-      "name": Json("prod-farm"), "engine": Json("3001"), "profile": Json("1002"),
+      "name": Json("prod-farm"), "engine": Json("3001"), "project": Json("1002"),
       "max_heap_size": Json(2048L), "server_options": Json("-Xss512k"),
       "proxy_options": Json("balance roundrobin"),
     ]),
@@ -189,14 +202,14 @@ private Row[] artifactRows() {
       "packaging": Json("war"), "classifier": Json(""), "latest_version": Json("0.0.8"),
       "title": Json("BAS 控制台"), "description": Json("配置管理控制台"),
       "context_path": Json("/bas"), "arch": Json(1L), "resolve_support": Json(true),
-      "jsp_support": Json(false), "websocket_support": Json(true), "profile": Json("1002"),
+      "jsp_support": Json(false), "websocket_support": Json(true), "project": Json("1002"),
     ]),
     row("6002", [
       "artifact_id": Json("basctl"), "group_id": Json("org.beangle.basctl"),
       "packaging": Json("jar"), "classifier": Json(""), "latest_version": Json("0.0.8"),
       "title": Json("BAS 命令行"), "description": Json("节点代理与部署工具"),
       "context_path": Json(""), "arch": Json(2L), "resolve_support": Json(false),
-      "jsp_support": Json(false), "websocket_support": Json(false), "profile": Json(""),
+      "jsp_support": Json(false), "websocket_support": Json(false), "project": Json(""),
     ]),
   ];
 }
@@ -204,7 +217,7 @@ private Row[] artifactRows() {
 private Row[] webappRows() {
   return [
     row("7001", [
-      "artifact": Json("6001"), "profile": Json("1002"), "version": Json("0.0.8"),
+      "artifact": Json("6001"), "project": Json("1002"), "version": Json("0.0.8"),
       "context_path": Json("/bas"), "urls": Json([Json("/bas")]), "unpack": Json(false),
       "libs": Json(""),
     ]),
@@ -324,7 +337,7 @@ private Row[] componentRows() {
   ];
 }
 
-private Row[] profileMicdnRows() {
+private Row[] projectMicdnRows() {
   auto config = Json.emptyObject;
   config["home"] = Json("/var/lib/micdn");
   config["listen"] = Json("0.0.0.0:8888");
@@ -363,14 +376,14 @@ private Row[] profileMicdnRows() {
     "publicImages": Json(true),
   ]);
   auto item = row("1002", ["config": config]);
-  item["profile_id"] = Json("1002");
+  item["project_id"] = Json("1002");
   return [item];
 }
 
-private Row[] profileMicdnComponentRows() {
+private Row[] projectMicdnComponentRows() {
   return [
-    row("18001", ["profile": Json("1002"), "component": Json("17001"), "sortno": Json(10L)]),
-    row("18002", ["profile": Json("1002"), "component": Json("17002"), "sortno": Json(20L)]),
+    row("18001", ["project": Json("1002"), "component": Json("17001"), "sortno": Json(10L)]),
+    row("18002", ["project": Json("1002"), "component": Json("17002"), "sortno": Json(20L)]),
   ];
 }
 

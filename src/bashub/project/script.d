@@ -6,12 +6,12 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.script;
-/// `GET /api/bashub/config/{profile}/script/{host}`：生成主机检查脚本。
-/// 与 Scala `ScriptWS` 同口径：按 Profile + Host.ip 找机器，递归收集特性的依赖，
+module bashub.project.script;
+/// `GET /api/bashub/config/{project}/script/{host}`：生成主机检查脚本。
+/// 与 Scala `ScriptWS` 同口径：按 Project + Host.ip 找机器，递归收集特性的依赖，
 /// 让依赖排在前面，再取该平台对应的脚本。排序遇到同优先级时按 id 固定，避免集合顺序漂移。
 
-import bashub.profile.resolver : ProfileContext, loadAll;
+import bashub.project.resolver : ProjectContext, loadAll;
 
 import beangle.data.query : Query;
 import beangle.data.resource : Registry;
@@ -52,7 +52,7 @@ struct HostScriptModel {
 }
 
 /// 读取 Host、平台、特性与脚本并生成模型；Host 或平台不存在时返回 false。
-bool loadHostScriptModel(Store store, Registry reg, const ProfileContext context, string hostIp,
+bool loadHostScriptModel(Store store, Registry reg, const ProjectContext context, string hostIp,
     out HostScriptModel model) {
   auto ip = hostIp.strip;
   if (ip.length == 0)
@@ -60,7 +60,7 @@ bool loadHostScriptModel(Store store, Registry reg, const ProfileContext context
 
   Json host;
   bool found;
-  foreach (candidate; loadAll(store, reg.find("hosts"), ["profile": context.id])) {
+  foreach (candidate; loadAll(store, reg.find("hosts"), ["project": context.id])) {
     if (attributeText(candidate, "ip") == ip) {
       host = candidate;
       found = true;
@@ -175,7 +175,7 @@ string renderBashScript(const HostScriptModel model) {
 }
 
 /// 组合读取与渲染；Host / 平台不存在时返回空串，没有匹配脚本仍返回基础脚本。
-string renderHostScript(Store store, Registry reg, const ProfileContext context, string hostIp) {
+string renderHostScript(Store store, Registry reg, const ProjectContext context, string hostIp) {
   HostScriptModel model;
   if (!loadHostScriptModel(store, reg, context, hostIp, model))
     return "";

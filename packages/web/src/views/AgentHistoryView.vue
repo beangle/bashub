@@ -5,12 +5,12 @@
         <router-link class="detail-back" to="/monitor/agents">← 在线节点</router-link>
         <h2 class="page-title">运行历史</h2>
         <p class="page-subtitle">
-          {{ profile || '-' }} · 最近 {{ days }} 天；采样窗口与频率由 bashub 的
+          {{ project || '-' }} · 最近 {{ days }} 天；采样窗口与频率由 bashub 的
           <code>&lt;agent health-interval&gt;</code> 配置决定。
         </p>
       </div>
       <div class="page-actions">
-        <t-button v-if="profileId" variant="outline" @click="goProfile">配置</t-button>
+        <t-button v-if="projectId" variant="outline" @click="goProject">配置</t-button>
       </div>
     </div>
 
@@ -107,8 +107,8 @@ const route = useRoute()
 const router = useRouter()
 const days = 180
 
-const profile = computed(() => String(route.params.profile ?? ''))
-const profileId = computed(() => history.value?.profileId ?? '')
+const project = computed(() => String(route.params.project ?? ''))
+const projectId = computed(() => history.value?.projectId ?? '')
 const history = ref<AgentHistory | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -273,11 +273,11 @@ function errorText(reason: unknown): string {
 }
 
 async function reload() {
-  if (!profile.value || loading.value) return
+  if (!project.value || loading.value) return
   loading.value = true
   error.value = ''
   try {
-    history.value = await readAgentHistory(profile.value, { days })
+    history.value = await readAgentHistory(project.value, { days })
   } catch (reason) {
     error.value = errorText(reason)
   } finally {
@@ -285,11 +285,11 @@ async function reload() {
   }
 }
 
-function goProfile() {
-  if (profileId.value) router.push(`/config/profiles/${encodeURIComponent(profileId.value)}`)
+function goProject() {
+  if (projectId.value) router.push(`/config/projects/${encodeURIComponent(projectId.value)}`)
 }
 
-watch(profile, () => {
+watch(project, () => {
   history.value = null
   serverFilter.value = ''
   void reload()

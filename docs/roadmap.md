@@ -39,14 +39,14 @@
 
 以下普通资源已具备统一 CRUD：
 
-`organizations`、`platforms`、`profiles`、`engines`、`farms`、`servers`、`hosts`、
+`organizations`、`platforms`、`projects`、`engines`、`farms`、`servers`、`hosts`、
 `artifacts`、`webapps`、`platform-features`、`platform-feature-scripts`、`app-groups`、
 `apps`、`channels`、`resources`、`menus`、`cdn-components`。
 
 | 资源特化 | 状态 | 说明 |
 |---|---|---|
-| `profiles` 默认值 | ✅ | 生成 key、默认本地/远程仓库、HTTPS 开关 |
-| `profiles` 重置凭证 | ✅ | `POST /profiles/{id}/reset-key` |
+| `projects` 默认值 | ✅ | 生成 key、默认本地/远程仓库、HTTPS 开关 |
+| `projects` 重置凭证 | ✅ | `POST /projects/{id}/reset-key` |
 | `resources` 默认值 | ✅ | 新建默认 `Private` / 启用 |
 | `channels` 默认值与唯一性 | ✅ | 默认 `pc` / `iframe` / 启用；同 app + 端类型唯一 |
 | `engines.listeners/jars` | ✅ | 分隔符字符串规范化 |
@@ -72,43 +72,43 @@
 | `GET /ems/configs` | ✅ | 登录前可读，下发 ems base / app name / logo |
 | `GET /ems/sessions` | ✅ | 当前用户 |
 | `POST /ems/sessions/logout` | ✅ | 本地会话清理与 CAS 登出地址 |
-| `GET /monitor/agents/status` | ✅ | 在线节点快照，按 profile 排序；断连即从登记册摘除 |
+| `GET /monitor/agents/status` | ✅ | 在线节点快照，按 project 排序；断连即从登记册摘除 |
 
-### 2. 配置分发 `/api/bashub/config/{profile}`
+### 2. 配置分发 `/api/bashub/config/{project}`
 
 部署配置直接输出文本，不再依赖模板运行时。
 
 | 功能 | 状态 | 关键行为 |
 |---|---|---|
-| Profile 解析与令牌校验 | ✅ | `{profile}` 为 `org.name`；请求携带 Profile key，不再使用可伪造的 `ip` 头 |
-| `GET /config/server` | ✅ | farms / hosts / webapps / 被引用的 engines、servers、artifacts；存在已启用 setline 的 Host 时在 Host 上输出 listen/admin 端口；`profile.proxyByHostname=true` 时输出 `setline-hostname`，默认省略并使用 `*` 组，不输出通道凭证 |
-| `GET /config/proxy` | ✅ | 按 `proxyEngine` 输出 haproxy / nginx；用 Profile 令牌鉴权；haproxy 由 setline agent 生成 backend 与路由 map |
-| `GET /config/certificate` / `config/certificate-key` | ✅ | Profile 分别保存 PEM 公钥证书与私钥；机器端点用 Profile 令牌下载，管理台私钥脱敏；setline pull 落成 nginx 的 cert/key 与 haproxy 的 bundle |
-| `GET /config/setline-peers` | ✅ | 每个 Profile 都输出 sidecar peer 列表：web/Micdn 节点合并并按 URL 去重，没有节点时返回空数组；用 Profile 令牌鉴权 |
-| `GET /api/bashub/ems/{profile}/menus/{appName}` | ✅ | 按 profile 与 artifact 找 App，再递归输出菜单和资源 XML |
-| `GET /api/bashub/micdn/{profile}/micdn.xml` | ✅ | 按 Profile 输出完整 micdn 配置；用 `profile.key` 令牌鉴权；组件与绑定来自 `cdn_components` / `cfg_profile_micdn_components` |
+| Project 解析与令牌校验 | ✅ | `{project}` 为 `org.name`；请求携带 Project key，不再使用可伪造的 `ip` 头 |
+| `GET /config/server` | ✅ | farms / hosts / webapps / 被引用的 engines、servers、artifacts；存在已启用 setline 的 Host 时在 Host 上输出 listen/admin 端口；`proxySetting.proxyByHostname=true` 时输出 `setline-hostname`，默认省略并使用 `*` 组，不输出通道凭证 |
+| `GET /config/proxy` | ✅ | 按 `proxyEngine` 输出 haproxy / nginx；用 Project 令牌鉴权；haproxy 由 setline agent 生成 backend 与路由 map |
+| `GET /config/certificate` / `config/certificate-key` | ✅ | Project 分别保存 PEM 公钥证书与私钥；机器端点用 Project 令牌下载，管理台私钥脱敏；setline pull 落成 nginx 的 cert/key 与 haproxy 的 bundle |
+| `GET /config/setline-peers` | ✅ | 每个 Project 都输出 sidecar peer 列表：web/Micdn 节点合并并按 URL 去重，没有节点时返回空数组；用 Project 令牌鉴权 |
+| `GET /api/bashub/ems/{project}/menus/{appName}` | ✅ | 按 project 与 artifact 找 App，再递归输出菜单和资源 XML |
+| `GET /api/bashub/micdn/{project}/micdn.xml` | ✅ | 按 Project 输出完整 micdn 配置；用 `project.key` 令牌鉴权；组件与绑定来自 `cdn_components` / `cfg_project_micdn_components` |
 | `GET /script/{host}` | ✅ | 找 Host，收集平台特性及依赖，按依赖优先级输出该平台脚本 |
 
-这一组是 basctl 部署闭环的第一优先级。`server` 配置还承担节点通道地址与 Profile key 的
+这一组是 basctl 部署闭环的第一优先级。`server` 配置还承担节点通道地址与 Project key 的
 下发，必须先于 WebSocket 通道完成。
 
-### 3. 节点通道 `/api/bashub/monitor/agents/{profile}/channel`
+### 3. 节点通道 `/api/bashub/monitor/agents/{project}/channel`
 
 通道主体、`log:read` 与 `service:*` 已移植；启停动作由 basctl agent 执行，hub 等待 `result`。
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
-| WebSocket 握手鉴权 | ✅ | 推荐 `Authorization: Bearer <profile>:<Profile.key>`（兼容只发 key），失败在升级前返回 401 |
-| 单 profile 单连接 | ✅ | 新连接登记后旧连接以 1008 `superseded` 关闭 |
+| WebSocket 握手鉴权 | ✅ | 推荐 `Authorization: Bearer <project>:<Project.key>`（兼容只发 key），失败在升级前返回 401 |
+| 单 project 单连接 | ✅ | 新连接登记后旧连接以 1008 `superseded` 关闭 |
 | `hello` 身份与能力协商 | ✅ | host / basctl / bas / basHome / supports，能力去重排序 |
 | `report:os`、`report:bas` | ✅ | 整份替换现状快照，保留各自 `at` |
 | `pong`、`result` | ✅ | `pong` 已接收；`result` 按请求号唤醒等待者，超时与断连都会收敛为错误 |
 | Hub 下发 `ping` | ✅ | 每条连接 60s 一次 app 层 ping |
-| Hub 下发 `report:now` | ✅ | `POST /api/bashub/monitor/agents/{profile}/report`；按 `hello.supports` 门禁 |
-| Hub 下发 `log:read` | ✅ | `GET /api/bashub/monitor/agents/{profile}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
-| Hub 下发 `agent:log` | ✅ | `GET /api/bashub/monitor/agents/{profile}/agent-log`；读 agent 自身 console，按能力门禁 |
-| 浏览器日志跟随 | ✅ | `GET /api/bashub/monitor/agents/{profile}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
-| `service:start/stop/restart` | ✅ | `POST /api/bashub/monitor/agents/{profile}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
+| Hub 下发 `report:now` | ✅ | `POST /api/bashub/monitor/agents/{project}/report`；按 `hello.supports` 门禁 |
+| Hub 下发 `log:read` | ✅ | `GET /api/bashub/monitor/agents/{project}/log`；按能力门禁，5 秒超时，返回 `{total,from,to,lines}` |
+| Hub 下发 `agent:log` | ✅ | `GET /api/bashub/monitor/agents/{project}/agent-log`；读 agent 自身 console，按能力门禁 |
+| 浏览器日志跟随 | ✅ | `GET /api/bashub/monitor/agents/{project}/log/follow` SSE；首次 `tail`、增量游标、轮转 `reset`、`Last-Event-ID` 续传 |
+| `service:start/stop/restart` | ✅ | `POST /api/bashub/monitor/agents/{project}/service/{action}`；按 `hello.supports` 门禁，等待 agent 回执 |
 | 在线节点登记与摘除 | ✅ | 只摘自己那条，旧连接迟到的关闭不会挤掉新连接 |
 
 ### 4. 原生发行包仓库（已迁至 micdn）
@@ -121,7 +121,7 @@
 | 功能 | 状态 | 说明 |
 |---|---|---|
 | 内存会话缓存 | ✅ | 读取 CAS JSON 会话，含心跳与过期 |
-| `CasHttpSessionRepo` 兼容 | ✅ | 以 Profile key / sid 读取真实会话 |
+| `CasHttpSessionRepo` 兼容 | ✅ | 以 Project key / sid 读取真实会话 |
 | 完整 CAS 登录流程 | ✅ | serviceValidate、JSON 401 / 浏览器 302；退出为本地 evict + 清 cookie，前端重定向到 CAS logout，不做后通道 SLO |
 | 权限校验 | ✅ | Public/Protected/Private、root、`authorities` / `permissions`；未知资源只要求登录 |
 | CORS | ✅ | 同源不加头、预检 204、来源白名单与安全响应头 |
@@ -139,7 +139,7 @@
 | 功能 | 状态 | 说明 |
 |---|---|---|
 | 管理台 18 个资源的表映射 | ✅ | 与 `db/postgresql/db.xml` 对齐 |
-| `0.0.8` schema 收尾 | ✅ | 增量脚本已归档；`init/` 与 `db.xml` 是当前全量；`cfg_webapps.urls`、`cfg_hosts.setline_listen_port` / `setline_admin_port` 已就位，旧 `cfg_profiles.setline_port` 已移除 |
+| `0.0.8` schema 收尾 | ✅ | 增量脚本已归档；`init/` 与 `db.xml` 是当前全量；`cfg_webapps.urls`、`cfg_hosts.setline_listen_port` / `setline_admin_port` 已就位，旧 `cfg_projects.setline_port` 已移除 |
 | D 侧 schema 漂移检查 | ✅ | 启动时告警；`--check-schema` 只检查并返回退出码 3 |
 | 约束冲突错误映射 | ✅ | 唯一键、外键转为 409，非空、检查约束转为 400 |
 
@@ -148,20 +148,20 @@
 ### M0：管理台骨架（已完成）
 
 - 18 个资源统一 CRUD、基础查询、关系与派生属性。
-- `configs`、`sessions`、菜单、Profile key、批量升级/版本刷新等定制动作。
+- `configs`、`sessions`、菜单、Project key、批量升级/版本刷新等定制动作。
 - ems 常量、数据源、CAS 会话读取。
 - `0.0.8` schema 迁移。
 
 ### M1：部署配置分发闭环（已完成）
 
-1. ✅ Profile 解析与 IP 校验。
+1. ✅ Project 解析与 IP 校验。
 2. ✅ `config/server` 文本输出。
 3. ✅ `config/proxy` 的 haproxy / nginx 输出。
 4. ✅ `ems/menus/{appName}`。
 5. ✅ `micdn.xml`、`script/{host}`。
 
-验收：同一 Profile、同一数据库、同一请求头下，输出与迁移前基线逐字对比（空白差异单独记录）；
-`config/server` 缺失 Profile 返回 404、token 不匹配返回 401；仍走 IP 的其余端点保持原有 404 口径。
+验收：同一 Project、同一数据库、同一请求头下，输出与迁移前基线逐字对比（空白差异单独记录）；
+`config/server` 缺失 Project 返回 404、token 不匹配返回 401；仍走 IP 的其余端点保持原有 404 口径。
 
 ### M2：节点通道（已完成）
 
@@ -187,7 +187,7 @@
 ### M4：登录与权限（已完成）
 
 1. ✅ CAS 票据校验、302 登录跳转与 CAS logout。
-2. ✅ 资源动作权限、Profile 上下文与超级管理员判定。
+2. ✅ 资源动作权限、Project 上下文与超级管理员判定。
 3. ✅ CORS 与安全响应头。
 
 验收：未登录、会话过期、无权限、合法用户四条路径均有稳定测试；`configs` 仍保持免登录。
@@ -199,7 +199,7 @@
 - 非 PostgreSQL 数据源、PBE 密文、远程 ems 配置。
 - CAS/ems 出站请求目前走阻塞 curl；并发上量前改为 worker 线程或 libcurl 绑定。
 - 节点状态的历史曲线、筛选与日志下载（基础页面 `/monitor/agents` 已接入）。
-- Profile 数据范围过滤（当前只作为安全上下文，未用于列表查询）。
+- Project 数据范围过滤（当前只作为安全上下文，未用于列表查询）。
 - 热加载、指标与更完整的定时任务。
 
 这些不阻塞单机低功耗部署，只有实际部署提出要求时再做。
@@ -208,7 +208,7 @@
 
 - 真实库 + SPA：18 个管理页完整回归，确认前端没有 D 后端专用分支。
 - 真实 basctl：本机已完成一次出站连接、`report:now`、`agents/status` 与 `log:read`；生产环境仍需留档一次。
-- 配置输出：同一 Profile/数据库/请求头下与迁移前基线对比 server.xml、代理、菜单、资产和脚本。
+- 配置输出：同一 Project/数据库/请求头下与迁移前基线对比 server.xml、代理、菜单、资产和脚本。
 - 真实 CAS：登录、会话续期、过期、登出与前端重定向各跑一遍。
 
 ## 明确不追求的事项
@@ -221,8 +221,8 @@
 ## 迁移完成状态
 
 1. ✅ 管理台 SPA 的所有现有页面只连 D 后端。
-2. ✅ basctl 能通过 `/api/bashub/config/{profile}/server` 获取配置，通过
-   `/api/bashub/monitor/agents/{profile}/channel` 建立通道。
+2. ✅ basctl 能通过 `/api/bashub/config/{project}/server` 获取配置，通过
+   `/api/bashub/monitor/agents/{project}/channel` 建立通道。
 3. ✅ 生产部署所需文本配置、菜单、静态资产和主机脚本均可由 D 输出。
 4. ✅ 登录、会话、权限和登出行为与迁移前基线一致。
 5. ✅ 原 JVM 后端已退役，代码与专用构建已删除。

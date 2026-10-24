@@ -4,13 +4,13 @@
       <div>
         <h2 class="page-title">在线节点</h2>
       </div>
-      <div v-if="profileOptions.length > 1" class="page-actions">
+      <div v-if="projectOptions.length > 1" class="page-actions">
         <t-select
-          v-model="selectedProfile"
-          class="profile-select"
-          :options="profileOptions"
+          v-model="selectedProject"
+          class="project-select"
+          :options="projectOptions"
           filterable
-          placeholder="选择 Profile"
+          placeholder="选择 Project"
         />
       </div>
     </div>
@@ -22,7 +22,7 @@
     </div>
 
     <div v-else class="agent-grid">
-      <section v-for="group in visibleGroups" :key="group.profile" class="agent-group">
+      <section v-for="group in visibleGroups" :key="group.project" class="agent-group">
         <div class="agent-card-head">
           <div class="agent-identity">
             <div class="agent-title-row">
@@ -32,25 +32,25 @@
                   class="agent-org-logo"
                   :src="groupLogo(group)"
                   :alt="groupOrgTitle(group)"
-                  @error="markLogoFailed(group.profile)"
+                  @error="markLogoFailed(group.project)"
                 />
-                <h3>{{ groupTitle(group) }}</h3>
+                <h3>{{ groupHeading(group) }}</h3>
                 <t-tag theme="success" variant="light">{{ group.agents.length }} 个 agent</t-tag>
-                <span class="agent-profile">
-                  {{ group.profile }}
-                  · {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
+                <span class="agent-project">
+                  <template v-if="groupSubtitle(group)">{{ groupSubtitle(group) }} · </template>
+                  {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
                 </span>
               </div>
               <div class="agent-actions">
                 <t-button size="small" variant="outline" :loading="refreshing" @click="refreshNow">
                   刷新（{{ secondsLeft }}s）
                 </t-button>
-                <t-button size="small" variant="outline" @click="goHistory(group.profile)">运行历史</t-button>
+                <t-button size="small" variant="outline" @click="goHistory(group.project)">运行历史</t-button>
                 <t-button
-                  v-if="group.agents[0]?.profileId"
+                  v-if="group.agents[0]?.projectId"
                   size="small"
                   variant="outline"
-                  @click="goProfile(group.agents[0].profileId)"
+                  @click="goProject(group.agents[0].projectId)"
                 >
                   配置
                 </t-button>
@@ -303,9 +303,9 @@ import {
   type AgentStatus,
 } from '@/api/agents'
 
-/** 同一个 profile 下的多台 agent（每台一张连接卡片，实例表合并）。 */
+/** 同一个 project 下的多台 agent（每台一张连接卡片，实例表合并）。 */
 interface AgentGroup {
-  profile: string
+  project: string
   org?: AgentOrganization
   agents: AgentStatus[]
 }
@@ -362,7 +362,7 @@ async function load(quiet = false) {
   loading.value = true
   if (!quiet) error.value = ''
   try {
-    // 一个 profile 可以有多台 agent：/agents/status 每台一项，页面按 profile 分组展示。
+    // 一个 project 可以有多台 agent：/agents/status 每台一项，页面按 project 分组展示。
     agents.value = await listAgents()
   } catch (reason) {
     error.value = errorText(reason)
@@ -371,67 +371,75 @@ async function load(quiet = false) {
   }
 }
 
-/** 同一 profile 的 agent 归到一张卡片：实例表合并，右侧列各台连接信息。 */
+/** 同一 project 的 agent 归到一张卡片：实例表合并，右侧列各台连接信息。 */
 const groups = computed<AgentGroup[]>(() => {
-  const byProfile = new Map<string, AgentGroup>()
+  const byProject = new Map<string, AgentGroup>()
   for (const agent of agents.value) {
-    let group = byProfile.get(agent.profile)
+    let group = byProject.get(agent.project)
     if (!group) {
-      group = { profile: agent.profile, org: agent.org, agents: [] }
-      byProfile.set(agent.profile, group)
+      group = { project: agent.project, org: agent.org, agents: [] }
+      byProject.set(agent.project, group)
     }
     group.org ??= agent.org
     group.agents.push(agent)
   }
-  return [...byProfile.values()]
+  return [...byProject.values()]
 })
 
-const MONITOR_PROFILE_KEY = 'bashub.monitor_profile'
+const MONITOR_PROJECT_KEY = 'bashub.monitor_project'
 
-function readSelectedProfile(): string {
+function readSelectedProject(): string {
   try {
-    return window.localStorage.getItem(MONITOR_PROFILE_KEY) ?? ''
+    return window.localStorage.getItem(MONITOR_PROJECT_KEY) ?? ''
   } catch {
     return ''
   }
 }
 
-/** 多个 profile 同时在线时只展示一个，用右上角下拉切换。 */
-const selectedProfile = ref(readSelectedProfile())
+/** 多个 project 同时在线时只展示一个，用右上角下拉切换。 */
+const selectedProject = ref(readSelectedProject())
 
-function profileLabel(group: AgentGroup): string {
-  const title = groupTitle(group)
-  return title === group.profile ? group.profile : `${title}（${group.profile}）`
+/** 大标题与下拉框共用：org.name · project.name。 */
+function groupHeading(group: AgentGroup): string {
+  const org = group.org?.name?.trim()
+  return org ? `${org} · ${group.project}` : group.project
 }
 
-const profileOptions = computed(() =>
-  groups.value.map((group) => ({ value: group.profile, label: profileLabel(group) })),
+/** 下拉框在前面放 (org.name · project.name)，有说明时再接括号。 */
+function projectLabel(group: AgentGroup): string {
+  const heading = groupHeading(group)
+  const title = groupSubtitle(group)
+  return title && title !== heading ? `${heading}（${title}）` : heading
+}
+
+const projectOptions = computed(() =>
+  groups.value.map((group) => ({ value: group.project, label: projectLabel(group) })),
 )
 
-/** 当前选中的 profile；选中的已经离线时退回第一个。 */
+/** 当前选中的 project；选中的已经离线时退回第一个。 */
 const activeGroup = computed<AgentGroup | undefined>(() => {
   const list = groups.value
   if (!list.length) return undefined
-  return list.find((group) => group.profile === selectedProfile.value) ?? list[0]
+  return list.find((group) => group.project === selectedProject.value) ?? list[0]
 })
 
-/** 卡片模板按数组渲染，但只放当前选中的那个 profile。 */
+/** 卡片模板按数组渲染，但只放当前选中的那个 project。 */
 const visibleGroups = computed(() => (activeGroup.value ? [activeGroup.value] : []))
 
 watch(
   groups,
   (list) => {
     if (!list.length) return
-    if (!list.some((group) => group.profile === selectedProfile.value)) {
-      selectedProfile.value = list[0].profile
+    if (!list.some((group) => group.project === selectedProject.value)) {
+      selectedProject.value = list[0].project
     }
   },
   { immediate: true },
 )
 
-watch(selectedProfile, (value) => {
+watch(selectedProject, (value) => {
   try {
-    window.localStorage.setItem(MONITOR_PROFILE_KEY, value)
+    window.localStorage.setItem(MONITOR_PROJECT_KEY, value)
   } catch {
     /* 隐私模式等场景忽略写入失败 */
   }
@@ -439,21 +447,21 @@ watch(selectedProfile, (value) => {
 
 const router = useRouter()
 
-/** 运行历史是独立页面：`/monitor/agents/:profile/history`。 */
-function goHistory(profile: string) {
-  if (!profile) return
-  void router.push(`/monitor/agents/${encodeURIComponent(profile)}/history`)
+/** 运行历史是独立页面：`/monitor/agents/:project/history`。 */
+function goHistory(project: string) {
+  if (!project) return
+  void router.push(`/monitor/agents/${encodeURIComponent(project)}/history`)
 }
 
-/** 跳到该 profile 的配置详情（管理 server.xml / webapp 的地方）。 */
-function goProfile(profileId?: string) {
-  if (!profileId) return
-  void router.push(`/config/profiles/${encodeURIComponent(profileId)}`)
+/** 跳到该 project 的配置详情（管理 server.xml / webapp 的地方）。 */
+function goProject(projectId?: string) {
+  if (!projectId) return
+  void router.push(`/config/projects/${encodeURIComponent(projectId)}`)
 }
 
-/** 同一 profile 下多台 agent 的键：后端用 `ip` 区分机器，没有 ip 时退回 host。 */
+/** 同一 project 下多台 agent 的键：后端用 `ip` 区分机器，没有 ip 时退回 host。 */
 function agentKey(agent: AgentStatus): string {
-  return `${agent.profile}@${agent.ip || agent.host || ''}`
+  return `${agent.project}@${agent.ip || agent.host || ''}`
 }
 
 /** 运行/停止数以实例表为准：service:start 后 agent 先补发 report:bas，health 要等下一次采样。 */
@@ -479,7 +487,7 @@ function agentInstances(agent: AgentStatus): AgentInstance[] {
 }
 
 /**
- * 手动刷新：让当前 profile 的每台 agent 重报一次，再取一次完整快照，倒计时归零重来。
+ * 手动刷新：让当前 project 的每台 agent 重报一次，再取一次完整快照，倒计时归零重来。
  * 30 秒自动刷新只重读 `/agents/status`，不打扰 agent。
  */
 async function refreshNow() {
@@ -490,7 +498,7 @@ async function refreshNow() {
     const group = activeGroup.value
     if (group) {
       const results = await Promise.allSettled(
-        group.agents.map((agent) => requestAgentReport(agent.profile, agent.ip)),
+        group.agents.map((agent) => requestAgentReport(agent.project, agent.ip)),
       )
       const rejected = results.filter(
         (result): result is PromiseRejectedResult => result.status === 'rejected',
@@ -506,29 +514,29 @@ async function refreshNow() {
   }
 }
 
-/** 加载失败的 Logo 按 profile 记住，避免每次重渲染都再请求一次坏地址。 */
+/** 加载失败的 Logo 按 project 记住，避免每次重渲染都再请求一次坏地址。 */
 const failedLogos = ref<Record<string, boolean>>({})
 
-/** 卡片大标题：机构标题优先；没有机构信息时退回 profile。 */
+/** 卡片大标题：机构标题优先；没有机构信息时退回 project。 */
 function groupOrgTitle(group: AgentGroup): string {
-  return group.org?.title || group.org?.shortTitle || group.profile
+  return group.org?.title || group.org?.shortTitle || group.project
 }
 
-/** 卡片大标题：优先 profile 的说明（title），没有时回退机构标题 / profile 名。 */
-function groupTitle(group: AgentGroup): string {
-  return group.agents[0]?.profileTitle || groupOrgTitle(group)
+/** 卡片副标题：project 的说明；没有时留空。 */
+function groupSubtitle(group: AgentGroup): string {
+  return group.agents[0]?.projectTitle?.trim() || ''
 }
 
 function groupLogo(group: AgentGroup): string {
   const url = group.org?.logoUrl
-  return url && !failedLogos.value[group.profile] ? url : ''
+  return url && !failedLogos.value[group.project] ? url : ''
 }
 
 
 
 /** Logo 加载失败只隐藏图片，标题与在线状态照常显示。 */
-function markLogoFailed(profile: string) {
-  failedLogos.value = { ...failedLogos.value, [profile]: true }
+function markLogoFailed(project: string) {
+  failedLogos.value = { ...failedLogos.value, [project]: true }
 }
 
 function canService(agent: AgentStatus, action: AgentServiceAction): boolean {
@@ -565,7 +573,7 @@ async function runService(agent: AgentStatus, instance: AgentInstance, action: A
   if (serviceLoading.value[key]) return
   serviceLoading.value = { ...serviceLoading.value, [key]: true }
   try {
-    const result = await serviceAgentInstance(agent.profile, instance.id, action, agent.ip)
+    const result = await serviceAgentInstance(agent.project, instance.id, action, agent.ip)
     const label = action === 'restart' ? '重启' : action === 'stop' ? '停止' : '启动'
     MessagePlugin.success(`${instance.id} 已${label}（${result.state}）`)
     await waitForServiceSnapshot(agent, instance.id, result.state)
@@ -606,7 +614,7 @@ async function waitForServiceSnapshot(
 
 function openLog(agent: AgentStatus, instance: AgentInstance) {
   logTarget.value = 'instance'
-  logAgent.value = agent.profile
+  logAgent.value = agent.project
   logIp.value = agent.ip || ''
   logInstance.value = instance.id || ''
   logFrom.value = ''
@@ -619,7 +627,7 @@ function openLog(agent: AgentStatus, instance: AgentInstance) {
 
 function openAgentLog(agent: AgentStatus) {
   logTarget.value = 'agent'
-  logAgent.value = agent.profile
+  logAgent.value = agent.project
   logIp.value = agent.ip || ''
   logInstance.value = ''
   logFrom.value = ''
@@ -798,7 +806,7 @@ async function copyLog() {
   }
 }
 
-/** 下载当前窗口内的日志；文件名带 profile、实例与本地时间，便于区分多次抓取。 */
+/** 下载当前窗口内的日志；文件名带 project、实例与本地时间，便于区分多次抓取。 */
 function downloadLog() {
   const text = logLines.value.join('\n')
   if (!text) return
@@ -1021,7 +1029,7 @@ onBeforeUnmount(() => {
   padding: 0 12px 16px;
 }
 
-/* profile 不再套卡片：标题直接落在页面上，IP 卡片占满整宽。 */
+/* project 不再套卡片：标题直接落在页面上，IP 卡片占满整宽。 */
 .agent-group {
   display: flex;
   flex-direction: column;
@@ -1065,13 +1073,13 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 
-/* 右上角的 profile 切换；窄屏下占满整行。 */
-.profile-select {
-  width: 280px;
+/* 右上角的 project 切换；窄屏下占满整行。 */
+.project-select {
+  width: 420px;
   max-width: 100%;
 }
 
-.agent-profile {
+.agent-project {
   margin: 2px 0 0;
   color: var(--td-text-color-placeholder);
   font-size: 13px;

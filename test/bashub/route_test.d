@@ -46,19 +46,19 @@ private struct Exchange {
 }
 
 private final class FakeAgentHistory : AgentHistoryStore {
-  string profileId;
-  string profile;
+  string projectId;
+  string project;
   int daysCount;
 
-  void record(string profileId, const(AgentSample)[] samples) {
+  void record(string projectId, const(AgentSample)[] samples) {
   }
 
-  Json query(string profileId, string profile, int daysCount) {
-    this.profileId = profileId;
-    this.profile = profile;
+  Json query(string projectId, string project, int daysCount) {
+    this.projectId = projectId;
+    this.project = project;
     this.daysCount = daysCount;
     return Json([
-      "profile": Json(profile),
+      "project": Json(project),
       "from": Json("2026-04-25T00:00:00+08:00"),
       "to": Json("2026-10-22T00:00:00+08:00"),
       "days": Json(cast(long) daysCount),
@@ -177,7 +177,7 @@ unittest {
 unittest {
   auto router = newRouter();
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/search");
   assert(ex.status == 200, ex.body);
 
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/menus/search");
@@ -192,7 +192,7 @@ unittest {
   assert(ex.status == 200, ex.body);
 
   // 平台配置资源不再挂在 ems 下。
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/profiles/search");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/projects/search");
   assert(ex.status == 404, ex.body);
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/apps/search");
   assert(ex.status == 404, ex.body);
@@ -206,7 +206,7 @@ unittest {
   assert(ex.status == 404, ex.body);
 
   // 旧的无域前缀不再兜底
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/profiles/search");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/projects/search");
   assert(ex.body.length == 0, ex.body);
 }
 
@@ -273,11 +273,11 @@ unittest {
   assert(ex.status == 200);
   auto list = parseJson(ex.body)["agents"].get!(Json[]);
   assert(list.length == 2);
-  assert(list[0]["profile"].get!string == "openurp.demo");
+  assert(list[0]["project"].get!string == "openurp.demo");
   assert(list[1]["host"].get!string == "app1");
-  assert(list[1]["profileId"].get!string == "1002", "前端用 profileId 跳到配置详情");
-  assert(list[1]["profileTitle"].get!string == "生产配置", "卡片大标题用 profile 的说明");
-  // 卡片大标题：按 profile 的 org 前缀补上机构展示信息
+  assert(list[1]["projectId"].get!string == "1002", "前端用 projectId 跳到配置详情");
+  assert(list[1]["projectTitle"].get!string == "生产配置", "卡片大标题用 project 的说明");
+  // 卡片大标题：按 project 的 org 前缀补上机构展示信息
   assert(list[0]["org"]["name"].get!string == "openurp");
   assert(list[0]["org"]["title"].get!string == "OpenURP 高校教务");
   assert(list[1]["org"]["shortTitle"].get!string == "URP");
@@ -297,7 +297,7 @@ unittest {
 
   auto person = agents.attach("openurp.prod", "1002");
   person.host = "app1";
-  // 全部停止：instances 为空，只剩 declared；标题仍要按 profile 的 webapp 配置补上
+  // 全部停止：instances 为空，只剩 declared；标题仍要按 project 的 webapp 配置补上
   person.basReport = parseJsonString(`{
     "instances":[],
     "declared":[{"id":"prod-farm.app1","http.port":8080,"webapps":[
@@ -362,8 +362,8 @@ unittest {
   ex = call(router, HTTPMethod.GET,
       "http://localhost/api/bashub/monitor/agents/openurp.prod/history?days=180");
   assert(ex.status == 200, ex.body);
-  assert(history.profileId == "1002");
-  assert(history.profile == "openurp.prod");
+  assert(history.projectId == "1002");
+  assert(history.project == "openurp.prod");
   assert(history.daysCount == 180);
   auto samples = parseJson(ex.body)["samples"].get!(Json[]);
   assert(samples.length == 1);
@@ -476,7 +476,7 @@ unittest {
 }
 
 
-@("agent commands need ?agent= when one profile has several agents") unittest {
+@("agent commands need ?agent= when one project has several agents") unittest {
   auto agents = new AgentRegistry();
   auto router = newRouter(false, agents);
 
@@ -550,7 +550,7 @@ unittest {
   assert(ex.status == 200, ex.body);
 }
 
-@("profile config/server requires the profile key and returns server.xml")
+@("project config/server requires the project key and returns server.xml")
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
@@ -576,31 +576,31 @@ unittest {
   assert(ex.status == 401);
 }
 
-@("SPA can view server, proxy and setline config by profile id without the machine token")
+@("SPA can view server, proxy and setline config by project id without the machine token")
 unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, demoDao(reg));
   auto router = newRouterWith(reg, store);
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/server");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/server");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(!ex.body.canFind("<hub"));
   assert(!ex.body.canFind("download-secret"));
   assert(ex.body.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="********"/>`));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/proxy");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/proxy");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/plain");
   assert(ex.body.canFind("upstream prod-farm{"));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/setline-peers");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/setline-peers");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/json", ex.contentType);
   assert(parseJson(ex.body)["peers"].length == 2);
 
 }
 
-@("profile config/proxy requires the profile key and returns the selected proxy config")
+@("project config/proxy requires the project key and returns the selected proxy config")
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
@@ -630,7 +630,7 @@ unittest {
   assert(ex.status == 401);
 }
 
-@("profile config/setline-peers requires the profile key and follows the profile")
+@("project config/setline-peers requires the project key and follows the project")
 unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, demoDao(reg));
@@ -665,7 +665,7 @@ unittest {
   assert(parseJson(ex.body)["peers"].length == 0);
 }
 
-@("profile config/setline-manifest requires the key and hashes every downloaded body")
+@("project config/setline-manifest requires the key and hashes every downloaded body")
 unittest {
   auto router = newRouter();
   auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];
@@ -697,7 +697,7 @@ unittest {
   assert(ex.status == 401);
 }
 
-@("profile ems menus resolve the app from deployed artifacts and return xml")
+@("project ems menus resolve the app from deployed artifacts and return xml")
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
@@ -716,12 +716,12 @@ unittest {
   assert(ex.status == 404);
 }
 
-@("profile micdn.xml renders the complete profile configuration")
+@("project micdn.xml renders the complete project configuration")
 unittest {
   auto router = newRouter();
-  auto profileKey = "fedcba9876543210fedcba9876543210";
+  auto projectKey = "fedcba9876543210fedcba9876543210";
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["Authorization": "Bearer " ~ profileKey]);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["Authorization": "Bearer " ~ projectKey]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(ex.body.canFind(
@@ -738,10 +738,10 @@ unittest {
   assert(ex.body.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["X-Micdn-Token": profileKey]);
+      "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml", ["X-Micdn-Token": projectKey]);
   assert(ex.status == 200, ex.body);
 
-  auto basicValue = "prod:" ~ profileKey;
+  auto basicValue = "prod:" ~ projectKey;
   ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Basic " ~ cast(string) Base64.encode(cast(const(ubyte)[]) basicValue)]);
@@ -760,32 +760,32 @@ unittest {
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/micdn/openurp.missing/micdn.xml", ["Authorization": "Bearer " ~ profileKey]);
+      "http://localhost/api/bashub/micdn/openurp.missing/micdn.xml", ["Authorization": "Bearer " ~ projectKey]);
   assert(ex.status == 401);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
-      ["Authorization": "Bearer " ~ profileKey, "X-Forwarded-Proto": "https",
+      ["Authorization": "Bearer " ~ projectKey, "X-Forwarded-Proto": "https",
        "X-Forwarded-Host": "hub.example.com"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body.canFind(
       `remote="https://hub.example.com/api/bashub/micdn/openurp.prod/micdn.xml"`));
 }
 
-@("profile micdn aggregate masks secrets and preserves them on save")
+@("project micdn aggregate masks secrets and preserves them on save")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/profiles/1002");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/projects/1002");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
-  assert(doc["profile"]["qualifiedName"].get!string == "openurp.prod");
+  assert(doc["project"]["qualifiedName"].get!string == "openurp.prod");
   assert(doc["config"]["auth"]["publishKeySet"].get!bool);
   assert(doc["config"]["auth"]["downloadKeySet"].get!bool);
   assert(doc["config"]["auth"].length == 3);
   assert(doc["config"]["blob"].length == 3);
   assert(doc["config"]["blob"]["declared"].type == Json.Type.undefined);
   assert(doc["config"]["remote"].type == Json.Type.undefined);
-  assert(doc["profile"]["keyMasked"].get!string == "fe**10");
+  assert(doc["project"]["keyMasked"].get!string == "fe**10");
   assert(doc["bindings"].get!(Json[]).length == 2);
   assert(doc["components"].get!(Json[]).length == 2);
   assert(doc["xml"].get!string.canFind(
@@ -802,7 +802,7 @@ unittest {
   auto body = Json.emptyObject;
   body["config"] = config;
   body["bindings"] = Json(savedBindings);
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/profiles/1002", body.toString);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/projects/1002", body.toString);
   assert(ex.status == 200, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
@@ -819,7 +819,7 @@ unittest {
   auto cleared = doc["config"];
   cleared["auth"] = Json(["maxSize": Json("64M"), "publishKey": Json(""), "downloadKey": Json("")]);
   body["config"] = cleared;
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/profiles/1002", body.toString);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/projects/1002", body.toString);
   assert(ex.status == 200, ex.body);
   ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
@@ -828,24 +828,24 @@ unittest {
   assert(!ex.body.canFind("<auth"));
 }
 
-@("profile micdn returns 404 for missing profiles")
+@("project micdn returns 404 for missing projects")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/profiles/9999");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/projects/9999");
   assert(ex.status == 404, ex.body);
 
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/profiles/9999",
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/projects/9999",
       `{"config":{"listen":"0.0.0.0:8888","logLevel":"info"}}`);
   assert(ex.status == 404, ex.body);
 }
 
-@("profile micdn emits blob from the profile key without a saved config row")
+@("project micdn emits blob from the project key without a saved config row")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/profiles/1001");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/projects/1001");
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
-  assert(doc["profile"]["keySet"].get!bool);
+  assert(doc["project"]["keySet"].get!bool);
   assert(doc["config"]["blob"].length == 3);
   assert(doc["xml"].get!string.canFind(`<blob base="/blob" max-size="100M">`));
   assert(doc["xml"].get!string.canFind(`<bucket name="demo" key="01**ef"/>`));
@@ -876,27 +876,27 @@ unittest {
   assert(rows[0]["attributes"]["displayName"].get!string == "prod-farm.app1 (10.0.0.11)");
 }
 
-@("profile certificates live outside profile and are downloadable by token")
+@("project certificates live outside project and are downloadable by token")
 unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, demoDao(reg));
   auto cert = "-----BEGIN CERTIFICATE-----\nCERT\n-----END CERTIFICATE-----";
   auto cert2 = "-----BEGIN CERTIFICATE-----\nCERT2\n-----END CERTIFICATE-----";
   auto key = "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----";
-  assert(store.upsertColumns(reg.find("profile-certificates"), "1002", [
+  assert(store.upsertColumns(reg.find("project-certificates"), "1002", [
     "certificate": Json(cert), "private_key": Json(key),
   ]));
   auto router = newRouterWith(reg, store);
 
-  // profile 资源不再携带证书大字段
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002");
+  // project 资源不再携带证书大字段
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002");
   assert(ex.status == 200, ex.body);
   auto attributes = parseJson(ex.body)["data"]["attributes"];
   assert(attributes["sslCertificate"].type == Json.Type.undefined);
   assert(attributes["sslCertificateKey"].type == Json.Type.undefined);
 
   // 管理台专用端点：回公钥与「私钥是否已设置」，绝不回私钥原文
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1002/certificate");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/certificate");
   assert(ex.status == 200, ex.body);
   auto info = parseJson(ex.body);
   assert(info["certificate"].get!string == cert);
@@ -906,7 +906,7 @@ unittest {
   // PATCH 只换公钥：私钥留空保持原值
   auto body = Json.emptyObject;
   body["certificate"] = Json(cert2);
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/profiles/1002/certificate",
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/projects/1002/certificate",
       body.toString);
   assert(ex.status == 200, ex.body);
   auto cert2Pem = cert2 ~ "\n";
@@ -916,11 +916,11 @@ unittest {
 
   // 非法 PEM 拒绝
   body["certificate"] = Json("not a certificate");
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/profiles/1002/certificate",
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/projects/1002/certificate",
       body.toString);
   assert(ex.status == 400, ex.body);
 
-  // setline 的机器端点仍按 Profile key 下载
+  // setline 的机器端点仍按 Project key 下载
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate");
   assert(ex.status == 401, ex.body);
   ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate",
@@ -983,11 +983,11 @@ unittest {
     assert(component["id"].get!string != bundleId);
 }
 
-@("profile host script resolves the host ip and returns shell text")
+@("project host script resolves the host ip and returns shell text")
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.11", ["ip": "10.0.0.12"]);
+      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.11", ["ip": "10.0.0.10"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/x-shellscript");
   assert(ex.body.canFind("#!/bin/bash"));
@@ -996,7 +996,7 @@ unittest {
   assert(ex.body.indexOf("java -version") < ex.body.indexOf("node --version"));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.12", ["ip": "10.0.0.11"]);
+      "http://localhost/api/bashub/config/openurp.prod/script/10.0.0.12", ["ip": "10.0.0.10"]);
   assert(ex.status == 200, ex.body);
   assert(ex.body.canFind("#!/bin/bash"));
   assert(!ex.body.canFind("java -version"));
@@ -1014,13 +1014,13 @@ unittest {
 unittest {
   auto router = newRouter();
 
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/search?page[size]=1");
+  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/search?page[size]=1");
   assert(ex.status == 200);
   auto doc = parseJson(ex.body);
   assert(doc["data"].length == 1);
   assert(doc["meta"]["page"]["total"].get!long == 2);
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1001");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1001");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["data"]["attributes"]["name"].get!string == "demo");
 
@@ -1034,7 +1034,7 @@ unittest {
   auto router = newRouter();
   // 属性名（camelCase）过滤：前端发的就是这种
   auto ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/profiles/search?filter%5Borg.name%5D=openurp&include=org");
+      "http://localhost/api/bashub/config/projects/search?filter%5Borg.name%5D=openurp&include=org");
   assert(ex.status == 200);
   auto doc = parseJson(ex.body);
   assert(doc["meta"]["page"]["total"].get!long == 1);
@@ -1042,12 +1042,12 @@ unittest {
   assert(doc["included"][0]["type"].get!string == "organizations");
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/hosts/search?filter%5Bprofile%5D=1002&sort=name");
+      "http://localhost/api/bashub/config/hosts/search?filter%5Bproject%5D=1002&sort=name");
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 2);
 
-  // 前端统一带实体别名与引用主键（`filter[profile.name]` / `filter[webapp.profile.id]`）
+  // 前端统一带实体别名与引用主键（`filter[project.name]` / `filter[webapp.project.id]`）
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/profiles/search?filter%5Bprofile.name%5D=demo&sort=profile.name");
+      "http://localhost/api/bashub/config/projects/search?filter%5Bproject.name%5D=demo&sort=project.name");
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 1);
 
   ex = call(router, HTTPMethod.GET,
@@ -1061,7 +1061,7 @@ unittest {
   assert(parseJson(ex.body)["meta"]["page"]["total"].get!long == 1);
 
   ex = call(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/webapps/search?filter%5Bwebapp.profile.id%5D=1002" ~
+      "http://localhost/api/bashub/config/webapps/search?filter%5Bwebapp.project.id%5D=1002" ~
       "&include=artifact,targets,targets.host");
   auto webapps = parseJson(ex.body);
   assert(webapps["meta"]["page"]["total"].get!long == 1);
@@ -1133,15 +1133,15 @@ unittest {
   assert(parseJson(ex.body)["logoutUrl"].get!string == "https://sas.openurp.net/cas/logout");
 }
 
-@("reset-key rotates the profile key and returns the new one")
+@("reset-key rotates the project key and returns the new one")
 unittest {
   auto router = newRouter();
-  auto before = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1001").body);
+  auto before = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1001").body);
   auto oldKey = before["data"]["attributes"]["key"].get!string;
 
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/profiles/1001/reset-key");
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/projects/1001/reset-key");
   assert(ex.status == 200);
-  // 与 Scala 侧 ProfileWS.resetKey 同形：扁平的 {id, key}
+  // 与 Scala 侧 ProjectWS.resetKey 同形：扁平的 {id, key}
   auto doc = parseJson(ex.body);
   assert(doc["id"].get!string == "1001");
   auto key = doc["key"].get!string;
@@ -1149,14 +1149,14 @@ unittest {
   assert(isHex(key));
   // 重置即吊销：key 真的换了，而且落到了行上（详情里读到的就是新 key）
   assert(key != oldKey);
-  auto after = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/profiles/1001").body);
+  auto after = parseJson(call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1001").body);
   assert(after["data"]["attributes"]["key"].get!string == key);
 }
 
-@("reset-key 404s on a missing profile")
+@("reset-key 404s on a missing project")
 unittest {
   auto router = newRouter();
-  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/profiles/9999/reset-key");
+  auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/config/projects/9999/reset-key");
   assert(ex.status == 404);
   assert(parseJson(ex.body)["errors"][0]["status"].get!string == "404");
 }
@@ -1245,7 +1245,7 @@ unittest {
 @("reset-key needs a credential when auth is required")
 unittest {
   auto ex = call(newRouter(true), HTTPMethod.POST,
-      "http://localhost/api/bashub/config/profiles/1001/reset-key");
+      "http://localhost/api/bashub/config/projects/1001/reset-key");
   assert(ex.status == 401);
   assert(parseJson(ex.body)["errors"][0]["meta"]["redirectUrl"].get!string == "https://sas.openurp.net/cas");
 }
@@ -1255,7 +1255,7 @@ unittest {
   auto ex = call(newRouter(), HTTPMethod.GET, "http://localhost/api/bashub/ems/menus/export?app=11001");
   assert(ex.status == 200, ex.body);
   auto xml = parseJson(ex.body)["xml"].get!string;
-  assert(xml.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<profile>"));
+  assert(xml.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>"));
   assert(xml.canFind("<resource name=\"/setting/config.action\" title=\"配置管理\" scope=\"Protected\"/>"));
   assert(xml.canFind("<resource name=\"/setting/menu.action\" title=\"菜单管理\" scope=\"Private\"/>"));
   assert(xml.canFind("<menu indexno=\"1\" name=\"设置\" enName=\"setting\" params=\"\" fonticon=\"fa-cog\">"));
@@ -1263,14 +1263,14 @@ unittest {
       "entry=\"/setting/config.action\" params=\"\""));
   assert(xml.canFind("fonticon=\"fa-sliders\""));
   assert(xml.canFind("resources=\"/setting/menu.action\""));
-  assert(xml.endsWith("</menu>\n</profile>"));
+  assert(xml.endsWith("</menu>\n</project>"));
 }
 
 @("menus import merges resources and nested menus, then exports them back")
 unittest {
   auto router = newRouter();
   auto xml = `<?xml version="1.0" encoding="UTF-8"?>
-<profile>
+<project>
   <resources>
     <resource name="/setting/new.action" title="新资源" scope="Public"/>
   </resources>
@@ -1280,7 +1280,7 @@ unittest {
             params="a=1&amp;b=2" resources="/setting/menu.action"/>
     </children>
   </menu>
-</profile>`;
+</project>`;
   auto ex = upload(router, "http://localhost/api/bashub/ems/menus/import", multipartBody("11001", xml));
   assert(ex.status == 200, ex.body);
   assert(parseJson(ex.body)["success"].get!bool);
@@ -1331,7 +1331,7 @@ unittest {
   auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/ems/menus/import");
   assert(ex.status == 400);
 
-  ex = upload(router, "http://localhost/api/bashub/ems/menus/import", multipartBody("9999", "<profile/>"));
+  ex = upload(router, "http://localhost/api/bashub/ems/menus/import", multipartBody("9999", "<project/>"));
   assert(ex.status == 404);
 }
 

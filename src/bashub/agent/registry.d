@@ -7,7 +7,7 @@
  */
 
 module bashub.agent.registry;
-/// 在线 agent 的登记册：每个 profile 最多一条连接，断连即摘除。
+/// 在线 agent 的登记册：每个 project 最多一条连接，断连即摘除。
 ///
 /// D 的 WebSocket 是回调作用域里的对象，不能塞进长期存活的登记册。于是把「连接」拆成两份：
 /// 这里只放现状快照与出站队列；真正读写 socket 的循环在 `bashub.agent.socket`，它拿队列里的
@@ -66,9 +66,9 @@ private final class PendingRequest {
 
 /// 一条 agent 通道的现状快照。
 final class AgentSession {
-  immutable string profile;
-  immutable string profileId;
-  /// agent 上报的服务器 IP；同一 profile 下按它区分多台机器（`profile@ip`）。
+  immutable string project;
+  immutable string projectId;
+  /// agent 上报的服务器 IP；同一 project 下按它区分多台机器（`project@ip`）。
   immutable string ip;
   immutable string connectedAt;
   /// 建立连接的本地时刻：只用来算在线时长，对外展示仍用 `connectedAt`。
@@ -104,9 +104,9 @@ final class AgentSession {
   short closeCode;
   string closeReason;
 
-  this(string profile, string profileId = "", string ip = "") {
-    this.profile = profile;
-    this.profileId = profileId;
+  this(string project, string projectId = "", string ip = "") {
+    this.project = project;
+    this.projectId = projectId;
     this.ip = ip;
     this.connectedAt = channel.now();
     this.startedAt = MonoTime.currTime;
@@ -141,7 +141,7 @@ final class AgentSession {
       complete(message.id, message.body);
       break;
     default:
-      logWarn("%s: ignore %s %s", profile, message.isRequest ? "request" : "notice", message.typ);
+      logWarn("%s: ignore %s %s", project, message.isRequest ? "request" : "notice", message.typ);
       break;
     }
   }
@@ -166,7 +166,7 @@ final class AgentSession {
     return messages;
   }
 
-  /// 被同一 profile 的新连接取代。
+  /// 被同一 project 的新连接取代。
   void supersede() {
     superseded = true;
     closeRequested = true;
@@ -247,8 +247,8 @@ final class AgentSession {
   /// 控制台读到的现状，字段名与协议文档、Scala 侧保持一致。
   Json status() {
     auto item = Json.emptyObject;
-    item["profile"] = Json(profile);
-    item["profileId"] = Json(profileId);
+    item["project"] = Json(project);
+    item["projectId"] = Json(projectId);
     item["ip"] = Json(ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
@@ -272,8 +272,8 @@ final class AgentSession {
   /// 轻量在线列表用的摘要：不携带 OS 与 webapps，避免每 30 秒重复搬运大对象。
   Json summary() {
     auto item = Json.emptyObject;
-    item["profile"] = Json(profile);
-    item["profileId"] = Json(profileId);
+    item["project"] = Json(project);
+    item["projectId"] = Json(projectId);
     item["ip"] = Json(ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
@@ -444,37 +444,37 @@ final class AgentSession {
   }
 }
 
-/// 同一 `profile@ip` 在 60 秒内又一次被新连接顶掉：说明这台 agent 在反复重连。
+/// 同一 `project@ip` 在 60 秒内又一次被新连接顶掉：说明这台 agent 在反复重连。
 private enum SupersedeChurnSeconds = 60;
-/// 重连告警的间隔：同一 `profile@ip` 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
+/// 重连告警的间隔：同一 `project@ip` 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
 private enum SupersedeWarnSeconds = 60;
 
-/// 在线 agent 登记册：一个 profile 可以有多台机器，按上报的 `ip` 区分；
-/// 同一个 `profile@ip` 只保留最新一条连接（旧连接被顶掉），不同 IP 的连接互不影响。
+/// 在线 agent 登记册：一个 project 可以有多台机器，按上报的 `ip` 区分；
+/// 同一个 `project@ip` 只保留最新一条连接（旧连接被顶掉），不同 IP 的连接互不影响。
 final class AgentRegistry {
-  /// profile → (server ip → session)。
+  /// project → (server ip → session)。
   private AgentSession[string][string] sessions;
   private AgentHistoryStore historyStore;
-  /// `profile@ip` → 上次被新连接顶掉的时刻，用于识别同一台机器反复重连。
+  /// `project@ip` → 上次被新连接顶掉的时刻，用于识别同一台机器反复重连。
   private MonoTime[string] lastSupersedeAt;
-  /// `profile@ip` → 上次重连告警的时刻，用于限流。
+  /// `project@ip` → 上次重连告警的时刻，用于限流。
   private MonoTime[string] lastSupersedeWarnAt;
 
   this(AgentHistoryStore historyStore = null) {
     this.historyStore = historyStore;
   }
 
-  /// 登记新连接；同一 `profile@ip` 的旧连接被标记为 `superseded`，其它 IP 的连接不受影响。
-  AgentSession attach(string profile, string profileId = "", string ip = "") {
-    auto session = new AgentSession(profile, profileId, ip);
-    auto byIp = profile in sessions;
+  /// 登记新连接；同一 `project@ip` 的旧连接被标记为 `superseded`，其它 IP 的连接不受影响。
+  AgentSession attach(string project, string projectId = "", string ip = "") {
+    auto session = new AgentSession(project, projectId, ip);
+    auto byIp = project in sessions;
     if (byIp is null) {
-      sessions[profile] = [ip: session];
+      sessions[project] = [ip: session];
       return session;
     }
     if (auto previous = ip in *byIp) {
       (*previous).supersede();
-      noteSupersede(profile, ip, *previous);
+      noteSupersede(project, ip, *previous);
     }
     (*byIp)[ip] = session;
     return session;
@@ -483,12 +483,12 @@ final class AgentRegistry {
   /**
    * 记录一次「同一台机器的新连接顶掉旧连接」。
    *
-   * 正常重连时旧连接往往还没超时，这一次顶替不值得告警；只有同一 `profile@ip` 在
+   * 正常重连时旧连接往往还没超时，这一次顶替不值得告警；只有同一 `project@ip` 在
    * {@link SupersedeChurnSeconds} 内被反复顶掉，才说明这台 agent 在反复重连（网络抖动、
-   * 进程崩溃重启等）。告警带旧连接的 host 与在线时长，按 `profile@ip` 每分钟最多一条。
+   * 进程崩溃重启等）。告警带旧连接的 host 与在线时长，按 `project@ip` 每分钟最多一条。
    */
-  private void noteSupersede(string profile, string ip, AgentSession previous) {
-    auto key = profile ~ "@" ~ ip;
+  private void noteSupersede(string project, string ip, AgentSession previous) {
+    auto key = project ~ "@" ~ ip;
     auto now = MonoTime.currTime;
     bool churn;
     if (auto last = key in lastSupersedeAt)
@@ -508,59 +508,59 @@ final class AgentRegistry {
   }
 
   /// 摘除一条连接；只摘自己那条，旧连接迟到的关闭不能把新连接挤掉。
-  void detach(string profile, string ip, AgentSession session) nothrow {
-    if (auto byIp = profile in sessions) {
+  void detach(string project, string ip, AgentSession session) nothrow {
+    if (auto byIp = project in sessions) {
       if (auto found = ip in *byIp) {
         if (*found is session) {
           (*byIp).remove(ip);
           if ((*byIp).length == 0)
-            sessions.remove(profile);
+            sessions.remove(project);
         }
       }
     }
     session.disconnect();
   }
 
-  /// 主动作废该 profile 的全部连接（例如重置 Profile.key 之后）。
-  void supersede(string profile) {
-    if (auto byIp = profile in sessions)
+  /// 主动作废该 project 的全部连接（例如重置 Project.key 之后）。
+  void supersede(string project) {
+    if (auto byIp = project in sessions)
       foreach (_, session; *byIp)
         session.supersede();
   }
 
-  /// 按 `profile@ip` 找连接。
-  AgentSession find(string profile, string ip) {
-    if (auto byIp = profile in sessions) {
+  /// 按 `project@ip` 找连接。
+  AgentSession find(string project, string ip) {
+    if (auto byIp = project in sessions) {
       if (auto found = ip in *byIp)
         return *found;
     }
     return null;
   }
 
-  /// 该 profile 下唯一的连接；0 条或多条时返回 null（调用方按 ip 指定）。
-  AgentSession find(string profile) {
-    auto list = sessionsOf(profile);
+  /// 该 project 下唯一的连接；0 条或多条时返回 null（调用方按 ip 指定）。
+  AgentSession find(string project) {
+    auto list = sessionsOf(project);
     return list.length == 1 ? list[0] : null;
   }
 
-  /// 该 profile 下的全部连接，按 ip 排序。
-  AgentSession[] sessionsOf(string profile) {
+  /// 该 project 下的全部连接，按 ip 排序。
+  AgentSession[] sessionsOf(string project) {
     AgentSession[] list;
-    if (auto byIp = profile in sessions)
+    if (auto byIp = project in sessions)
       foreach (_, session; *byIp)
         list ~= session;
     list.sort!((left, right) => left.ip < right.ip);
     return list;
   }
 
-  /// 在线连接，先按 profile、再按 ip 排序。
+  /// 在线连接，先按 project、再按 ip 排序。
   AgentSession[] online() {
     AgentSession[] list;
-    foreach (profileKey, byIp; sessions)
+    foreach (projectKey, byIp; sessions)
       foreach (sessionIp, session; byIp)
         list ~= session;
-    list.sort!((left, right) => left.profile == right.profile
-        ? left.ip < right.ip : left.profile < right.profile);
+    list.sort!((left, right) => left.project == right.project
+        ? left.ip < right.ip : left.project < right.project);
     return list;
   }
 
@@ -581,28 +581,28 @@ final class AgentRegistry {
   }
 
   /// 写入一条轻量健康快照；数据库故障不能影响 agent 通道本身。
-  void recordHealth(string profileId, const(AgentSample)[] samples) nothrow {
-    if (historyStore is null || profileId.length == 0 || samples.length == 0)
+  void recordHealth(string projectId, const(AgentSample)[] samples) nothrow {
+    if (historyStore is null || projectId.length == 0 || samples.length == 0)
       return;
     try
-      historyStore.record(profileId, samples);
+      historyStore.record(projectId, samples);
     catch (Exception e)
-      logWarn("%s: record health history failed: %s", profileId, e.msg);
+      logWarn("%s: record health history failed: %s", projectId, e.msg);
   }
 
   /**
-   * 合并该 profile 下所有在线 agent 的最新 health 后写一条采样。
+   * 合并该 project 下所有在线 agent 的最新 health 后写一条采样。
    *
-   * 同一 profile 的多台 agent 各报各的 server；入库前按 server id 合并（先到先得，
-   * 正常情况下 id 跨机器唯一），表里就是「这个 profile 此刻所有 server 的状态」。
+   * 同一 project 的多台 agent 各报各的 server；入库前按 server id 合并（先到先得，
+   * 正常情况下 id 跨机器唯一），表里就是「这个 project 此刻所有 server 的状态」。
    */
-  void recordProfileHealth(string profile, string profileId) nothrow {
-    if (historyStore is null || profileId.length == 0)
+  void recordProjectHealth(string project, string projectId) nothrow {
+    if (historyStore is null || projectId.length == 0)
       return;
     try {
       AgentSample[] merged;
       bool[string] seen;
-      foreach (session; sessionsOf(profile)) {
+      foreach (session; sessionsOf(project)) {
         foreach (sample; session.effectiveHealth) {
           if ((sample.id in seen) !is null)
             continue;
@@ -611,9 +611,9 @@ final class AgentRegistry {
         }
       }
       if (merged.length > 0)
-        historyStore.record(profileId, merged);
+        historyStore.record(projectId, merged);
     } catch (Exception e) {
-      logWarn("%s: record health history failed: %s", profileId, e.msg);
+      logWarn("%s: record health history failed: %s", projectId, e.msg);
     }
   }
 
@@ -623,26 +623,26 @@ final class AgentRegistry {
   }
 
   /// 查询历史；调用方负责把异常转换成 HTTP 错误。
-  Json history(string profileId, string profileName, int daysCount) {
+  Json history(string projectId, string projectName, int daysCount) {
     if (historyStore is null)
       throw new Exception("agent history is not configured");
-    return historyStore.query(profileId, profileName, daysCount);
+    return historyStore.query(projectId, projectName, daysCount);
   }
 
   /// 请某个在线 agent 立即上报；不在线返回 false。
-  bool reportNow(string profile, string ip = "") {
-    auto session = resolve(profile, ip);
+  bool reportNow(string project, string ip = "") {
+    auto session = resolve(project, ip);
     if (session is null || !session.supportsPrimitive("report:now"))
       return false;
     return session.offer(channel.reportNow());
   }
 
   /// 下发 `log:read` 并等待 agent 的 `result`。
-  AgentReply logRead(string profile, string instance, long from, long to,
+  AgentReply logRead(string project, string instance, long from, long to,
       Duration timeout = 5.seconds, long tail = 0, string ip = "") {
-    auto session = resolve(profile, ip);
+    auto session = resolve(project, ip);
     if (session is null)
-      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
+      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project);
     if (!session.supportsPrimitive("log:read"))
       return AgentReply.failure(RequestOutcome.failed, "unsupported:log:read");
     auto body = Json.emptyObject;
@@ -655,11 +655,11 @@ final class AgentRegistry {
   }
 
   /// 下发 `agent:log` 并等待 agent 的 `result`；用于查 agent 自身日志。
-  AgentReply agentLog(string profile, long from, long to,
+  AgentReply agentLog(string project, long from, long to,
       Duration timeout = 5.seconds, long tail = 0, string ip = "") {
-    auto session = resolve(profile, ip);
+    auto session = resolve(project, ip);
     if (session is null)
-      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
+      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project);
     if (!session.supportsPrimitive("agent:log"))
       return AgentReply.failure(RequestOutcome.failed, "unsupported:agent:log");
     auto body = Json.emptyObject;
@@ -671,13 +671,13 @@ final class AgentRegistry {
   }
 
   /// 下发 `service:start|stop|restart` 并等待 agent 的 `result`。
-  AgentReply service(string profile, string action, string instance,
+  AgentReply service(string project, string action, string instance,
       Duration timeout = 120.seconds, string ip = "") {
     if (action != "start" && action != "stop" && action != "restart")
       return AgentReply.failure(RequestOutcome.failed, "bad-request");
-    auto session = resolve(profile, ip);
+    auto session = resolve(project, ip);
     if (session is null)
-      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ profile);
+      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project);
     auto primitive = "service:" ~ action;
     if (!session.supportsPrimitive(primitive))
       return AgentReply.failure(RequestOutcome.failed, "unsupported:" ~ primitive);
@@ -687,10 +687,10 @@ final class AgentRegistry {
   }
 
   /// 动作的目标连接：给了 ip 就精确找；没给时只有唯一连接才可用。
-  private AgentSession resolve(string profile, string ip) {
+  private AgentSession resolve(string project, string ip) {
     if (ip.length > 0)
-      return find(profile, ip);
-    return find(profile);
+      return find(project, ip);
+    return find(project);
   }
 
   /// 给所有在线连接投递一条保活；没有连接时什么也不做。

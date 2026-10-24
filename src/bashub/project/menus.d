@@ -6,14 +6,14 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.menus;
-/// `GET /api/bashub/ems/{profile}/menus/{appName}`：按 Profile 部署的 webapp 找到 EMS 应用，
+module bashub.project.menus;
+/// `GET /api/bashub/ems/{project}/menus/{appName}`：按 Project 部署的 webapp 找到 EMS 应用，
 /// 再输出该应用的资源与菜单 XML。应用匹配口径与 Scala `EmsWS.menus` 一致：
 /// `webapp.artifact.groupId == app.group.name` 且 `artifact.artifactId == app.artifactId`。
 
 import bashub.menus : renderMenusXml;
-import bashub.profile.distribution : loadProfileData;
-import bashub.profile.resolver : ProfileContext, loadAll;
+import bashub.project.distribution : loadProjectData;
+import bashub.project.resolver : ProjectContext, loadAll;
 
 import beangle.data.resource : Registry;
 import beangle.data.value : jsonText;
@@ -25,8 +25,8 @@ import vibe.data.json : Json;
 import std.algorithm : sort;
 import std.string : strip;
 
-/// 找不到与当前 Profile 匹配的应用时返回空串（路由按 404 处理）。
-string renderEmsMenus(Store store, Registry reg, const ProfileContext context, string appName) {
+/// 找不到与当前 Project 匹配的应用时返回空串（路由按 404 处理）。
+string renderEmsMenus(Store store, Registry reg, const ProjectContext context, string appName) {
   auto name = appName.strip;
   if (name.length == 0)
     return "";
@@ -40,7 +40,7 @@ string renderEmsMenus(Store store, Registry reg, const ProfileContext context, s
   foreach (group; loadAll(store, reg.find("app-groups")))
     groupNames[jsonText(group["id"])] = attributeText(group, "name");
 
-  auto data = loadProfileData(store, reg, context);
+  auto data = loadProjectData(store, reg, context);
   foreach (app; apps) {
     auto groupName = groupNames.get(relationshipId(app, "group"), "");
     auto appArtifactId = attributeText(app, "artifactId");

@@ -1,7 +1,7 @@
 {
   "name": "beangle-bashub",
   "private": true,
-  "version": "0.0.8-SNAPSHOT",
+  "version": "0.0.9-SNAPSHOT",
   "packageManager": "pnpm@11.21.0",
   "engines": {
     "node": ">=20",

@@ -2,9 +2,9 @@ import { apiPath, resourceApiPath } from '@/api/prefix'
 import type { ResourceRef, ResourceSchema, ResourceTabGroup } from './types'
 
 const organizationRef: ResourceRef = { path: '/organizations', type: 'organizations', labelFields: ['name', 'title'] }
-const profileRef: ResourceRef = {
-  path: '/profiles',
-  type: 'profiles',
+const projectRef: ResourceRef = {
+  path: '/projects',
+  type: 'projects',
   labelFields: ['qualifiedName'],
   sort: 'org.name,name',
 }
@@ -90,44 +90,55 @@ export const resourceSchemas: ResourceSchema[] = [
     ],
   },
   {
-    key: 'profiles',
-    alias: 'profile',
-    path: '/profiles',
-    type: 'profiles',
+    key: 'projects',
+    alias: 'project',
+    path: '/projects',
+    type: 'projects',
     title: '配置管理',
     group: '平台配置',
-    description: '部署配置：仓库、端口、HTTPS、setline 与 Micdn',
+    description: '项目：组织、域名、仓库与 Micdn；代理/SETLINE 单独维护',
     sort: 'name',
     filters: [{ key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
-      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/profiles/{id}'), text: '{qualifiedName}', target: '_self' } },
+      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/projects/{id}'), text: '{qualifiedName}', target: '_self' } },
       { key: 'title', label: '说明', required: true, cell: { type: 'join', fields: ['org.shortTitle', 'title'], separator: '' } },
       { key: 'org', label: '机构', type: 'ref', ref: organizationRef, column: false },
       { key: 'basVersion', label: '版本', required: true, width: '8%' },
       { key: 'key', label: 'Key', column: false, wide: true },
-      { key: 'ip', label: 'IP', required: true, width: '13%' },
       { key: 'hostname', label: '域名', width: '16%' },
-      {
-        key: 'proxyByHostname', label: 'Setline 按域名分组', type: 'boolean', column: false,
-        help: '启用时把 Profile 域名生成为 setline-hostname；关闭时省略该属性，由 basctl 使用 * 默认组',
-      },
-      { key: 'proxyEngine', label: '代理类型', type: 'select', column: false, options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
-      { key: 'httpPort', label: 'HTTP 端口', type: 'number', column: false },
-      { key: 'maxconn', label: '最大连接数', type: 'number', column: false },
-      { key: 'enableHttps', label: '使用HTTPS', type: 'boolean', width: '10%', cell: { type: 'boolean', trueText: 'true', falseText: 'false' } },
-      { key: 'forceHttps', label: '强制 HTTPS', type: 'boolean', column: false },
-      { key: 'httpsPort', label: 'HTTPS 端口', type: 'number', column: false },
-      {
-        key: 'sslCiphers', label: 'SSL 加密套件', column: false,
-        help: '不填写时由代理使用默认套件',
-      },
-      { key: 'sslProtocols', label: 'SSL 协议', column: false },
       { key: 'localRepo', label: '本地仓库', column: false, help: '默认 ~/.m2/repository' },
       { key: 'remoteRepo', label: '远程仓库', column: false, width: 260 },
     ],
     drawerLinks: [
-      { label: '配置详情', to: resourceApiPath('/profiles/{id}') },
-      { label: 'Micdn 配置', to: apiPath('micdn', '/profiles/{id}') },
+      { label: '配置详情', to: resourceApiPath('/projects/{id}') },
+      { label: 'Micdn 配置', to: apiPath('micdn', '/projects/{id}') },
+    ],
+  },
+  {
+    key: 'proxy-settings',
+    alias: 'proxySetting',
+    path: '/proxy-settings',
+    type: 'proxySettings',
+    title: '代理配置',
+    group: '平台配置',
+    description: '每个项目一份代理/SETLINE 配置；IP 是 setline 下载用的内部地址',
+    sort: 'project.qualifiedName',
+    filters: [{ key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true }],
+    fields: [
+      { key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true, column: false },
+      { key: 'ip', label: '内部 IP', required: true, help: '多个地址用空格或逗号分隔；仅用于 setline 配置下载鉴权' },
+      {
+        key: 'proxyByHostname', label: 'Setline 按域名分组', type: 'boolean',
+        help: '启用时把项目域名生成为 setline-hostname；关闭时省略该属性，由 basctl 使用 * 默认组',
+      },
+      { key: 'proxyEngine', label: '代理类型', type: 'select', required: true, options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
+      { key: 'httpPort', label: 'HTTP 端口', type: 'number' },
+      { key: 'maxconn', label: '最大连接数', type: 'number' },
+      { key: 'enableHttps', label: '使用HTTPS', type: 'boolean' },
+      { key: 'forceHttps', label: '强制 HTTPS', type: 'boolean' },
+      { key: 'httpsPort', label: 'HTTPS 端口', type: 'number' },
+      { key: 'sslCiphers', label: 'SSL 加密套件', help: '不填写时由代理使用默认套件' },
+      { key: 'sslProtocols', label: 'SSL 协议' },
     ],
   },
   {
@@ -151,7 +162,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'version', label: '版本', required: true },
       { key: 'jspSupport', label: 'JSP', type: 'boolean', help: '仅 tomcat-server（发行包）带 Jasper；嵌入式引擎不支持 JSP' },
       { key: 'websocketSupport', label: 'WebSocket', type: 'boolean', help: '关闭后 basctl 不再引入 websocket 依赖；tomcat-server 随发行包，不受影响' },
-      { key: 'profile', label: '配置', type: 'ref', ref: profileRef },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef },
       { key: 'listeners', label: '监听器', type: 'lines', column: false, help: '一行一个监听器类名' },
       { key: 'jars', label: '依赖 Jar', type: 'lines', column: false, help: '一行一个 jar 坐标' },
     ],
@@ -165,11 +176,11 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '同一配置下的引擎与进程参数',
     sort: 'name',
-    filters: [{ key: 'name', label: '名称' }, { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true }],
+    filters: [{ key: 'name', label: '名称' }, { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true }],
     fields: [
       { key: 'name', label: '名称', required: true, width: '10%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
-      { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true, column: false },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false },
       { key: 'engine', label: '引擎', type: 'ref', ref: { path: '/engines', type: 'engines', labelFields: ['name', 'version'] }, required: true, width: '12%' },
       { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', required: true, width: '8%' },
       // 进程参数只在表单里维护。
@@ -221,13 +232,13 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '主机规格与操作系统特性',
     sort: 'name',
-    filters: [{ key: 'name', label: '名称' }, { key: 'ip', label: 'IP' }, { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true }],
+    filters: [{ key: 'name', label: '名称' }, { key: 'ip', label: 'IP' }, { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true }],
     fields: [
       // 列标题与宽度对齐原 host/list.ftl：名称10% IP地址13% 操作系统12% 系统特性(auto) 内存8% 平台10% CPU核心8% CPU规格20%。
       { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/hosts/{id}'), text: '{name}', target: '_self' } },
       { key: 'ip', label: 'IP', columnTitle: 'IP地址', required: true, width: '13%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
-      { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true, column: false },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false },
       // 与原 host/list.ftl 一致：平台图标 + 名称(版本) 合成一列。
       {
         key: 'platform', label: '操作系统', type: 'ref', ref: platformRef, required: true, width: '12%',
@@ -298,7 +309,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'latestVersion', label: '最新版本', required: true, column: false },
       { key: 'gav', label: 'GAV', form: false, sortable: false },
       { key: 'contextPath', label: '部署上下文', width: '15%' },
-      { key: 'profile', label: '针对配置', type: 'ref', ref: profileRef, column: false },
+      { key: 'project', label: '针对配置', type: 'ref', ref: projectRef, column: false },
       { key: 'description', label: '介绍', type: 'textarea', column: false },
       { key: 'resolveSupport', label: '需要解析', type: 'boolean', width: '8%' },
       {
@@ -327,13 +338,13 @@ export const resourceSchemas: ResourceSchema[] = [
     filters: [
       { key: 'artifact.artifactId', label: '组件', filterKey: 'artifact.artifactId' },
       { key: 'version', label: '版本' },
-      { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true },
     ],
     fields: [
       { key: 'artifact', label: '标题', type: 'ref', ref: artifactRef, required: true, form: true, cell: { type: 'join', fields: ['artifact.title'] } },
       { key: 'artifactName', label: '名称', form: false, sortable: false, width: '21%', cell: { type: 'join', fields: ['artifact.artifactId'] } },
       // 配置是查询条件里的必填项，列表列不再重复展示。
-      { key: 'profile', label: '配置', type: 'ref', ref: profileRef, required: true, column: false },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false },
       { key: 'version', label: '版本', required: true, width: '12%', cell: { type: 'updatable' } },
       { key: 'contextPath', label: '上下文', required: true },
       { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，反代与 setline 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
@@ -491,7 +502,8 @@ export const resourceTabGroups: ResourceTabGroup[] = [
     group: '平台配置',
     description: '机构及其部署配置',
     tabs: [
-      { key: 'profiles', label: '配置管理' },
+      { key: 'projects', label: '配置管理' },
+      { key: 'proxy-settings', label: '代理配置' },
       { key: 'organizations', label: '机构管理' },
     ],
   },

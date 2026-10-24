@@ -83,7 +83,7 @@ export interface MicdnBindingInput {
   sortno: number
 }
 
-export interface MicdnProfileSummary {
+export interface MicdnProjectSummary {
   id: string
   name: string
   qualifiedName: string
@@ -93,8 +93,8 @@ export interface MicdnProfileSummary {
   keySet: boolean
 }
 
-export interface MicdnProfileDocument {
-  profile: MicdnProfileSummary
+export interface MicdnProjectDocument {
+  project: MicdnProjectSummary
   config: MicdnConfig
   bindings: MicdnBinding[]
   components: CdnComponent[]
@@ -126,20 +126,20 @@ export function defaultMicdnConfig(): MicdnConfig {
   }
 }
 
-export function getMicdnProfile(profileId: string): Promise<MicdnProfileDocument> {
-  return apiClient.getPlain<MicdnProfileDocument>(apiPath('micdn', `/profiles/${encodeURIComponent(profileId)}`))
+export function getMicdnProject(projectId: string): Promise<MicdnProjectDocument> {
+  return apiClient.getPlain<MicdnProjectDocument>(apiPath('micdn', `/projects/${encodeURIComponent(projectId)}`))
 }
 
-export async function saveMicdnProfile(
-  profileId: string,
+export async function saveMicdnProject(
+  projectId: string,
   config: MicdnConfig,
   bindings: MicdnBindingInput[],
-): Promise<MicdnProfileDocument> {
+): Promise<MicdnProjectDocument> {
   const document = await apiClient.patch<unknown>(
-    apiPath('micdn', `/profiles/${encodeURIComponent(profileId)}`),
+    apiPath('micdn', `/projects/${encodeURIComponent(projectId)}`),
     { config, bindings },
   )
-  return document as unknown as MicdnProfileDocument
+  return document as unknown as MicdnProjectDocument
 }
 
 export async function listCdnComponents(): Promise<CdnComponent[]> {
@@ -163,6 +163,6 @@ export async function deleteCdnComponent(id: string): Promise<void> {
   await apiClient.delete(apiPath('micdn', `/components/${id}`))
 }
 
-export function micdnXmlUrl(profileId: string): string {
-  return apiClient.resolveUrl(apiPath('micdn', `/profiles/${encodeURIComponent(profileId)}/micdn.xml`))
+export function micdnXmlUrl(projectId: string): string {
+  return apiClient.resolveUrl(apiPath('micdn', `/projects/${encodeURIComponent(projectId)}/micdn.xml`))
 }

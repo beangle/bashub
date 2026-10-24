@@ -6,9 +6,9 @@
  * (at your option) any later version.
  */
 
-module test.bashub.profile.manifest_test;
+module test.bashub.project.manifest_test;
 
-import bashub.profile.manifest : renderSetlineManifest, sha256Hex;
+import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 
 import vibe.data.json : parseJson;
 

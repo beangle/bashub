@@ -38,24 +38,14 @@ Registry hubRegistry() {
       [], [],
       "name"),
     Resource(
-      "profiles", "profiles", "bas.cfg_profiles", "id",
+      "projects", "projects", "bas.cfg_projects", "id",
       [
         Column("name", "name", Kind.text),
         Column("title", "title", Kind.text),
         Column("bas_version", "basVersion", Kind.text),
-        Column("ip", "ip", Kind.text),
         Column("hostname", "hostname", Kind.text),
-        Column("proxy_by_hostname", "proxyByHostname", Kind.boolean),
-        Column("http_port", "httpPort", Kind.number),
-        Column("https_port", "httpsPort", Kind.number),
-        Column("enable_https", "enableHttps", Kind.boolean),
-        Column("force_https", "forceHttps", Kind.boolean),
-        Column("maxconn", "maxconn", Kind.number),
-        Column("proxy_engine", "proxyEngine", Kind.text),
         Column("local_repo", "localRepo", Kind.text),
         Column("remote_repo", "remoteRepo", Kind.text),
-        Column("ssl_ciphers", "sslCiphers", Kind.text),
-        Column("ssl_protocols", "sslProtocols", Kind.text),
         Column("key", "key", Kind.text, true, "\"key\""),
       ],
       [Relation("org", "org_id", "organizations")],
@@ -65,15 +55,33 @@ Registry hubRegistry() {
       ],
       "name",
       []),
-    /// 证书单独成表：profile 的列表/详情不再携带大字段；只给专用端点内部使用。
+    /// 代理/SETLINE 配置与 project 1:1；IP 是 setline 下载用的内部地址。
     Resource(
-      "profile-certificates", "profileCertificates", "bas.cfg_profile_certificates", "profile_id",
+      "proxy-settings", "proxySettings", "bas.cfg_proxy_settings", "id",
+      [
+        Column("proxy_by_hostname", "proxyByHostname", Kind.boolean),
+        Column("proxy_engine", "proxyEngine", Kind.text),
+        Column("maxconn", "maxconn", Kind.number),
+        Column("http_port", "httpPort", Kind.number),
+        Column("https_port", "httpsPort", Kind.number),
+        Column("enable_https", "enableHttps", Kind.boolean),
+        Column("force_https", "forceHttps", Kind.boolean),
+        Column("ssl_ciphers", "sslCiphers", Kind.text),
+        Column("ssl_protocols", "sslProtocols", Kind.text),
+        Column("ip", "ip", Kind.text),
+      ],
+      [Relation("project", "project_id", "projects")],
+      [],
+      "id"),
+    /// 证书单独成表：project 的列表/详情不再携带大字段；只给专用端点内部使用。
+    Resource(
+      "project-certificates", "projectCertificates", "bas.cfg_project_certificates", "project_id",
       [
         Column("certificate", "certificate", Kind.text),
         Column("private_key", "privateKey", Kind.text),
       ],
       [], [],
-      "profile_id"),
+      "project_id"),
     Resource(
       "engines", "engines", "bas.cfg_engines", "id",
       [
@@ -84,7 +92,7 @@ Registry hubRegistry() {
         Column("jsp_support", "jspSupport", Kind.boolean),
         Column("websocket_support", "websocketSupport", Kind.boolean),
       ],
-      [Relation("profile", "profile_id", "profiles")],
+      [Relation("project", "project_id", "projects")],
       [],
       "name",
       [
@@ -101,7 +109,7 @@ Registry hubRegistry() {
       ],
       [
         Relation("engine", "engine_id", "engines"),
-        Relation("profile", "profile_id", "profiles"),
+        Relation("project", "project_id", "projects"),
       ],
       [],
       "name",
@@ -143,7 +151,7 @@ Registry hubRegistry() {
         Column("setline_admin_port", "setlineAdminPort", Kind.number),
       ],
       [
-        Relation("profile", "profile_id", "profiles"),
+        Relation("project", "project_id", "projects"),
         Relation("platform", "platform_id", "platforms"),
       ],
       [],
@@ -166,7 +174,7 @@ Registry hubRegistry() {
         Column("resolve_support", "resolveSupport", Kind.boolean),
         Column("websocket_support", "websocketSupport", Kind.boolean),
       ],
-      [Relation("profile", "profile_id", "profiles")],
+      [Relation("project", "project_id", "projects")],
       [],
       "artifact_id"),
     Resource(
@@ -180,7 +188,7 @@ Registry hubRegistry() {
       ],
       [
         Relation("artifact", "artifact_id", "artifacts"),
-        Relation("profile", "profile_id", "profiles"),
+        Relation("project", "project_id", "projects"),
       ],
       [],
       "context_path",
@@ -287,16 +295,16 @@ Registry hubRegistry() {
       [],
       "name"),
     Resource(
-      "profile-micdn", "profileMicdn", "bas.cfg_profile_micdn", "profile_id",
+      "project-micdn", "projectMicdn", "bas.cfg_project_micdn", "project_id",
       [Column("config", "config", Kind.jsonDocument)],
       [],
       [],
-      "profile_id"),
+      "project_id"),
     Resource(
-      "profile-micdn-components", "profileMicdnComponents", "bas.cfg_profile_micdn_components", "id",
+      "project-micdn-components", "projectMicdnComponents", "bas.cfg_project_micdn_components", "id",
       [Column("sortno", "sortno", Kind.number)],
       [
-        Relation("profile", "profile_id", "profiles"),
+        Relation("project", "project_id", "projects"),
         Relation("component", "component_id", "cdn-components"),
       ],
       [],
@@ -316,20 +324,22 @@ private string[] requiredOf(string path) {
     return ["name", "title"];
   case "platforms":
     return ["name"];
-  case "profiles":
-    return ["name", "title", "basVersion", "ip"];
+  case "projects":
+    return ["name", "title", "basVersion"];
+  case "proxy-settings":
+    return ["project", "proxyEngine", "ip"];
   case "engines":
     return ["name", "typ", "version"];
   case "farms":
-    return ["name", "profile", "engine", "maxHeapSize"];
+    return ["name", "project", "engine", "maxHeapSize"];
   case "servers":
     return ["name", "farm", "host"];
   case "hosts":
-    return ["name", "ip", "profile", "platform", "platformVersion", "memory", "arch", "cores", "cpu"];
+    return ["name", "ip", "project", "platform", "platformVersion", "memory", "arch", "cores", "cpu"];
   case "artifacts":
     return ["title", "artifactId", "groupId", "packaging", "latestVersion"];
   case "webapps":
-    return ["artifact", "profile", "version", "contextPath"];
+    return ["artifact", "project", "version", "contextPath"];
   case "platform-features":
     return ["name", "version", "logo"];
   case "apps":
@@ -344,10 +354,10 @@ private string[] requiredOf(string path) {
     return ["app", "name", "title"];
   case "cdn-components":
     return ["kind", "name", "mountName", "spec"];
-  case "profile-micdn":
+  case "project-micdn":
     return ["config"];
-  case "profile-micdn-components":
-    return ["profile", "component", "sortno"];
+  case "project-micdn-components":
+    return ["project", "component", "sortno"];
   default:
     return null;
   }
@@ -364,10 +374,12 @@ private string aliasOf(string path) {
     return "appGroup";
   case "cdn-components":
     return "cdnComponents";
-  case "profile-micdn":
-    return "profileMicdn";
-  case "profile-micdn-components":
-    return "profileMicdnComponents";
+  case "proxy-settings":
+    return "proxySetting";
+  case "project-micdn":
+    return "projectMicdn";
+  case "project-micdn-components":
+    return "projectMicdnComponents";
   default:
     return path.endsWith("s") ? path[0 .. $ - 1] : path;
   }

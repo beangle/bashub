@@ -25,7 +25,7 @@ export function apiRootPath(group: ApiGroup, path = ''): string {
   return `${API_PREFIX}${apiPath(group, path)}`
 }
 
-/** 通用资源路径按主表前缀选择能力域，例如 `/apps` → `ems`、`/profiles` → `config`。 */
+/** 通用资源路径按主表前缀选择能力域，例如 `/apps` → `ems`、`/projects` → `config`。 */
 export function resourceApiPath(path: string): string {
   const resource = path.replace(/^\/+/, '').split('/')[0]
   return apiPath(EMS_RESOURCE_PATHS.has(resource) ? 'ems' : 'config', path)

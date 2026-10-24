@@ -11,7 +11,7 @@ module bashub.api;
 ///
 ///   - `ems`     管理台资源、会话与 EMS 菜单
 ///   - `config`  平台配置资源、server.xml、代理、证书、setline 与主机脚本
-///   - `micdn`   micdn.xml、Profile 聚合配置与组件目录
+///   - `micdn`   micdn.xml、Project 聚合配置与组件目录
 ///   - `monitor` 在线节点、日志、上报与实例启停
 ///
 /// 前缀只在装配路由时计算一次，处理器里不再手写 `/api/bashub/...`。

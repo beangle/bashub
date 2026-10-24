@@ -14,11 +14,13 @@ alter table bas.cfg_platform_feature_scripts add constraint pk_rmm7vn5sjxej75psv
 alter table bas.cfg_platform_features add constraint pk_801cr12kkx4lqccjq8yo31rxj primary key (id);
 alter table bas.cfg_platform_features_dependencies add constraint pk_i89r1dro2uhe54fe1ta7e2iyg primary key (from_feature_id,platform_feature_id);
 alter table bas.cfg_platforms add constraint pk_giwqec5q65yu05qsao5ijus8e primary key (id);
-alter table bas.cfg_profile_certificates add constraint pk_cfg_profile_certificates primary key (profile_id);
-alter table bas.cfg_profile_micdn add constraint pk_cfg_profile_micdn primary key (profile_id);
-alter table bas.cfg_profile_micdn_components add constraint pk_cfg_profile_micdn_components primary key (id);
-alter table bas.cfg_profile_micdn_components add constraint uq_profile_micdn_component unique (profile_id,component_id);
-alter table bas.cfg_profiles add constraint pk_hh10tdbnl5j7ncrvpm5mp4cci primary key (id);
+alter table bas.cfg_project_certificates add constraint pk_cfg_project_certificates primary key (project_id);
+alter table bas.cfg_project_micdn add constraint pk_cfg_project_micdn primary key (project_id);
+alter table bas.cfg_project_micdn_components add constraint pk_cfg_project_micdn_components primary key (id);
+alter table bas.cfg_project_micdn_components add constraint uq_project_micdn_component unique (project_id,component_id);
+alter table bas.cfg_projects add constraint pk_hh10tdbnl5j7ncrvpm5mp4cci primary key (id);
+alter table bas.cfg_proxy_settings add constraint pk_cfg_proxy_settings primary key (id);
+alter table bas.cfg_proxy_settings add constraint uq_cfg_proxy_settings_project unique (project_id);
 alter table bas.cfg_servers add constraint pk_n1kin1jg3pxkwhq69v9oodwgn primary key (id);
 alter table bas.cfg_webapps add constraint pk_drfaoltpyejnt1b86ynk6f4a4 primary key (id);
 alter table bas.cfg_webapps_targets add constraint pk_5x2tbawi1eus1x8tgrrfng3e3 primary key (webapp_id,server_id);
@@ -30,5 +32,5 @@ alter table bas.ems_menus add constraint pk_njtud98p8314fiicyo0xe2mkh primary ke
 alter table bas.ems_menus_resources add constraint pk_gdv0xbg06sy84ur7hxrfo8fch primary key (menu_id,resource_id);
 alter table bas.ems_resources add constraint pk_nr89evw3ueq159rpu4dp2k1gc primary key (id);
 alter table bas.mon_server_samples add constraint pk_mon_server_samples primary key (id);
-alter table bas.mon_server_samples add constraint uq_mon_server_samples_point unique (profile_id,sampled_at);
-alter table bas.mon_server_samples add constraint fk_mon_server_samples_profile foreign key (profile_id) references bas.cfg_profiles (id);
+alter table bas.mon_server_samples add constraint uq_mon_server_samples_point unique (project_id,sampled_at);
+alter table bas.mon_server_samples add constraint fk_mon_server_samples_project foreign key (project_id) references bas.cfg_projects (id);

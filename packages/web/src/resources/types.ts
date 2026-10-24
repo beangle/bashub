@@ -167,7 +167,7 @@ export interface ResourceSchema {
   key: string
   /** 后端实体别名（simpleEntityName，如 `webapp`），列表 filter 的查询前缀。 */
   alias: string
-  /** 后端资源路径，如 `/profiles`；页面路由由所属能力域和页签组决定。 */
+  /** 后端资源路径，如 `/projects`；页面路由由所属能力域和页签组决定。 */
   path: string
   /** JSON:API 资源名（复数）。 */
   type: string

@@ -166,8 +166,8 @@ string result(string id, bool ok, Json data, string error) {
   return render("result", id, body);
 }
 
-/// 从 `.../<profile>/agents` 取 profile；路径末尾的斜杠可以省略。
-bool profileOf(string path, out string profile) {
+/// 从 `.../<project>/agents` 取 project；路径末尾的斜杠可以省略。
+bool projectOf(string path, out string project) {
   if (path.length == 0)
     return false;
   auto parts = path.strip.split("/");
@@ -176,7 +176,7 @@ bool profileOf(string path, out string profile) {
     end--;
   if (end < 2 || parts[end - 1] != "agents" || parts[end - 2].length == 0)
     return false;
-  profile = parts[end - 2];
+  project = parts[end - 2];
   return true;
 }
 

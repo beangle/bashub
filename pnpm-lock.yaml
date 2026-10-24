@@ -18,8 +18,8 @@ importers:
         specifier: ^0.0.5
         version: 0.0.5(tdesign-icons-vue-next@0.4.11(vue@3.5.43(typescript@6.0.3)))(tdesign-vue-next@1.20.8(vue@3.5.43(typescript@6.0.3)))(vue@3.5.43(typescript@6.0.3))
       '@beangle/ems-app':
-        specifier: ^0.0.2
-        version: 0.0.2(tdesign-icons-vue-next@0.4.11(vue@3.5.43(typescript@6.0.3)))(tdesign-vue-next@1.20.8(vue@3.5.43(typescript@6.0.3)))(vue-router@4.6.4(vue@3.5.43(typescript@6.0.3)))(vue@3.5.43(typescript@6.0.3))
+        specifier: ^0.0.3
+        version: 0.0.3(tdesign-icons-vue-next@0.4.11(vue@3.5.43(typescript@6.0.3)))(tdesign-vue-next@1.20.8(vue@3.5.43(typescript@6.0.3)))(vue-router@4.6.4(vue@3.5.43(typescript@6.0.3)))(vue@3.5.43(typescript@6.0.3))
       '@fortawesome/fontawesome-free':
         specifier: ^6.7.2
         version: 6.7.2
@@ -82,8 +82,8 @@ packages:
       tdesign-vue-next: ^1.20.1
       vue: ^3.5.22
 
-  '@beangle/ems-app@0.0.2':
-    resolution: {integrity: sha512-oucpsXraQ1Echa4dc4+yiLq7Spt0QZnMbHX2ChBZ+THKWq5TJnI9+P6FrGzNZsm8dlBYcIbv73p0OX7xGD8hAA==}
+  '@beangle/ems-app@0.0.3':
+    resolution: {integrity: sha512-pJygOWXSJYWOHSI8w3dQAncA45fQuIpZDMysqaxm5U11w/qsFUOjGVHGY/iq6pZUNGzkZbX/4wO3hhgDvxlC3g==}
     peerDependencies:
       tdesign-icons-vue-next: '*'
       tdesign-vue-next: '*'
@@ -988,7 +988,7 @@ snapshots:
       tdesign-vue-next: 1.20.8(vue@3.5.43(typescript@6.0.3))
       vue: 3.5.43(typescript@6.0.3)
 
-  '@beangle/ems-app@0.0.2(tdesign-icons-vue-next@0.4.11(vue@3.5.43(typescript@6.0.3)))(tdesign-vue-next@1.20.8(vue@3.5.43(typescript@6.0.3)))(vue-router@4.6.4(vue@3.5.43(typescript@6.0.3)))(vue@3.5.43(typescript@6.0.3))':
+  '@beangle/ems-app@0.0.3(tdesign-icons-vue-next@0.4.11(vue@3.5.43(typescript@6.0.3)))(tdesign-vue-next@1.20.8(vue@3.5.43(typescript@6.0.3)))(vue-router@4.6.4(vue@3.5.43(typescript@6.0.3)))(vue@3.5.43(typescript@6.0.3))':
     dependencies:
       '@beangle/bui-vue': 0.0.5(tdesign-icons-vue-next@0.4.11(vue@3.5.43(typescript@6.0.3)))(tdesign-vue-next@1.20.8(vue@3.5.43(typescript@6.0.3)))(vue@3.5.43(typescript@6.0.3))
       vue: 3.5.43(typescript@6.0.3)

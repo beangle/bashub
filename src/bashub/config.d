@@ -52,7 +52,7 @@ struct HubConfig {
   string casServer;
   /// 会话 cookie 名（ems 的 `Ems.sid.name`）
   string sessionIdName = "EMS_SID";
-  /// micdn `/maven` 的下载令牌；Profile 的 micdn `<auth download-key>` 为空时用它写进
+  /// micdn `/maven` 的下载令牌；Project 的 micdn `<auth download-key>` 为空时用它写进
   /// server.xml 的 `<snapshot-repo token>`。
   string mavenDownloadToken = "";
   /// 组件最新版本刷新间隔（分钟）；0 表示关闭周期刷新

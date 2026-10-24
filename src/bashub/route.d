@@ -30,19 +30,19 @@ import bashub.agent.socket : HealthSchedule, serveAgentSocket;
 import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
-import bashub.profile.menus : renderEmsMenus;
-import bashub.profile.manifest : renderSetlineManifest;
-import bashub.profile.micdnconfig : MicdnConfigException, MicdnProfileView, MicdnState, loadMicdnProfile, loadMicdnState,
-  micdnProfileDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProfile,
+import bashub.project.menus : renderEmsMenus;
+import bashub.project.manifest : renderSetlineManifest;
+import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
+  micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
-import bashub.profile.proxy : renderProxy;
-import bashub.profile.resolver : ProfileContext, dataOf, findProfile, findProfileById, ipHeaderAddresses,
-  loadAll, matchProfileIp, resolveProfile;
-import bashub.profile.script : renderHostScript;
-import bashub.profile.server : renderServerXml;
-import bashub.profile.peers : renderPeers;
+import bashub.project.proxy : renderProxy;
+import bashub.project.resolver : ProjectContext, dataOf, findProject, findProjectById, ipHeaderAddresses,
+  loadAll, matchHostIp, resolveHostProject, resolveSetlineProject;
+import bashub.project.script : renderHostScript;
+import bashub.project.server : renderServerXml;
+import bashub.project.peers : renderPeers;
 import bashub.security : HubSecurity;
-import bashub.store : profileKey;
+import bashub.store : projectKey;
 
 import core.time : seconds;
 import vibe.data.json : Json;
@@ -188,24 +188,24 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET /api/bashub/config/{profile}/server`：basctl 拉取的 server.xml。
+  /// `GET /api/bashub/config/{project}/server`：basctl 拉取的 server.xml。
   ///
-  /// 机器端点不属于 JSON:API，也不走浏览器登录；Profile 名定位记录，`Authorization:
-  /// Bearer <profile>:<Profile.key>` 证明这台机器有权取走配置。不再接受可伪造的 `ip:` 头。
-  void profileServer(HTTPServerRequest req, HTTPServerResponse res) {
-    auto profileName = req.params.get("profile", "");
-    ProfileContext profile;
-    if (!findProfile(reg, store, profileName, profile)) {
+  /// 机器端点不属于 JSON:API，也不走浏览器登录；Project 名定位记录，`Authorization:
+  /// Bearer <project>:<Project.key>` 证明这台机器有权取走配置。不再接受可伪造的 `ip:` 头。
+  void projectServer(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
-    if (!profileTokenAccepted(req, profileName, attributeText(profile.data, "key"))) {
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
       writeConfigUnauthorized(res);
       return;
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, profile, false, cfg.mavenDownloadToken),
+      res.writeBody(renderServerXml(store, reg, project, false, cfg.mavenDownloadToken),
           HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
@@ -213,21 +213,21 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/profiles/{id}/server`：管理台查看最终 server.xml。
+  /// `GET /api/bashub/config/projects/{id}/server`：管理台查看最终 server.xml。
   ///
-  /// 与机器下载端点分开：这里按登录会话鉴权，不要求 Profile key，也不接受 `ip:` 头。
-  void profileServerView(HTTPServerRequest req, HTTPServerResponse res) {
+  /// 与机器下载端点分开：这里按登录会话鉴权，不要求 Project key，也不接受 `ip:` 头。
+  void projectServerView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
-    ProfileContext profile;
-    if (!findProfileById(reg, store, req.params.get("id", ""), profile)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ req.params.get("id", "")),
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ req.params.get("id", "")),
           HTTPStatus.notFound);
       return;
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, profile, true, cfg.mavenDownloadToken),
+      res.writeBody(renderServerXml(store, reg, project, true, cfg.mavenDownloadToken),
           HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
@@ -235,21 +235,21 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/{profile}/proxy`：按 Profile 的 `proxyEngine` 输出 haproxy / nginx。
-  /// 机器下载与 `config/server` 使用同一个 Profile key；未知引擎与不存在的 Profile 一样返回 404。
-  void profileProxy(HTTPServerRequest req, HTTPServerResponse res) {
-    auto profileName = req.params.get("profile", "");
-    ProfileContext profile;
-    if (!findProfile(reg, store, profileName, profile)) {
+  /// `GET /api/bashub/config/{project}/proxy`：按 Project 的 `proxyEngine` 输出 haproxy / nginx。
+  /// 机器下载与 `config/server` 使用同一个 Project key；未知引擎与不存在的 Project 一样返回 404。
+  void projectProxy(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
-    if (!profileTokenAccepted(req, profileName, attributeText(profile.data, "key"))) {
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
       writeConfigUnauthorized(res);
       return;
     }
     try {
-      auto text = renderProxy(store, reg, profile);
+      auto text = renderProxy(store, reg, project);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -261,51 +261,51 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/{profile}/certificate`：setline 拉取的 PEM 公钥证书。
-  void profileCertificate(HTTPServerRequest req, HTTPServerResponse res) {
-    writeProfileCertificate(req, res, false);
+  /// `GET /api/bashub/config/{project}/certificate`：setline 拉取的 PEM 公钥证书。
+  void projectCertificate(HTTPServerRequest req, HTTPServerResponse res) {
+    writeProjectCertificate(req, res, false);
   }
 
-  /// `GET /api/bashub/config/{profile}/certificate-key`：setline 拉取的 PEM 私钥。
-  void profileCertificateKey(HTTPServerRequest req, HTTPServerResponse res) {
-    writeProfileCertificate(req, res, true);
+  /// `GET /api/bashub/config/{project}/certificate-key`：setline 拉取的 PEM 私钥。
+  void projectCertificateKey(HTTPServerRequest req, HTTPServerResponse res) {
+    writeProjectCertificate(req, res, true);
   }
 
-  private void writeProfileCertificate(HTTPServerRequest req, HTTPServerResponse res, bool privateKey) {
-    ProfileContext profile;
-    auto profileName = req.params.get("profile", "");
-    if (!findProfile(reg, store, profileName, profile)) {
+  private void writeProjectCertificate(HTTPServerRequest req, HTTPServerResponse res, bool privateKey) {
+    ProjectContext project;
+    auto projectName = req.params.get("project", "");
+    if (!findProject(reg, store, projectName, project)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
-    if (!profileTokenAccepted(req, profileName, attributeText(profile.data, "key"))) {
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
       writeConfigUnauthorized(res);
       return;
     }
 
     Row row;
     auto text = "";
-    if (store.fetchRaw(reg.find("profile-certificates"), profile.id, row))
+    if (store.fetchRaw(reg.find("project-certificates"), project.id, row))
       text = jsonText(rowGet(row, privateKey ? "private_key" : "certificate"));
     res.headers["Cache-Control"] = "no-store";
     res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
   }
 
-  /// `GET /api/bashub/config/profiles/{id}/certificate`：管理台读取公钥与私钥是否已设置。
-  void profileCertificateInfo(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `GET /api/bashub/config/projects/{id}/certificate`：管理台读取公钥与私钥是否已设置。
+  void projectCertificateInfo(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
-    ProfileContext profile;
-    if (!findProfileById(reg, store, id, profile)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+    ProjectContext project;
+    if (!findProjectById(reg, store, id, project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
       return;
     }
     auto doc = Json.emptyObject;
     doc["certificate"] = Json("");
     doc["keySet"] = Json(false);
     Row row;
-    if (store.fetchRaw(reg.find("profile-certificates"), profile.id, row)) {
+    if (store.fetchRaw(reg.find("project-certificates"), project.id, row)) {
       doc["certificate"] = Json(jsonText(rowGet(row, "certificate")));
       doc["keySet"] = Json(jsonText(rowGet(row, "private_key")).length > 0);
     }
@@ -313,14 +313,14 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `PATCH /api/bashub/config/profiles/{id}/certificate`：保存 PEM 公钥证书；私钥留空表示保持原值。
-  void updateProfileCertificate(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `PATCH /api/bashub/config/projects/{id}/certificate`：保存 PEM 公钥证书；私钥留空表示保持原值。
+  void updateProjectCertificate(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
-    ProfileContext profile;
-    if (!findProfileById(reg, store, id, profile)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+    ProjectContext project;
+    if (!findProjectById(reg, store, id, project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
       return;
     }
     auto body = requestJson(req, res);
@@ -342,12 +342,12 @@ class HubService {
     values["certificate"] = Json(certificate);
     if (privateKey.length > 0)
       values["private_key"] = Json(privateKey);
-    auto certificates = reg.find("profile-certificates");
-    store.upsertColumns(certificates, profile.id, values);
+    auto certificates = reg.find("project-certificates");
+    store.upsertColumns(certificates, project.id, values);
     Row stored;
     auto doc = Json.emptyObject;
     doc["certificate"] = Json(certificate);
-    doc["keySet"] = Json(store.fetchRaw(certificates, profile.id, stored)
+    doc["keySet"] = Json(store.fetchRaw(certificates, project.id, stored)
         && jsonText(rowGet(stored, "private_key")).length > 0);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
@@ -358,31 +358,31 @@ class HubService {
     return text.length > 0 && !text.endsWith("\n") ? text ~ "\n" : text;
   }
 
-  /// `GET /api/bashub/config/{profile}/setline-peers`：setline 的 peer 列表机器下载端点。
-  void profilePeers(HTTPServerRequest req, HTTPServerResponse res) {
-    auto profileName = req.params.get("profile", "");
-    ProfileContext profile;
-    if (!findProfile(reg, store, profileName, profile)) {
+  /// `GET /api/bashub/config/{project}/setline-peers`：setline 的 peer 列表机器下载端点。
+  void projectPeers(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
-    if (!profileTokenAccepted(req, profileName, attributeText(profile.data, "key"))) {
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
       writeConfigUnauthorized(res);
       return;
     }
-    writePeers(res, profile, "attachment");
+    writePeers(res, project, "attachment");
   }
 
-  /// `GET /api/bashub/config/{profile}/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
+  /// `GET /api/bashub/config/{project}/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
   /// agent 先比清单，只下载变化项；值与对应下载端点的响应 Body 完全一致。
-  void profileManifest(HTTPServerRequest req, HTTPServerResponse res) {
-    auto profileName = req.params.get("profile", "");
-    ProfileContext profile;
-    if (!findProfile(reg, store, profileName, profile)) {
+  void projectManifest(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
-    if (!profileTokenAccepted(req, profileName, attributeText(profile.data, "key"))) {
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
       writeConfigUnauthorized(res);
       return;
     }
@@ -390,13 +390,13 @@ class HubService {
     Row row;
     auto certificate = "";
     auto certificateKey = "";
-    if (store.fetchRaw(reg.find("profile-certificates"), profile.id, row)) {
+    if (store.fetchRaw(reg.find("project-certificates"), project.id, row)) {
       certificate = jsonText(rowGet(row, "certificate"));
       certificateKey = jsonText(rowGet(row, "private_key"));
     }
     try {
-      auto peers = renderPeers(store, reg, profile);
-      auto proxy = renderProxy(store, reg, profile);
+      auto peers = renderPeers(store, reg, project);
+      auto proxy = renderProxy(store, reg, project);
       auto text = renderSetlineManifest(peers, proxy, certificate, certificateKey);
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "application/json");
@@ -406,18 +406,18 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/profiles/{id}/proxy`：管理台查看最终代理配置。
-  void profileProxyView(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `GET /api/bashub/config/projects/{id}/proxy`：管理台查看最终代理配置。
+  void projectProxyView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
-    ProfileContext profile;
-    if (!findProfileById(reg, store, req.params.get("id", ""), profile)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ req.params.get("id", "")),
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ req.params.get("id", "")),
           HTTPStatus.notFound);
       return;
     }
     try {
-      auto text = renderProxy(store, reg, profile);
+      auto text = renderProxy(store, reg, project);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -430,28 +430,30 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/profiles/{id}/setline-peers`：管理台查看 setline peers。
-  void profilePeersView(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `GET /api/bashub/config/projects/{id}/setline-peers`：管理台查看 setline peers。
+  void projectPeersView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
-    ProfileContext profile;
-    if (!findProfileById(reg, store, req.params.get("id", ""), profile)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ req.params.get("id", "")),
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ req.params.get("id", "")),
           HTTPStatus.notFound);
       return;
     }
-    writePeers(res, profile, "inline");
+    writePeers(res, project, "inline");
   }
 
-  /// `GET /api/bashub/ems/{profile}/menus/{appName}`：当前 Profile 部署应用的资源与菜单 XML。
-  void profileEmsMenus(HTTPServerRequest req, HTTPServerResponse res) {
-    ProfileContext profile;
-    if (!resolveProfile(reg, store, req.params.get("profile", ""), req.headers.get("ip", ""), profile)) {
+  /// `GET /api/bashub/ems/{project}/menus/{appName}`：当前 Project 部署应用的资源与菜单 XML。
+  void projectEmsMenus(HTTPServerRequest req, HTTPServerResponse res) {
+    ProjectContext project;
+    string matched;
+    if (!resolveHostProject(reg, store, req.params.get("project", ""), req.headers.get("ip", ""),
+        project, matched)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
     try {
-      auto text = renderEmsMenus(store, reg, profile, req.params.get("appName", ""));
+      auto text = renderEmsMenus(store, reg, project, req.params.get("appName", ""));
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -463,21 +465,21 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/micdn/{profile}/micdn.xml`：micdn 拉取的完整配置。
+  /// `GET /api/bashub/micdn/{project}/micdn.xml`：micdn 拉取的完整配置。
   ///
-  /// 只按 `{org.name}` 找 Profile，不再要求 `ip` 头；令牌必须等于 `profile.key`。
+  /// 只按 `{org.name}` 找 Project，不再要求 `ip` 头；令牌必须等于 `project.key`。
   /// 同时接受 `X-Micdn-Token`、`Authorization: Bearer` 和 `Authorization: Basic`
   /// （Basic 的用户名或口令任一等于 key，与 micdn 的鉴权约定一致）。
-  void profileMicdnXml(HTTPServerRequest req, HTTPServerResponse res) {
-    ProfileContext profile;
-    if (!findProfile(reg, store, req.params.get("profile", ""), profile)
-        || !micdnTokenAccepted(req, attributeText(profile.data, "key"))) {
+  void projectMicdnXml(HTTPServerRequest req, HTTPServerResponse res) {
+    ProjectContext project;
+    if (!findProject(reg, store, req.params.get("project", ""), project)
+        || !micdnTokenAccepted(req, attributeText(project.data, "key"))) {
       writeMicdnUnauthorized(res);
       return;
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderMicdnXmlForProfile(profile.id, false, requestOrigin(req)), HTTPStatus.ok,
+      res.writeBody(renderMicdnXmlForProject(project.id, false, requestOrigin(req)), HTTPStatus.ok,
           "application/xml");
     } catch (Exception e) {
       logError("Render micdn.xml failed: %s", e.msg);
@@ -485,26 +487,26 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/micdn/profiles/{id}`：管理台聚合视图（密钥脱敏）。
-  void profileMicdn(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `GET /api/bashub/micdn/projects/{id}`：管理台聚合视图（密钥脱敏）。
+  void projectMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
-    MicdnProfileView view;
+    MicdnProjectView view;
     try {
-      if (!loadMicdnProfile(store, reg, id, view)) {
-        writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+      if (!loadMicdnProject(store, reg, id, view)) {
+        writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
         return;
       }
-      writeJsonApi(res, micdnProfileDocument(view, profileMicdnUrl(requestOrigin(req),
-          jsonText(view.profile["qualifiedName"]))), HTTPStatus.ok);
+      writeJsonApi(res, micdnProjectDocument(view, projectMicdnUrl(requestOrigin(req),
+          jsonText(view.project["qualifiedName"]))), HTTPStatus.ok);
     } catch (Exception e) {
       writeMicdnError(res, e);
     }
   }
 
-  /// `PATCH /api/bashub/micdn/profiles/{id}`：一次保存配置与组件绑定。
-  void updateProfileMicdn(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `PATCH /api/bashub/micdn/projects/{id}`：一次保存配置与组件绑定。
+  void updateProjectMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
@@ -512,28 +514,28 @@ class HubService {
     if (body.type == Json.Type.undefined)
       return;
     try {
-      saveMicdnProfile(store, reg, id, body);
-      MicdnProfileView view;
-      if (!loadMicdnProfile(store, reg, id, view)) {
-        writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+      saveMicdnProject(store, reg, id, body);
+      MicdnProjectView view;
+      if (!loadMicdnProject(store, reg, id, view)) {
+        writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
         return;
       }
-      writeJsonApi(res, micdnProfileDocument(view, profileMicdnUrl(requestOrigin(req),
-          jsonText(view.profile["qualifiedName"]))), HTTPStatus.ok);
+      writeJsonApi(res, micdnProjectDocument(view, projectMicdnUrl(requestOrigin(req),
+          jsonText(view.project["qualifiedName"]))), HTTPStatus.ok);
     } catch (Exception e) {
       writeMicdnError(res, e);
     }
   }
 
-  /// `GET /api/bashub/micdn/profiles/{id}/micdn.xml`：下载真实配置（含密钥）。
-  void downloadProfileMicdnXml(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `GET /api/bashub/micdn/projects/{id}/micdn.xml`：下载真实配置（含密钥）。
+  void downloadProjectMicdnXml(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
     try {
-      auto xml = renderMicdnXmlForProfile(id, false, requestOrigin(req));
+      auto xml = renderMicdnXmlForProject(id, false, requestOrigin(req));
       if (xml.length == 0) {
-        writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+        writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
         return;
       }
       res.headers["Cache-Control"] = "no-store";
@@ -638,7 +640,7 @@ class HubService {
     }
   }
 
-  /// `DELETE /api/bashub/micdn/components/{id}`：仍被 Profile 引用时由外键拒绝。
+  /// `DELETE /api/bashub/micdn/components/{id}`：仍被 Project 引用时由外键拒绝。
   void deleteCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -654,27 +656,27 @@ class HubService {
     }
   }
 
-  /// 机器分发只依赖 Profile 是否存在；配置为空时仍输出一份可启动的缺省 micdn.xml。
-  private string renderMicdnXmlForProfile(string profileId, bool maskSecrets, string origin = "") {
-    Json profile;
-    if (!store.fetch(reg.find("profiles"), profileId, Query.init, profile))
+  /// 机器分发只依赖 Project 是否存在；配置为空时仍输出一份可启动的缺省 micdn.xml。
+  private string renderMicdnXmlForProject(string projectId, bool maskSecrets, string origin = "") {
+    Json project;
+    if (!store.fetch(reg.find("projects"), projectId, Query.init, project))
       return "";
     MicdnState state;
-    if (!loadMicdnState(store, reg, profileId, state))
+    if (!loadMicdnState(store, reg, projectId, state))
       return "";
-    auto data = profile["data"];
-    auto remoteUrl = origin.length > 0 ? profileMicdnUrl(origin, attributeText(data, "qualifiedName")) : "";
+    auto data = project["data"];
+    auto remoteUrl = origin.length > 0 ? projectMicdnUrl(origin, attributeText(data, "qualifiedName")) : "";
     return renderMicdnXml(state.config, state.components, attributeText(data, "name"),
         attributeText(data, "key"), maskSecrets, remoteUrl);
   }
 
-  private string profileMicdnUrl(string origin, string qualifiedName) {
+  private string projectMicdnUrl(string origin, string qualifiedName) {
     return origin ~ api.micdn ~ "/" ~ qualifiedName ~ "/micdn.xml";
   }
 
-  private void writePeers(HTTPServerResponse res, const ProfileContext profile, string disposition) {
+  private void writePeers(HTTPServerResponse res, const ProjectContext project, string disposition) {
     try {
-      auto text = renderPeers(store, reg, profile);
+      auto text = renderPeers(store, reg, project);
       res.headers["Cache-Control"] = "no-store";
       res.headers["Content-Disposition"] = disposition ~ `; filename="setline-peers.json"`;
       res.writeBody(text, HTTPStatus.ok, "application/json");
@@ -684,22 +686,22 @@ class HubService {
     }
   }
 
-  /// 机器配置下载接受 `Bearer <profile>:<Profile.key>` 或 Basic（用户名 profile、口令 key），
-  /// 也兼容旧客户端只发 `<Profile.key>`。带 Profile 名时同时校验 URL 与凭证绑定关系。
-  private bool profileTokenAccepted(HTTPServerRequest req, string profileName, string profileKey) {
-    auto expected = profileKey.strip;
+  /// 机器配置下载接受 `Bearer <project>:<Project.key>` 或 Basic（用户名 project、口令 key），
+  /// 也兼容旧客户端只发 `<Project.key>`。带 Project 名时同时校验 URL 与凭证绑定关系。
+  private bool projectTokenAccepted(HTTPServerRequest req, string projectName, string projectKey) {
+    auto expected = projectKey.strip;
     if (expected.length == 0)
       return false;
     auto authorization = req.headers.get("Authorization", "").strip;
     if (authorization.length > 7 && authorization[0 .. 6].toLower == "bearer"
         && authorization[6] == ' ')
-      return tokenMatchesProfile(authorization[7 .. $], profileName, expected);
+      return tokenMatchesProject(authorization[7 .. $], projectName, expected);
     if (authorization.length > 6 && authorization[0 .. 5].toLower == "basic"
         && authorization[5] == ' ') {
       try {
         auto text = cast(string) Base64.decode(authorization[6 .. $].strip);
         auto colon = text.indexOf(':');
-        return colon > 0 && tokenEquals(text[0 .. colon], profileName)
+        return colon > 0 && tokenEquals(text[0 .. colon], projectName)
             && tokenEquals(text[colon + 1 .. $], expected);
       } catch (Exception)
         return false;
@@ -710,12 +712,12 @@ class HubService {
   private void writeConfigUnauthorized(HTTPServerResponse res) {
     res.headers["WWW-Authenticate"] = `Bearer realm="basctl"`;
     res.headers["Cache-Control"] = "no-store";
-    res.writeBody("config requires Authorization: Bearer <profile>:<Profile.key> or Basic <profile>:<Profile.key>",
+    res.writeBody("config requires Authorization: Bearer <project>:<Project.key> or Basic <project>:<Project.key>",
         HTTPStatus.unauthorized, "text/plain; charset=utf-8");
   }
 
-  private bool micdnTokenAccepted(HTTPServerRequest req, string profileKey) {
-    auto expected = profileKey.strip;
+  private bool micdnTokenAccepted(HTTPServerRequest req, string projectKey) {
+    auto expected = projectKey.strip;
     if (expected.length == 0)
       return false;
     if (tokenEquals(req.headers.get("X-Micdn-Token", ""), expected))
@@ -749,11 +751,11 @@ class HubService {
     return diff == 0;
   }
 
-  private bool tokenMatchesProfile(string supplied, string profileName, string expected) {
+  private bool tokenMatchesProject(string supplied, string projectName, string expected) {
     auto actual = supplied.strip;
     auto colon = actual.indexOf(':');
     if (colon > 0 && colon + 1 < actual.length)
-      return tokenEquals(actual[0 .. colon], profileName)
+      return tokenEquals(actual[0 .. colon], projectName)
           && tokenEquals(actual[colon + 1 .. $], expected);
     return tokenEquals(actual, expected);
   }
@@ -774,7 +776,7 @@ class HubService {
 
   private void writeMicdnError(HTTPServerResponse res, Exception e) {
     if (auto ce = cast(MicdnConfigException) e) {
-      if (ce.field == "profile") {
+      if (ce.field == "project") {
         writeJsonApi(res, errorDocument(404, "记录不存在", ce.msg), HTTPStatus.notFound);
         return;
       }
@@ -785,7 +787,7 @@ class HubService {
       if (de.msg.indexOf("duplicate key value violates unique constraint") >= 0) {
         writeJsonApi(res, errorDocument(409, "数据冲突", "名称或挂载名已存在"), HTTPStatus.conflict);
       } else if (de.msg.indexOf("violates foreign key constraint") >= 0) {
-        writeJsonApi(res, errorDocument(409, "关联数据冲突", "组件仍被 Profile 引用，或 Profile 不存在"),
+        writeJsonApi(res, errorDocument(409, "关联数据冲突", "组件仍被 Project 引用，或 Project 不存在"),
             HTTPStatus.conflict);
       } else {
         logError("Micdn data error: %s", de.msg);
@@ -797,15 +799,15 @@ class HubService {
     writeJsonApi(res, errorDocument(500, "Micdn 配置处理失败", e.msg), HTTPStatus.internalServerError);
   }
 
-  /// `GET /api/bashub/config/{profile}/script/{host}`：按 Host.ip 生成该主机的检查脚本。
-  void profileHostScript(HTTPServerRequest req, HTTPServerResponse res) {
-    ProfileContext profile;
-    if (!resolveProfile(reg, store, req.params.get("profile", ""), req.headers.get("ip", ""), profile)) {
+  /// `GET /api/bashub/config/{project}/script/{host}`：按 Host.ip 生成该主机的检查脚本。
+  void projectHostScript(HTTPServerRequest req, HTTPServerResponse res) {
+    ProjectContext project;
+    if (!resolveSetlineProject(reg, store, req.params.get("project", ""), req.headers.get("ip", ""), project)) {
       res.writeBody("", HTTPStatus.notFound);
       return;
     }
     try {
-      auto text = renderHostScript(store, reg, profile, req.params.get("host", ""));
+      auto text = renderHostScript(store, reg, project, req.params.get("host", ""));
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -817,28 +819,28 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/monitor/agents/{profile}/channel`：basctl 的出站 WebSocket。
+  /// `GET /api/bashub/monitor/agents/{project}/channel`：basctl 的出站 WebSocket。
   ///
-  /// 鉴权在升级前完成：`Authorization: Bearer <profile>:<Profile.key>` 不对就直接 401，
-  /// 也兼容只发 `<Profile.key>` 的旧客户端。
+  /// 鉴权在升级前完成：`Authorization: Bearer <project>:<Project.key>` 不对就直接 401，
+  /// 也兼容只发 `<Project.key>` 的旧客户端。
   /// 这样未认证的连接拿不到一个字节的协议，也不会在登记册里留下任何痕迹。
-  void profileAgents(HTTPServerRequest req, HTTPServerResponse res) {
-    auto name = req.params.get("profile", "");
-    ProfileContext profile;
-    if (!findProfile(reg, store, name, profile)) {
+  void projectAgents(HTTPServerRequest req, HTTPServerResponse res) {
+    auto name = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, name, project)) {
       res.writeBody("", HTTPStatus.unauthorized);
       return;
     }
 
     string supplied;
-    auto expected = attributeText(profile.data, "key");
+    auto expected = attributeText(project.data, "key");
     if (expected.length == 0 || !bearer(req.headers.get("Authorization", ""), supplied)
-        || !tokenMatchesProfile(supplied, name, expected)) {
+        || !tokenMatchesProject(supplied, name, expected)) {
       res.writeBody("", HTTPStatus.unauthorized);
       return;
     }
-    // 身份 = profile + agent 上报的服务器 IP：同一 profile 的多台机器各占一条连接。
-    // 头里可以带多个地址（多网卡）；只接受 profile / hosts 里声明过的那个，命中才放行。
+    // 身份 = project + agent 上报的服务器 IP：同一 project 的多台机器各占一条连接。
+    // 头里可以带多个地址（多网卡）；只接受 project / hosts 里声明过的那个，命中才放行。
     auto reportedIps = ipHeaderAddresses(req.headers.get("ip", ""));
     if (reportedIps.length == 0) {
       writeJsonApi(res, errorDocument(400, "请求参数非法",
@@ -847,15 +849,15 @@ class HubService {
       return;
     }
     string agentIp;
-    if (!matchProfileIp(reg, store, profile, reportedIps, agentIp)) {
+    if (!matchHostIp(reg, store, project, reportedIps, agentIp)) {
       writeJsonApi(res, errorDocument(403, "来源 IP 未授权",
-          "agent ip is not declared for profile " ~ name ~ ": " ~ reportedIps.join(","), "ip"),
+          "agent ip does not match any host of project " ~ name ~ ": " ~ reportedIps.join(","), "ip"),
           HTTPStatus.forbidden);
       return;
     }
     auto health = HealthSchedule(cfg.agentHealthIntervalSeconds, cfg.agentHealthStartMinute,
         cfg.agentHealthEndMinute);
-    serveAgentSocket(agents, name, profile.id, agentIp, req, res, health);
+    serveAgentSocket(agents, name, project.id, agentIp, req, res, health);
   }
 
   /// `org.name` → 机构展示信息（标题/简称/Logo）；监控卡片用它替掉主机名当大标题。
@@ -882,7 +884,7 @@ class HubService {
     return index;
   }
 
-  /// 给在线节点补 `org`：profile 名是 `org.name`，取第一个 `.` 之前的部分查机构。
+  /// 给在线节点补 `org`：project 名是 `org.name`，取第一个 `.` 之前的部分查机构。
   /// 配置里的 webapp 标题索引：agent 只报 context/uri，标题由 bashub 反查，不扩协议。
   private static struct WebappTitles {
     string[string] byContext;
@@ -908,12 +910,12 @@ class HubService {
     return value;
   }
 
-  /// 读该 profile 的 webapp 配置：context / artifact(gav) → artifact.title。
-  private WebappTitles webappTitles(string profileId) {
+  /// 读该 project 的 webapp 配置：context / artifact(gav) → artifact.title。
+  private WebappTitles webappTitles(string projectId) {
     WebappTitles index;
     Query q;
     q.pageSize = 100000;
-    q.addFilter("profile", profileId);
+    q.addFilter("project", projectId);
     q.includes = ["artifact"];
     auto document = store.search(reg.find("webapps"), q);
 
@@ -1001,39 +1003,39 @@ class HubService {
       auto declared = jsonGet(report, "declared");
       if (!hasWebappArray(instances) && !hasWebappArray(declared))
         continue;
-      auto profileId = jsonText(item["profileId"]);
-      if (profileId.length == 0)
+      auto projectId = jsonText(item["projectId"]);
+      if (projectId.length == 0)
         continue;
-      if (profileId !in cache)
-        cache[profileId] = webappTitles(profileId);
-      auto titles = profileId in cache;
+      if (projectId !in cache)
+        cache[projectId] = webappTitles(projectId);
+      auto titles = projectId in cache;
       addWebappTitles(instances, *titles);
       addWebappTitles(declared, *titles);
     }
     return agentsJson;
   }
 
-  /// 监控卡片的大标题用 profile 的说明（title）；机构信息只留给 Logo。
-  private Json withProfileInfo(Json agentsJson) {
+  /// 监控卡片的大标题用 project 的说明（title）；机构信息只留给 Logo。
+  private Json withProjectInfo(Json agentsJson) {
     auto index = organizationIndex();
     string[string] titles;
     foreach (ref item; agentsJson) {
-      auto profileName = jsonText(item["profile"]);
-      auto dot = profileName.indexOf('.');
-      auto orgName = dot > 0 ? profileName[0 .. dot] : "";
+      auto projectName = jsonText(item["project"]);
+      auto dot = projectName.indexOf('.');
+      auto orgName = dot > 0 ? projectName[0 .. dot] : "";
       if (auto found = orgName in index)
         item["org"] = *found;
-      auto profileId = jsonText(item["profileId"]);
-      if (profileId.length == 0)
+      auto projectId = jsonText(item["projectId"]);
+      if (projectId.length == 0)
         continue;
-      if (profileId !in titles) {
-        ProfileContext context;
-        titles[profileId] = findProfileById(reg, store, profileId, context)
+      if (projectId !in titles) {
+        ProjectContext context;
+        titles[projectId] = findProjectById(reg, store, projectId, context)
             ? attributeText(context.data, "title") : "";
       }
-      auto title = profileId in titles;
+      auto title = projectId in titles;
       if ((*title).length > 0)
-        item["profileTitle"] = Json(*title);
+        item["projectTitle"] = Json(*title);
     }
     return agentsJson;
   }
@@ -1043,7 +1045,7 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
     auto doc = Json.emptyObject;
-    doc["agents"] = withWebappTitles(withProfileInfo(agents.status));
+    doc["agents"] = withWebappTitles(withProjectInfo(agents.status));
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -1052,12 +1054,12 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
     auto doc = Json.emptyObject;
-    doc["agents"] = withProfileInfo(agents.summary);
+    doc["agents"] = withProjectInfo(agents.summary);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET /api/bashub/monitor/agents/{profile}/history?days=180`
-  /// 一次返回 profile 的原始运行采样；按 server/天聚合与单 server 视图都在 SPA 本地完成。
+  /// `GET /api/bashub/monitor/agents/{project}/history?days=180`
+  /// 一次返回 project 的原始运行采样；按 server/天聚合与单 server 视图都在 SPA 本地完成。
   void agentHistory(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1068,10 +1070,10 @@ class HubService {
           HTTPStatus.badRequest);
       return;
     }
-    auto profileName = req.params.get("profile", "");
-    ProfileContext profile;
-    if (!findProfile(reg, store, profileName, profile)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profile with name " ~ profileName),
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no project with name " ~ projectName),
           HTTPStatus.notFound);
       return;
     }
@@ -1081,7 +1083,7 @@ class HubService {
       return;
     }
     try {
-      writeJsonApi(res, agents.history(profile.id, profileName, cast(int) daysCount), HTTPStatus.ok);
+      writeJsonApi(res, agents.history(project.id, projectName, cast(int) daysCount), HTTPStatus.ok);
     } catch (Exception e) {
       logError("Query agent history failed: %s", e.msg);
       writeJsonApi(res, errorDocument(500, "运行历史查询失败", e.msg), HTTPStatus.internalServerError);
@@ -1093,18 +1095,18 @@ class HubService {
    *
    * 返回 null 时响应已经写好（404 离线 / 409 需要指定）。
    */
-  private AgentSession pickAgent(HTTPServerRequest req, HTTPServerResponse res, string profile) {
+  private AgentSession pickAgent(HTTPServerRequest req, HTTPServerResponse res, string project) {
     auto ip = req.query.get("agent", "").strip;
     if (ip.length) {
-      auto session = agents.find(profile, ip);
+      auto session = agents.find(project, ip);
       if (session is null)
-        writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ profile ~ "@" ~ ip),
+        writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ project ~ "@" ~ ip),
             HTTPStatus.notFound);
       return session;
     }
-    auto sessions = agents.sessionsOf(profile);
+    auto sessions = agents.sessionsOf(project);
     if (sessions.length == 0) {
-      writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ profile), HTTPStatus.notFound);
+      writeJsonApi(res, errorDocument(404, "节点不在线", "agent offline: " ~ project), HTTPStatus.notFound);
       return null;
     }
     if (sessions.length == 1)
@@ -1113,12 +1115,12 @@ class HubService {
     foreach (session; sessions)
       ips ~= session.ip;
     writeJsonApi(res, errorDocument(409, "请指定 agent",
-        "multiple agents online for " ~ profile ~ " (" ~ ips.join(",") ~ "); pass ?agent=<ip>", "agent"),
+        "multiple agents online for " ~ project ~ " (" ~ ips.join(",") ~ "); pass ?agent=<ip>", "agent"),
         HTTPStatus.conflict);
     return null;
   }
 
-  /// `POST /api/bashub/monitor/agents/{profile}/report`：要求在线 agent 立即上报一次。
+  /// `POST /api/bashub/monitor/agents/{project}/report`：要求在线 agent 立即上报一次。
   ///
   /// `report:now` 没有 body 回执，真正的 `report:os` / `report:bas` 会随后到达并覆盖快照；
   /// 因此这里只表示「指令已入队」，返回 202。
@@ -1126,8 +1128,8 @@ class HubService {
     if (!requireAuth(req, res, opts))
       return;
 
-    auto profile = req.params.get("profile", "");
-    auto session = pickAgent(req, res, profile);
+    auto project = req.params.get("project", "");
+    auto session = pickAgent(req, res, project);
     if (session is null)
       return;
     if (!session.supportsPrimitive("report:now")) {
@@ -1135,11 +1137,11 @@ class HubService {
           HTTPStatus.conflict);
       return;
     }
-    agents.reportNow(profile, session.ip);
+    agents.reportNow(project, session.ip);
     writeJsonApi(res, okDocument(), HTTPStatus.accepted);
   }
 
-  /// `POST /api/bashub/monitor/agents/{profile}/service/{action}`：对在线节点上的实例执行启停。
+  /// `POST /api/bashub/monitor/agents/{project}/service/{action}`：对在线节点上的实例执行启停。
   ///
   /// body 只有 `{"instance":"farm.server"}`，`action` 取 `start` / `stop` / `restart`。
   /// agent 按 `hello.supports` 的能力协商接收，动作完成后以 `result` 回执快照里的
@@ -1165,11 +1167,11 @@ class HubService {
       return;
     }
 
-    auto profile = req.params.get("profile", "");
-    auto session = pickAgent(req, res, profile);
+    auto project = req.params.get("project", "");
+    auto session = pickAgent(req, res, project);
     if (session is null)
       return;
-    auto reply = agents.service(profile, action, instance, ServiceTimeoutSeconds.seconds, session.ip);
+    auto reply = agents.service(project, action, instance, ServiceTimeoutSeconds.seconds, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok: {
       auto doc = Json.emptyObject;
@@ -1208,7 +1210,7 @@ class HubService {
     return meta;
   }
 
-  /// `GET /api/bashub/monitor/agents/{profile}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
+  /// `GET /api/bashub/monitor/agents/{project}/log`：向在线 agent 下发 `log:read` 并等待 `result`。
   void agentLog(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1230,11 +1232,11 @@ class HubService {
       return;
     }
 
-    auto profile = req.params.get("profile", "");
-    auto session = pickAgent(req, res, profile);
+    auto project = req.params.get("project", "");
+    auto session = pickAgent(req, res, project);
     if (session is null)
       return;
-    auto reply = agents.logRead(profile, instance, from, to, 5.seconds, tail, session.ip);
+    auto reply = agents.logRead(project, instance, from, to, 5.seconds, tail, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok:
       writeJsonApi(res, reply.data, HTTPStatus.ok);
@@ -1251,7 +1253,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/monitor/agents/{profile}/agent-log`：读取 agent 自身 console 日志。
+  /// `GET /api/bashub/monitor/agents/{project}/agent-log`：读取 agent 自身 console 日志。
   void agentOwnLog(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -1266,11 +1268,11 @@ class HubService {
       return;
     }
 
-    auto profile = req.params.get("profile", "");
-    auto session = pickAgent(req, res, profile);
+    auto project = req.params.get("project", "");
+    auto session = pickAgent(req, res, project);
     if (session is null)
       return;
-    auto reply = agents.agentLog(profile, from, to, 5.seconds, tail, session.ip);
+    auto reply = agents.agentLog(project, from, to, 5.seconds, tail, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok:
       writeJsonApi(res, reply.data, HTTPStatus.ok);
@@ -1290,7 +1292,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/monitor/agents/{profile}/log/follow`：以 SSE 持续跟随实例日志。
+  /// `GET /api/bashub/monitor/agents/{project}/log/follow`：以 SSE 持续跟随实例日志。
   ///
   /// hub 仍按 `log:read` 的区间语义向 agent 拉取：首次取 `tail`，之后从 `上次 to + 1`
   /// 继续；检测到 `total` 回退就重新取尾部并下发 `reset=true`。对浏览器保持一条
@@ -1315,8 +1317,8 @@ class HubService {
       return;
     }
 
-    auto profile = req.params.get("profile", "");
-    auto session = pickAgent(req, res, profile);
+    auto project = req.params.get("project", "");
+    auto session = pickAgent(req, res, project);
     if (session is null)
       return;
     if (!session.supportsPrimitive("log:read")) {
@@ -1362,7 +1364,7 @@ class HubService {
         if (!first && !res.connected)
           break;
 
-        auto reply = agents.logRead(profile, instance, cursor, 0, LogReadTimeoutSeconds.seconds,
+        auto reply = agents.logRead(project, instance, cursor, 0, LogReadTimeoutSeconds.seconds,
             tailWindow, session.ip);
         if (reply.outcome != RequestOutcome.ok) {
           final switch (reply.outcome) {
@@ -1418,7 +1420,7 @@ class HubService {
       }
     } catch (Exception e) {
       if (res.connected)
-        logDebug("log follow %s/%s stopped: %s", profile, instance, e.msg);
+        logDebug("log follow %s/%s stopped: %s", project, instance, e.msg);
     }
   }
 
@@ -1511,26 +1513,26 @@ class HubService {
     return result;
   }
 
-  /** `POST /api/bashub/config/profiles/{id}/reset-key`：重置通道凭证。
+  /** `POST /api/bashub/config/projects/{id}/reset-key`：重置通道凭证。
    *
    * 重置即**吊销**：机器丢了、人走了、配置外泄了，换一个 key 就作废，旧 key 的连接下次握手
    * 就被拒（已经在线的连接要等它自己重连）。返回新 key，前端直接显示给操作者去更新那台机器。
-   * 对应 Scala 侧 `ProfileWS.resetKey`。
+   * 对应 Scala 侧 `ProjectWS.resetKey`。
    */
   void resetKey(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
-    auto key = profileKey();
+    auto key = projectKey();
     Row values;
     values["key"] = Json(key);
-    if (!store.updateColumns(reg.find("profiles"), id, values)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no profiles with id " ~ id), HTTPStatus.notFound);
+    if (!store.updateColumns(reg.find("projects"), id, values)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
       return;
     }
-    ProfileContext profile;
-    if (findProfileById(reg, store, id, profile))
-      agents.supersede(attributeText(profile.data, "qualifiedName"));
+    ProjectContext project;
+    if (findProjectById(reg, store, id, project))
+      agents.supersede(attributeText(project.data, "qualifiedName"));
     // 与 Scala 侧同形：扁平的 `{id, key}`，不是 JSON:API 文档
     auto doc = Json.emptyObject;
     doc["id"] = Json(id);
@@ -2046,24 +2048,24 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   auto hub = new HubService(cfg, reg, store, opts, api, sessions, agents, security);
 
   // config：机器配置分发与配置详情
-  router.get(api.config ~ "/:profile/server", &hub.profileServer);
-  router.get(api.config ~ "/:profile/proxy", &hub.profileProxy);
-  router.get(api.config ~ "/profiles/:id/certificate", &hub.profileCertificateInfo);
-  router.patch(api.config ~ "/profiles/:id/certificate", &hub.updateProfileCertificate);
-  router.get(api.config ~ "/:profile/certificate", &hub.profileCertificate);
-  router.get(api.config ~ "/:profile/certificate-key", &hub.profileCertificateKey);
-  router.get(api.config ~ "/:profile/setline-peers", &hub.profilePeers);
-  router.get(api.config ~ "/:profile/setline-manifest", &hub.profileManifest);
-  router.get(api.config ~ "/:profile/script/:host", &hub.profileHostScript);
-  router.get(api.config ~ "/profiles/:id/server", &hub.profileServerView);
-  router.get(api.config ~ "/profiles/:id/proxy", &hub.profileProxyView);
-  router.get(api.config ~ "/profiles/:id/setline-peers", &hub.profilePeersView);
+  router.get(api.config ~ "/:project/server", &hub.projectServer);
+  router.get(api.config ~ "/:project/proxy", &hub.projectProxy);
+  router.get(api.config ~ "/projects/:id/certificate", &hub.projectCertificateInfo);
+  router.patch(api.config ~ "/projects/:id/certificate", &hub.updateProjectCertificate);
+  router.get(api.config ~ "/:project/certificate", &hub.projectCertificate);
+  router.get(api.config ~ "/:project/certificate-key", &hub.projectCertificateKey);
+  router.get(api.config ~ "/:project/setline-peers", &hub.projectPeers);
+  router.get(api.config ~ "/:project/setline-manifest", &hub.projectManifest);
+  router.get(api.config ~ "/:project/script/:host", &hub.projectHostScript);
+  router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);
+  router.get(api.config ~ "/projects/:id/proxy", &hub.projectProxyView);
+  router.get(api.config ~ "/projects/:id/setline-peers", &hub.projectPeersView);
 
   // micdn：下载配置、管理台聚合视图与组件目录
-  router.get(api.micdn ~ "/:profile/micdn.xml", &hub.profileMicdnXml);
-  router.get(api.micdn ~ "/profiles/:id/micdn.xml", &hub.downloadProfileMicdnXml);
-  router.get(api.micdn ~ "/profiles/:id", &hub.profileMicdn);
-  router.patch(api.micdn ~ "/profiles/:id", &hub.updateProfileMicdn);
+  router.get(api.micdn ~ "/:project/micdn.xml", &hub.projectMicdnXml);
+  router.get(api.micdn ~ "/projects/:id/micdn.xml", &hub.downloadProjectMicdnXml);
+  router.get(api.micdn ~ "/projects/:id", &hub.projectMicdn);
+  router.patch(api.micdn ~ "/projects/:id", &hub.updateProjectMicdn);
   router.get(api.micdn ~ "/components", &hub.cdnComponents);
   router.post(api.micdn ~ "/components", &hub.createCdnComponent);
   router.patch(api.micdn ~ "/components/:id", &hub.updateCdnComponent);
@@ -2072,20 +2074,20 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   // monitor：在线节点、日志与实例启停
   router.get(api.monitor ~ "/agents/summary", &hub.agentSummary);
   router.get(api.monitor ~ "/agents/status", &hub.agentStatus);
-  router.get(api.monitor ~ "/agents/:profile/history", &hub.agentHistory);
-  router.get(api.monitor ~ "/agents/:profile/agent-log", &hub.agentOwnLog);
-  router.get(api.monitor ~ "/agents/:profile/log/follow", &hub.agentLogFollow);
-  router.get(api.monitor ~ "/agents/:profile/log", &hub.agentLog);
-  router.post(api.monitor ~ "/agents/:profile/service/:action", &hub.agentService);
-  router.post(api.monitor ~ "/agents/:profile/report", &hub.agentReportNow);
-  router.get(api.monitor ~ "/agents/:profile/channel", &hub.profileAgents);
+  router.get(api.monitor ~ "/agents/:project/history", &hub.agentHistory);
+  router.get(api.monitor ~ "/agents/:project/agent-log", &hub.agentOwnLog);
+  router.get(api.monitor ~ "/agents/:project/log/follow", &hub.agentLogFollow);
+  router.get(api.monitor ~ "/agents/:project/log", &hub.agentLog);
+  router.post(api.monitor ~ "/agents/:project/service/:action", &hub.agentService);
+  router.post(api.monitor ~ "/agents/:project/report", &hub.agentReportNow);
+  router.get(api.monitor ~ "/agents/:project/channel", &hub.projectAgents);
 
   // ems：登录前配置、会话、EMS 菜单与管理台资源
   router.get(api.ems ~ "/configs", &hub.configs);
   router.get(api.ems ~ "/sessions", &hub.currentSession);
   router.post(api.ems ~ "/sessions/logout", &hub.logout);
-  router.get(api.ems ~ "/:profile/menus/:appName", &hub.profileEmsMenus);
-  router.post(api.config ~ "/profiles/:id/reset-key", &hub.resetKey);
+  router.get(api.ems ~ "/:project/menus/:appName", &hub.projectEmsMenus);
+  router.post(api.config ~ "/projects/:id/reset-key", &hub.resetKey);
   router.post(api.config ~ "/webapps/upgrade", &hub.upgradeWebapps);
   router.post(api.config ~ "/artifacts/update-version", &hub.updateArtifactVersions);
   router.get(api.config ~ "/hosts/:id/webapps", &hub.hostWebapps);
@@ -2100,8 +2102,8 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   string[] configResources;
   string[] emsResources;
   foreach (item; reg.all) {
-    if (item.path != "cdn-components" && item.path != "profile-micdn"
-        && item.path != "profile-micdn-components" && item.path != "profile-certificates") {
+    if (item.path != "cdn-components" && item.path != "project-micdn"
+        && item.path != "project-micdn-components" && item.path != "project-certificates") {
       auto group = resourceApiGroup(item);
       if (group == "ems")
         emsResources ~= item.path;

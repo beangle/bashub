@@ -243,7 +243,7 @@ import {
   type ResourceRow,
 } from '@/api/resource'
 import { apiPath } from '@/api/prefix'
-import { currentProfileId, forgetProfile, isProfileRef, isProfileScoped, profileId, rememberProfile } from '@/current-profile'
+import { currentProjectId, forgetProject, isProjectRef, isProjectScoped, projectId, rememberProject } from '@/current-project'
 import { rememberedFilterValue, rememberFilterValue } from '@/filter-memory'
 import { getSchema } from '@/resources'
 import type { DrawerLinkSchema, FieldSchema, SelectOption } from '@/resources/types'
@@ -267,9 +267,9 @@ const isTree = Boolean(schema.tree)
 const treeConfig = isTree ? { childrenKey: 'children', defaultExpandAll: true } : undefined
 const isCards = schema.layout === 'cards'
 /** 以配置为工作域的资源（群集/主机/应用部署）：查询条件与新建表单都跟着「当前配置」走。 */
-const profileScoped = isProfileScoped(schema)
+const projectScoped = isProjectScoped(schema)
 /** 查询条件里的「配置」字段。 */
-const profileFilter = filterFields.find(isProfileRef)
+const projectFilter = filterFields.find(isProjectRef)
 /** 树形表格的 defaultExpandAll 只在挂载时生效，数据异步返回后需重挂一次才能整树展开。 */
 const treeRevision = ref(0)
 
@@ -767,7 +767,7 @@ function listFilters(): Record<string, string> {
     // 必填引用查询条件（如菜单管理的应用）记住选中值，下次进页面自动带上。
     if (field.required && field.type === 'ref') rememberFilterValue(schema.key, field.key, value)
     // 以配置为工作域的资源：查询时把选中的配置记为「当前配置」（空值不覆盖）。
-    if (isProfileRef(field)) rememberProfile(value)
+    if (isProjectRef(field)) rememberProject(value)
   })
   return filters
 }
@@ -776,14 +776,14 @@ function listFilters(): Record<string, string> {
  * 打开页面时把查询条件里的「配置」填成记忆值（URL 显式给出的查询条件优先）。
  * 需在 loadOptions 之后调用：记忆的配置可能已被删除，此时丢弃记忆，避免下拉框显示一个裸 id。
  */
-function applyCurrentProfile() {
-  if (!profileFilter) return
-  const options = optionsCache[profileFilter.key]
-  if (currentProfileId.value !== '' && options?.length && !options.some((option) => profileId(option.value) === currentProfileId.value)) {
-    forgetProfile()
+function applyCurrentProject() {
+  if (!projectFilter) return
+  const options = optionsCache[projectFilter.key]
+  if (currentProjectId.value !== '' && options?.length && !options.some((option) => projectId(option.value) === currentProjectId.value)) {
+    forgetProject()
   }
-  if (profileId(filterValues[profileFilter.key]) === '' && currentProfileId.value !== '') {
-    filterValues[profileFilter.key] = currentProfileId.value
+  if (projectId(filterValues[projectFilter.key]) === '' && currentProjectId.value !== '') {
+    filterValues[projectFilter.key] = currentProjectId.value
   }
 }
 
@@ -882,8 +882,8 @@ function resetForm(row?: ResourceRow) {
   formFields.forEach((field) => {
     if (!row) {
       // 以配置为工作域的资源：新建时配置默认取「当前配置」（原 UI 用隐藏域锁定在记忆的配置上）。
-      if (profileScoped && isProfileRef(field)) {
-        form[field.key] = currentProfileId.value
+      if (projectScoped && isProjectRef(field)) {
+        form[field.key] = currentProjectId.value
         return
       }
       // 从属页面（如 /config/servers?farm=1）：新建时父对象取查询条件里的值
@@ -1148,15 +1148,15 @@ onMounted(async () => {
     const value = route.query[field.key]
     if (typeof value === 'string' && value.length > 0) filterValues[field.key] = value
   })
-  // 宿主/门户下发的当前配置优先（参数名沿用 ems-app 的 EMS_URL_PARAMS.contextProfileId）。
-  const contextProfile = profileId(route.query.contextProfileId)
-  if (contextProfile !== '') rememberProfile(contextProfile)
+  // 宿主/门户下发的当前配置优先（参数名沿用 ems-app 的 EMS_URL_PARAMS.contextProjectId）。
+  const contextProject = projectId(route.query.contextProjectId)
+  if (contextProject !== '') rememberProject(contextProject)
   try {
     await loadOptions()
   } catch (error) {
     MessagePlugin.error(error instanceof Error ? error.message : '加载选项失败')
   }
-  applyCurrentProfile()
+  applyCurrentProject()
   applyDefaultRequiredFilters()
   await loadRows()
   // /menus?app=xx&action=export：从「应用」列表的导出链接直接落到菜单页并下载 XML。

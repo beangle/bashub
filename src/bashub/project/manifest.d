@@ -6,7 +6,7 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.manifest;
+module bashub.project.manifest;
 /// setline 远程配置清单。清单只暴露各资源的 SHA-256，agent 据此跳过未变化的下载。
 
 import std.array : appender;

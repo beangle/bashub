@@ -54,11 +54,11 @@ struct HealthSchedule {
 }
 
 /// 完成 HTTP → WebSocket 升级并跑连接循环。调用方必须已经验证过 Bearer 与 `ip` 头。
-void serveAgentSocket(AgentRegistry registry, string profile, string profileId, string ip,
+void serveAgentSocket(AgentRegistry registry, string project, string projectId, string ip,
     HTTPServerRequest req, HTTPServerResponse res, HealthSchedule health = HealthSchedule.init,
     Duration heartbeatInterval = HeartbeatInterval) {
-  auto name = profile.idup;
-  auto id = profileId.idup;
+  auto name = project.idup;
+  auto id = projectId.idup;
   auto agentIp = ip.idup;
   auto handler = handleWebSockets((scope WebSocket socket) nothrow {
       runAgentLoop(registry, name, id, agentIp, socket, health, heartbeatInterval);
@@ -67,21 +67,21 @@ void serveAgentSocket(AgentRegistry registry, string profile, string profileId, 
 }
 
 /// 一条连接的生命周期：登记、读消息、发队列、按期 ping、离开时摘除。
-void runAgentLoop(AgentRegistry registry, string profile, string profileId, string ip,
+void runAgentLoop(AgentRegistry registry, string project, string projectId, string ip,
     scope WebSocket socket, HealthSchedule health = HealthSchedule.init,
     Duration heartbeatInterval = HeartbeatInterval) nothrow {
   AgentSession session;
   scope (exit) {
     if (session !is null)
-      registry.detach(profile, ip, session);
-    closeQuietly(profile, socket);
+      registry.detach(project, ip, session);
+    closeQuietly(project, socket);
   }
 
   try {
-    session = registry.attach(profile, profileId, ip);
+    session = registry.attach(project, projectId, ip);
     // 每次重连都会走到这里；稳定连接只应出现一次，周期重复说明 agent 在反复重连。
     // 属于排错信息，放 debug 级（log-level=debug 时才出现），默认 info 不刷日志。
-    logDebug("%s@%s: agent connected", profile, ip);
+    logDebug("%s@%s: agent connected", project, ip);
 
     auto lastPing = MonoTime.currTime;
     auto lastHealth = lastPing;
@@ -115,20 +115,20 @@ void runAgentLoop(AgentRegistry registry, string profile, string profileId, stri
       if (parse(socket.receiveText(), message)) {
         session.accept(message);
         if (message.typ == "report:health" && session.healthKnown)
-          registry.recordProfileHealth(session.profile, session.profileId);
+          registry.recordProjectHealth(session.project, session.projectId);
       } else
-        logWarn("%s: unreadable message dropped", profile);
+        logWarn("%s: unreadable message dropped", project);
     }
   } catch (Exception e) {
-    logWarn("%s: agent channel error: %s", profile, e.msg);
+    logWarn("%s: agent channel error: %s", project, e.msg);
   }
 }
 
-private void closeQuietly(string profile, scope WebSocket socket) nothrow {
+private void closeQuietly(string project, scope WebSocket socket) nothrow {
   try {
     if (socket.connected)
       socket.close();
   } catch (Exception e) {
-    logWarn("%s: close agent channel failed: %s", profile, e.msg);
+    logWarn("%s: close agent channel failed: %s", project, e.msg);
   }
 }

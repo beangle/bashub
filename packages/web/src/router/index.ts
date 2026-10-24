@@ -33,13 +33,13 @@ const detailRoutes = [
     meta: { title: '主机详情' },
   },
   {
-    path: '/config/profiles/:id',
-    component: () => import('@/views/ProfileDetailView.vue'),
+    path: '/config/projects/:id',
+    component: () => import('@/views/ProjectDetailView.vue'),
     meta: { title: '配置详情' },
   },
   {
-    path: '/micdn/profiles/:id',
-    component: () => import('@/views/MicdnProfileView.vue'),
+    path: '/micdn/projects/:id',
+    component: () => import('@/views/MicdnProjectView.vue'),
     meta: { title: 'Micdn 配置' },
   },
   {
@@ -59,7 +59,7 @@ const router = createRouter({
     ...detailRoutes,
     { path: '/monitor/agents', component: () => import('@/views/AgentView.vue'), meta: { title: '在线节点' } },
     {
-      path: '/monitor/agents/:profile/history',
+      path: '/monitor/agents/:project/history',
       component: () => import('@/views/AgentHistoryView.vue'),
       meta: { title: '运行历史' },
     },

@@ -37,7 +37,7 @@ unittest {
   auto store = newStore(reg);
   assert(store.search(reg.find("organizations"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("platforms"), Query.init)["meta"]["page"]["total"].get!long == 2);
-  assert(store.search(reg.find("profiles"), Query.init)["meta"]["page"]["total"].get!long == 2);
+  assert(store.search(reg.find("projects"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("engines"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("farms"), Query.init)["meta"]["page"]["total"].get!long == 1);
   assert(store.search(reg.find("servers"), Query.init)["meta"]["page"]["total"].get!long == 2);
@@ -51,8 +51,8 @@ unittest {
   assert(store.search(reg.find("resources"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("menus"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("cdn-components"), Query.init)["meta"]["page"]["total"].get!long == 2);
-  assert(store.search(reg.find("profile-micdn"), Query.init)["meta"]["page"]["total"].get!long == 1);
-  assert(store.search(reg.find("profile-micdn-components"), Query.init)["meta"]["page"]["total"].get!long == 2);
+  assert(store.search(reg.find("project-micdn"), Query.init)["meta"]["page"]["total"].get!long == 1);
+  assert(store.search(reg.find("project-micdn-components"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.backend == "memory");
 }
 
@@ -74,7 +74,7 @@ unittest {
   foreach (item; farms["included"].get!(Json[])) {
     if (item["type"].get!string == "servers")
       hasServer = true;
-    if (item["type"].get!string == "hosts" && jsonText(item["relationships"]["profile"]["data"]["id"]) == "1002")
+    if (item["type"].get!string == "hosts" && jsonText(item["relationships"]["project"]["data"]["id"]) == "1002")
       hasHostRelation = true;
   }
   assert(hasServer);
@@ -85,21 +85,20 @@ unittest {
   assert(resources["data"][0]["attributes"]["scope"].get!string == "Private");
 }
 
-@("profile key is generated server side and is 32 hex chars")
+@("project key is generated server side and is 32 hex chars")
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  auto doc = store.create(reg.find("profiles"),
-      parseJsonString(`{"data":{"type":"profiles","attributes":{"name":"test","title":"测试",
-      "basVersion":"0.0.8","ip":"127.0.0.1"},
+  auto doc = store.create(reg.find("projects"),
+      parseJsonString(`{"data":{"type":"projects","attributes":{"name":"test","title":"测试",
+      "basVersion":"0.0.9"},
       "relationships":{"org":{"data":{"type":"organizations","id":"2"}}}}}`));
   assert(doc["data"]["attributes"]["name"].get!string == "test");
   auto key = doc["data"]["attributes"]["key"].get!string;
   assert(key.length == 32);
   assert(isHex(key));
-  // 与 Scala 侧 fillDefaults 同形：仓库地址与 https 开关也由服务端给默认值
+  // 与 Scala 侧 fillDefaults 同形：仓库地址由服务端给默认值
   assert(doc["data"]["attributes"]["localRepo"].get!string == "~/.m2/repository");
-  assert(doc["data"]["attributes"]["enableHttps"].get!bool == false);
   // 派生属性也在新建后的回读里出现
   assert(doc["data"]["attributes"]["qualifiedName"].get!string == "openurp.test");
 }
@@ -108,9 +107,9 @@ unittest {
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  auto doc = store.create(reg.find("profiles"),
-      parseJsonString(`{"data":{"type":"profiles","attributes":{"name":"test","title":"测试",
-      "basVersion":"0.0.8","ip":"127.0.0.1",
+  auto doc = store.create(reg.find("projects"),
+      parseJsonString(`{"data":{"type":"projects","attributes":{"name":"test","title":"测试",
+      "basVersion":"0.0.9",
       "key":"ffffffffffffffffffffffffffffffff"}}}`));
   // 与 Scala 侧 fillDefaults 同口径：只在为空时生成，显式给的就留着
   assert(doc["data"]["attributes"]["key"].get!string == "ffffffffffffffffffffffffffffffff");
@@ -207,23 +206,26 @@ unittest {
   assert(updated["data"]["attributes"]["setlineAdminPort"].get!long == 18081);
 }
 
-@("enabling setline requires the profile hostname only for hostname groups")
+@("enabling setline requires the project hostname only for hostname groups")
 unittest {
   Registry reg;
   auto store = newStore(reg);
   Json updated;
 
-  assert(store.updateColumns(reg.find("profiles"), "1002",
-      ["hostname": Json(""), "proxy_by_hostname": Json(false)]));
+  assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("")]));
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
+      ["proxy_by_hostname": Json(false)]));
   assert(store.update(reg.find("hosts"), "2001",
       parseJsonString(`{"data":{"type":"hosts","attributes":{
         "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
 
-  assert(store.updateColumns(reg.find("profiles"), "1002",
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
       ["proxy_by_hostname": Json(true)]));
   assertThrown!StoreException(store.update(reg.find("hosts"), "2001",
       parseJsonString(`{"data":{"type":"hosts","attributes":{
         "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
+  store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]);
+  store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(true)]);
 }
 
 @("webapp targets and host setline ports keep run-at valid")
@@ -285,6 +287,10 @@ unittest {
   auto artifact = artifacts["data"][0]["attributes"];
   assert(artifact["gav"].get!string == "org.beangle.bashub:bas-web:war:0.0.8");
 
+  auto proxies = store.search(reg.find("proxy-settings"),
+      parseQuery(["filter[proxySetting.project.id]": "1002"]));
+  assert(proxies["meta"]["page"]["total"].get!long == 1);
+  assert(proxies["data"][0]["attributes"]["ip"].get!string == "10.0.0.10");
   auto hosts = store.search(reg.find("hosts"), parseQuery(["filter[name]": "host01"]));
   auto logos = hosts["data"][0]["attributes"]["featureLogos"].get!(Json[]);
   assert(logos.length == 2);
@@ -316,7 +322,7 @@ unittest {
   assert(component["data"]["attributes"]["spec"]["sources"].get!(Json[]).length == 1);
 
   Json micdn;
-  assert(store.fetch(reg.find("profile-micdn"), "1002", Query.init, micdn));
+  assert(store.fetch(reg.find("project-micdn"), "1002", Query.init, micdn));
   assert(micdn["data"]["attributes"]["config"]["listen"].get!string == "0.0.0.0:8888");
 }
 

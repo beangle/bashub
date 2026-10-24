@@ -6,13 +6,13 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.distribution;
+module bashub.project.distribution;
 /// 配置分发端点的共同数据快照。server/proxy/menus/micdn/script 面对的
-/// 都是同一组 Profile、Farm、Host、Engine、Webapp、Artifact 与 Server；
+/// 都是同一组 Project、Farm、Host、Engine、Webapp、Artifact 与 Server；
 /// 每次请求按资源各取一次，再建 id 索引，避免模板渲染时逐行回查。
 
 import bashub.present : gavOf;
-import bashub.profile.resolver : ProfileContext, loadAll;
+import bashub.project.resolver : ProjectContext, loadAll;
 
 import beangle.data.resource : Registry;
 import beangle.data.value : jsonText;
@@ -22,8 +22,10 @@ import beangle.jsonapi.store : Store;
 import vibe.data.json : Json;
 
 /// 一次配置分发请求的只读数据。
-struct ProfileData {
-  ProfileContext profile;
+struct ProjectData {
+  ProjectContext project;
+  /// 代理/SETLINE 配置；缺失时为空对象（使用默认值，不回退到 project 字段）。
+  Json proxy;
   Json[] farms;
   Json[] hosts;
   Json[] webapps;
@@ -37,14 +39,18 @@ struct ProfileData {
   Json[string] artifactsById;
 }
 
-/// 取 Profile 下的主体（farm/host/webapp）以及它们引用到的全局配置。表都很小，
+/// 取 Project 下的主体（farm/host/webapp）以及它们引用到的全局配置。表都很小，
 /// 配置分发又是低频请求；一次全取再按引用收窄，比逐条回查更可预测，也少很多往返。
-ProfileData loadProfileData(Store store, Registry reg, const ProfileContext context) {
-  ProfileData data;
-  data.profile = context;
-  data.farms = loadAll(store, reg.find("farms"), ["profile": context.id]);
-  data.hosts = loadAll(store, reg.find("hosts"), ["profile": context.id]);
-  data.webapps = loadAll(store, reg.find("webapps"), ["profile": context.id]);
+ProjectData loadProjectData(Store store, Registry reg, const ProjectContext context) {
+  ProjectData data;
+  data.project = context;
+  data.proxy = Json.emptyObject;
+  auto proxyRows = loadAll(store, reg.find("proxy-settings"), ["project": context.id]);
+  if (proxyRows.length > 0)
+    data.proxy = proxyRows[0];
+  data.farms = loadAll(store, reg.find("farms"), ["project": context.id]);
+  data.hosts = loadAll(store, reg.find("hosts"), ["project": context.id]);
+  data.webapps = loadAll(store, reg.find("webapps"), ["project": context.id]);
 
   auto engineIds = referencedIds(data.farms, "engine", false);
   auto serverIds = referencedIds(data.farms, "servers", true);

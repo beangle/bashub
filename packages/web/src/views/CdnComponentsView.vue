@@ -16,7 +16,7 @@
     <div class="catalog-card">
       <t-loading :loading="loading" show-overlay>
         <div v-if="components.length === 0 && !loading" class="catalog-empty">
-          还没有组件。创建后可被任意 Profile 引用。
+          还没有组件。创建后可被任意 Project 引用。
         </div>
         <table v-else class="component-table">
           <thead>
@@ -369,7 +369,7 @@ async function submit() {
 function remove(component: CdnComponent) {
   const dialog = DialogPlugin.confirm({
     header: '删除组件',
-    body: `确定删除「${component.name}」？仍被 Profile 引用时会被拒绝。`,
+    body: `确定删除「${component.name}」？仍被 Project 引用时会被拒绝。`,
     onConfirm: async () => {
       try {
         await deleteCdnComponent(component.id)

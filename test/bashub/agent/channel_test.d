@@ -82,16 +82,16 @@ unittest {
   assert(restart["body"]["instance"].get!string == "platform.server1");
 }
 
-@("the profile comes out of the request path")
+@("the project comes out of the request path")
 unittest {
-  string profile;
-  assert(profileOf("/api/openurp.demo/agents", profile));
-  assert(profile == "openurp.demo");
-  assert(profileOf("/bashub/api/demo/agents/", profile));
-  assert(profile == "demo");
-  assert(!profileOf("/api/demo", profile));
-  assert(!profileOf("/agents", profile));
-  assert(!profileOf("", profile));
+  string project;
+  assert(projectOf("/api/openurp.demo/agents", project));
+  assert(project == "openurp.demo");
+  assert(projectOf("/bashub/api/demo/agents/", project));
+  assert(project == "demo");
+  assert(!projectOf("/api/demo", project));
+  assert(!projectOf("/agents", project));
+  assert(!projectOf("", project));
 }
 
 @("the key comes out of the Authorization value")

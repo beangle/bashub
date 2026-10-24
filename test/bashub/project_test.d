@@ -6,20 +6,20 @@
  * (at your option) any later version.
  */
 
-module test.bashub.profile_test;
-/// Profile 配置分发：配置名与来源 IP 的解析、server.xml 的关键结构。
+module test.bashub.project_test;
+/// Project 配置分发：配置名与来源 IP 的解析、server.xml 的关键结构。
 
 import bashub.demo : demoDao;
-import bashub.profile.distribution : loadProfileData;
-import bashub.profile.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
+import bashub.project.distribution : loadProjectData;
+import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
-import bashub.profile.proxy : renderProxy;
-import bashub.profile.resolver : ProfileContext, findProfile, ipHeaderAddresses, matchProfileIp,
-  resolveProfile;
-import bashub.profile.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
+import bashub.project.proxy : renderProxy;
+import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
+  resolveHostProject, resolveSetlineProject;
+import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
   renderBashScript, renderHostScript;
-import bashub.profile.server : renderServerXml;
-import bashub.profile.peers : renderPeers;
+import bashub.project.server : renderServerXml;
+import bashub.project.peers : renderPeers;
 import bashub.resources : hubRegistry;
 import bashub.store : createHubStore;
 
@@ -50,67 +50,69 @@ private MicdnConfigException expectConfigError(scope void delegate() action) {
   assert(false, "expected MicdnConfigException");
 }
 
-@("profile accepts the profile ip or one of its host ips")
-unittest {
+@("setline accepts only the proxy ip") unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
+  ProjectContext project;
 
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.10", profile));
-  assert(profile.id == "1002");
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  assert(!resolveProfile(reg, store, "openurp.prod", "192.168.1.1", profile));
-  assert(!resolveProfile(reg, store, "openurp.prod", "", profile));
-  assert(!resolveProfile(reg, store, "prod", "10.0.0.10", profile));
-  assert(!resolveProfile(reg, store, "openurp.missing", "10.0.0.10", profile));
+  // demo 的 openurp.prod 代理内部 IP 是 10.0.0.10；Host 是 .11/.12，不能替代。
+  assert(resolveSetlineProject(reg, store, "openurp.prod", "10.0.0.10", project));
+  assert(project.id == "1002");
+  assert(!resolveSetlineProject(reg, store, "openurp.prod", "10.0.0.11", project));
+  assert(!resolveSetlineProject(reg, store, "openurp.prod", "192.168.1.1", project));
+  assert(!resolveSetlineProject(reg, store, "openurp.prod", "", project));
+  assert(!resolveSetlineProject(reg, store, "prod", "10.0.0.10", project));
+  assert(!resolveSetlineProject(reg, store, "openurp.missing", "10.0.0.10", project));
 }
 
-@("agent ip header matches profile or host ips and returns the canonical address") unittest {
+@("agent ip header matches host ips and returns the canonical address") unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
-  assert(findProfile(reg, store, "openurp.prod", profile));
+  ProjectContext project;
+  assert(findProject(reg, store, "openurp.prod", project));
 
   string matched;
-  assert(matchProfileIp(reg, store, profile, ipHeaderAddresses("10.0.0.10"), matched));
-  assert(matched == "10.0.0.10");
-  // 多网卡全部上报：取配置里命中的那个
-  assert(matchProfileIp(reg, store, profile, ipHeaderAddresses("127.0.0.1, 10.0.0.11"), matched));
+  assert(matchHostIp(reg, store, project, ipHeaderAddresses("10.0.0.11"), matched));
   assert(matched == "10.0.0.11");
-  assert(!matchProfileIp(reg, store, profile, ipHeaderAddresses("192.168.1.1"), matched));
+  // 多网卡全部上报：取配置里命中的那个
+  assert(matchHostIp(reg, store, project, ipHeaderAddresses("127.0.0.1, 10.0.0.12"), matched));
+  assert(matched == "10.0.0.12");
+  // proxy 的内部 IP 不参与 agent 身份
+  assert(!matchHostIp(reg, store, project, ipHeaderAddresses("10.0.0.10"), matched));
+  assert(!matchHostIp(reg, store, project, ipHeaderAddresses("192.168.1.1"), matched));
   assert(ipHeaderAddresses("localhost").length == 0, "主机名不是身份");
   assert(ipHeaderAddresses("").length == 0);
 }
 
-@("agent ip must be declared by the profile or one of its hosts") unittest {
+@("agent ip must be declared by the project or one of its hosts") unittest {
   Registry reg;
   auto store = newStore(reg);
-  // profile 没有任何 ip / host 时不做兜底：无法验证的地址一律拒绝
-  ProfileContext unknown;
+  // project 没有任何 ip / host 时不做兜底：无法验证的地址一律拒绝
+  ProjectContext unknown;
   unknown.id = "999999";
   unknown.data = parseJsonString(`{"id":"999999","attributes":{}}`);
   string matched;
-  assert(!matchProfileIp(reg, store, unknown, ["10.0.0.10"], matched));
+  assert(!matchHostIp(reg, store, unknown, ["10.0.0.10"], matched));
 }
 
 @("server.xml keeps the basctl contract")
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  ProjectContext project;
+  assert(findProject(reg, store, "openurp.prod", project));
 
-  auto data = loadProfileData(store, reg, profile);
+  auto data = loadProjectData(store, reg, project);
   assert(data.engines.length == 1);
   assert(attributeText(data.engines[0], "name") == "tomcat");
   assert(data.artifacts.length == 1);
   assert(attributeText(data.artifacts[0], "artifactId") == "bas-web");
   assert(data.servers.length == 2);
 
-  auto xml = renderServerXml(store, reg, profile);
+  auto xml = renderServerXml(store, reg, project);
   assert(xml.canFind(`version="6.0.0"`));
-  // Profile 自己的 micdn 下载凭证优先于 hub.xml 的全局 token
-  assert(renderServerXml(store, reg, profile, false, "hub-secret").canFind(`token="download-secret"`));
+  // Project 自己的 micdn 下载凭证优先于 hub.xml 的全局 token
+  assert(renderServerXml(store, reg, project, false, "hub-secret").canFind(`token="download-secret"`));
   assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
   assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
   assert(!xml.canFind("<hub"));
@@ -131,17 +133,17 @@ unittest {
   assert(xml.canFind(`path="/bas" run-at="prod-farm.app1,prod-farm.app2"`));
   assert(xml.canFind(`<url path="/bas"/>`));
 
-  ProfileContext demo;
-  assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", demo));
+  ProjectContext demo;
+  assert(findProject(reg, store, "beangle.demo", demo));
   assert(!renderServerXml(store, reg, demo).canFind("setline-"));
 }
 
 @("server.xml falls back to the hub maven token") unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext demo;
-  assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", demo));
-  // 该 profile 没有 micdn auth；用 hub.xml 的 maven-download-token 兜底
+  ProjectContext demo;
+  assert(findProject(reg, store, "beangle.demo", demo));
+  // 该 project 没有 micdn auth；用 hub.xml 的 maven-download-token 兜底
   auto xml = renderServerXml(store, reg, demo, false, "hub-secret");
   assert(xml.canFind(`token="hub-secret"`));
   // 预览遮掉令牌
@@ -152,52 +154,61 @@ unittest {
   Registry reg;
   auto store = newStore(reg);
   auto hosts = reg.find("hosts");
-  ProfileContext profile;
+  ProjectContext project;
+  // 本用例只验证端口校验，避免受 hostname/按域名分组状态影响。
+  store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(false)]);
+  scope (exit)
+    store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(true)]);
 
   foreach (value; ["0", "70000", "not-a-port"]) {
     assert(store.updateColumns(hosts, "2001", ["setline_admin_port": Json(value)]));
-    assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-    assertThrown!Exception(renderServerXml(store, reg, profile));
+    assert(findProject(reg, store, "openurp.prod", project));
+    assertThrown!Exception(renderServerXml(store, reg, project));
   }
 }
 
-@("server.xml requires the profile hostname only when proxyByHostname is enabled") unittest {
+@("server.xml requires the project hostname only when proxyByHostname is enabled") unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
+  ProjectContext project;
+  scope (exit) {
+    store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]);
+    store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(true)]);
+  }
 
-  assert(store.updateColumns(reg.find("profiles"), "1002",
-      ["hostname": Json(""), "proxy_by_hostname": Json(false)]));
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  auto xml = renderServerXml(store, reg, profile);
+  assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("")]));
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
+      ["proxy_by_hostname": Json(false)]));
+  assert(findProject(reg, store, "openurp.prod", project));
+  auto xml = renderServerXml(store, reg, project);
   assert(!xml.canFind("setline-hostname"));
   assert(xml.canFind(`setline-listen-port="8080"`));
 
-  assert(store.updateColumns(reg.find("profiles"), "1002",
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
       ["proxy_by_hostname": Json(true)]));
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  assertThrown!Exception(renderServerXml(store, reg, profile));
+  assert(findProject(reg, store, "openurp.prod", project));
+  assertThrown!Exception(renderServerXml(store, reg, project));
 }
 
 @("peers contains web and micdn nodes")
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
+  ProjectContext project;
 
-  assert(resolveProfile(reg, store, "beangle.demo", "127.0.0.1", profile));
-  auto text = renderPeers(store, reg, profile);
+  assert(findProject(reg, store, "beangle.demo", project));
+  auto text = renderPeers(store, reg, project);
   auto config = parseJsonString(text);
   assert(config["peers"].length == 0);
 
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  text = renderPeers(store, reg, profile);
+  assert(findProject(reg, store, "openurp.prod", project));
+  text = renderPeers(store, reg, project);
   config = parseJsonString(text);
   assert(config["peers"].length == 2);
 
-  assert(store.updateColumns(reg.find("profiles"), "1002", ["proxy_engine": Json("haproxy")]));
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  text = renderPeers(store, reg, profile);
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
+  assert(findProject(reg, store, "openurp.prod", project));
+  text = renderPeers(store, reg, project);
   config = parseJsonString(text);
   assert(config["peers"].length == 2);
   assert(config["peers"][0]["name"].get!string == "host01");
@@ -209,15 +220,15 @@ unittest {
   assert(!text.canFind(`"listen"`));
 
   Json configDoc;
-  assert(store.fetch(reg.find("profile-micdn"), "1002", Query.init, configDoc));
+  assert(store.fetch(reg.find("project-micdn"), "1002", Query.init, configDoc));
   auto micdnConfig = jsonGet(jsonGet(configDoc["data"], "attributes"), "config");
   micdnConfig["servers"] = Json([
     Json(["name": Json("cdn02"), "adminListen": Json("10.0.0.32:8081")]),
     Json(["name": Json("cdn01"), "adminListen": Json("10.0.0.31:8081")]),
   ]);
-  assert(store.updateColumns(reg.find("profile-micdn"), "1002", ["config": micdnConfig]));
+  assert(store.updateColumns(reg.find("project-micdn"), "1002", ["config": micdnConfig]));
 
-  text = renderPeers(store, reg, profile);
+  text = renderPeers(store, reg, project);
   config = parseJsonString(text);
   assert(config["peers"].length == 4);
   assert(config["peers"][0]["name"].get!string == "cdn01");
@@ -229,19 +240,19 @@ unittest {
 @("peers reject invalid host setline listen ports") unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
+  ProjectContext project;
 
   foreach (value; [0L, 65536L]) {
     assert(store.updateColumns(reg.find("hosts"), "2001", ["setline_listen_port": Json(value)]));
-    assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-    assertThrown!Exception(renderPeers(store, reg, profile));
+    assert(findProject(reg, store, "openurp.prod", project));
+    assertThrown!Exception(renderPeers(store, reg, project));
   }
 }
 
 @("peers skip hosts without setline listen ports") unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
+  ProjectContext project;
   Json updated;
 
   assert(store.update(reg.find("webapps"), "7001",
@@ -250,9 +261,9 @@ unittest {
   assert(store.update(reg.find("hosts"), "2002",
       parseJsonString(`{"data":{"type":"hosts","attributes":{
         "setlineListenPort":null,"setlineAdminPort":null}}}`), updated));
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  assert(findProject(reg, store, "openurp.prod", project));
 
-  auto config = parseJsonString(renderPeers(store, reg, profile));
+  auto config = parseJsonString(renderPeers(store, reg, project));
   assert(config["peers"].length == 1);
   assert(config["peers"][0]["name"].get!string == "host01");
 }
@@ -285,10 +296,10 @@ unittest {
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  ProjectContext project;
+  assert(findProject(reg, store, "openurp.prod", project));
 
-  auto nginx = renderProxy(store, reg, profile);
+  auto nginx = renderProxy(store, reg, project);
   assert(nginx.canFind("worker_connections 60000;"));
   assert(nginx.canFind("upstream prod-farm{"));
   assert(nginx.canFind("server 10.0.0.11:9080 check inter 5s;"));
@@ -299,9 +310,9 @@ unittest {
   assert(nginx.canFind("ssl_certificate_key /etc/setline/certs/key.pem;"));
   assert(!nginx.canFind("/etc/nginx/prod.openurp.net"));
 
-  assert(store.updateColumns(reg.find("profiles"), "1002", ["proxy_engine": Json("haproxy")]));
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  auto haproxy = renderProxy(store, reg, profile);
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
+  assert(findProject(reg, store, "openurp.prod", project));
+  auto haproxy = renderProxy(store, reg, project);
   assert(haproxy.canFind("# HAProxy main configuration."));
   assert(!haproxy.canFind("setline.json"));
   assert(!haproxy.canFind(`"agent"`));
@@ -337,15 +348,15 @@ unittest {
 
   auto webapps = reg.find("webapps");
   Row single1 = [
-    "id": Json("7002"), "artifact": Json("6001"), "profile": Json("1002"), "version": Json("0.0.8"),
+    "id": Json("7002"), "artifact": Json("6001"), "project": Json("1002"), "version": Json("0.0.8"),
     "context_path": Json("/single1"), "urls": Json(Json[].init), "unpack": Json(false), "libs": Json(""),
   ];
   Row single2 = [
-    "id": Json("7003"), "artifact": Json("6001"), "profile": Json("1002"), "version": Json("0.0.8"),
+    "id": Json("7003"), "artifact": Json("6001"), "project": Json("1002"), "version": Json("0.0.8"),
     "context_path": Json("/single2"), "urls": Json(Json[].init), "unpack": Json(false), "libs": Json(""),
   ];
   Row root = [
-    "id": Json("7004"), "artifact": Json("6001"), "profile": Json("1002"), "version": Json("0.0.8"),
+    "id": Json("7004"), "artifact": Json("6001"), "project": Json("1002"), "version": Json("0.0.8"),
     "context_path": Json("/"), "urls": Json([Json("/context1"), Json("/context2")]),
     "unpack": Json(false), "libs": Json(""),
   ];
@@ -357,10 +368,10 @@ unittest {
   dao.seedMany(webapps, "targets", "7004", ["5003"]);
 
   auto store = createHubStore(reg, dao);
-  ProfileContext profile;
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  ProjectContext project;
+  assert(findProject(reg, store, "openurp.prod", project));
 
-  auto nginx = renderProxy(store, reg, profile);
+  auto nginx = renderProxy(store, reg, project);
   assert(nginx.canFind("upstream prod-farm2{"));
   assert(nginx.canFind("upstream prod-farm_app1{"));
   assert(nginx.canFind("upstream prod-farm_app2{"));
@@ -368,9 +379,9 @@ unittest {
   assert(nginx.canFind("location /context1 {"));
   assert(nginx.canFind("proxy_pass http://prod-farm_app3;"));
 
-  assert(store.updateColumns(reg.find("profiles"), "1002", ["proxy_engine": Json("haproxy")]));
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
-  auto haproxy = renderProxy(store, reg, profile);
+  assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
+  assert(findProject(reg, store, "openurp.prod", project));
+  auto haproxy = renderProxy(store, reg, project);
   assert(haproxy.canFind("map_beg(/var/lib/setline/haproxy/setline.map)"));
   assert(haproxy.canFind("use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)]"));
   assert(!haproxy.canFind("setline_route"));
@@ -378,17 +389,17 @@ unittest {
   assert(!haproxy.canFind("backend prod-farm2"));
 }
 
-@("micdn profile state renders every configured section")
+@("micdn project state renders every configured section")
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  ProjectContext project;
+  assert(findProject(reg, store, "openurp.prod", project));
 
   MicdnState state;
-  assert(loadMicdnState(store, reg, profile.id, state));
+  assert(loadMicdnState(store, reg, project.id, state));
   auto xml = renderMicdnXml(state.config, state.components,
-      attributeText(profile.data, "name"), attributeText(profile.data, "key"));
+      attributeText(project.data, "name"), attributeText(project.data, "key"));
   assert(xml.canFind(`<maven base="/var/lib/micdn/maven">`));
   assert(xml.canFind(`<static base="/var/cache/micdn/asset">`));
   assert(xml.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
@@ -466,7 +477,7 @@ unittest {
   assert(maskSecret("") == "");
 }
 
-@("micdn blob follows the profile key")
+@("micdn blob follows the project key")
 unittest {
   auto xml = renderMicdnXml(defaultMicdnConfig(), [], "prod", "secret-key");
   assert(xml.canFind(`<blob base="/blob" max-size="100M">`));
@@ -504,22 +515,22 @@ unittest {
   assert(text.indexOf("java -version") < text.indexOf("node --version"));
 }
 
-@("host script resolves the host by profile and ip")
+@("host script resolves the host by project and ip")
 unittest {
   Registry reg;
   auto store = newStore(reg);
-  ProfileContext profile;
-  assert(resolveProfile(reg, store, "openurp.prod", "10.0.0.11", profile));
+  ProjectContext project;
+  assert(resolveSetlineProject(reg, store, "openurp.prod", "10.0.0.10", project));
 
-  auto text = renderHostScript(store, reg, profile, "10.0.0.11");
+  auto text = renderHostScript(store, reg, project, "10.0.0.11");
   assert(text.canFind("#!/bin/bash"));
   assert(text.canFind("java -version"));
   assert(text.canFind("node --version"));
 
-  auto noFeatures = renderHostScript(store, reg, profile, "10.0.0.12");
+  auto noFeatures = renderHostScript(store, reg, project, "10.0.0.12");
   assert(noFeatures.canFind("#!/bin/bash"));
   assert(!noFeatures.canFind("java -version"));
 
-  assert(renderHostScript(store, reg, profile, "10.0.0.10").length == 0);
-  assert(renderHostScript(store, reg, profile, "192.168.1.1").length == 0);
+  assert(renderHostScript(store, reg, project, "10.0.0.10").length == 0);
+  assert(renderHostScript(store, reg, project, "192.168.1.1").length == 0);
 }

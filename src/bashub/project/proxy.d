@@ -6,13 +6,13 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.proxy;
-/// `GET /api/bashub/config/{profile}/proxy`：按 `proxyEngine` 输出 haproxy / nginx 配置。
+module bashub.project.proxy;
+/// `GET /api/bashub/config/{project}/proxy`：按 `proxyEngine` 输出 haproxy / nginx 配置。
 /// 分组口径与 Scala `ConfigWS.prepareProxyData` 一致：只有带 targets 的 webapp 参与，
 /// 同一个 farm 内按 server 集合拆后端；多个 server 的集合命名为 `farm2`、`farm3`…。
 
-import bashub.profile.distribution : ProfileData, loadProfileData;
-import bashub.profile.resolver : ProfileContext;
+import bashub.project.distribution : ProjectData, loadProjectData;
+import bashub.project.resolver : ProjectContext;
 
 import beangle.data.resource : Registry;
 import beangle.data.value : jsonText;
@@ -62,7 +62,8 @@ struct ProxyBackend {
 
 /// 模板渲染所需的全部数据。
 struct ProxyModel {
-  Json profile;
+  Json project;
+  Json proxy;
   ProxyWebapp[] webapps;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
@@ -85,10 +86,10 @@ private struct FarmGroup {
 /// setline pull 的证书落点。公钥/私钥分开给 nginx；haproxy 读拼接后的 bundle。
 private enum certificateDir = "/etc/setline/certs";
 
-/// 按 `profile.proxyEngine` 渲染；未知引擎返回空串（路由按 404 处理）。
-string renderProxy(Store store, Registry reg, const ProfileContext context) {
-  auto data = loadProfileData(store, reg, context);
-  auto engine = attributeText(context.data, "proxyEngine").strip;
+/// 按 `project.proxyEngine` 渲染；未知引擎返回空串（路由按 404 处理）。
+string renderProxy(Store store, Registry reg, const ProjectContext context) {
+  auto data = loadProjectData(store, reg, context);
+  auto engine = attributeText(data.proxy, "proxyEngine").strip;
   auto model = buildProxyModel(data);
   if (engine == "nginx")
     return renderNginx(model);
@@ -97,10 +98,11 @@ string renderProxy(Store store, Registry reg, const ProfileContext context) {
   return "";
 }
 
-/// 从共享 Profile 快照建立反代模型。
-ProxyModel buildProxyModel(ProfileData data) {
+/// 从共享 Project 快照建立反代模型。
+ProxyModel buildProxyModel(ProjectData data) {
   ProxyModel model;
-  model.profile = data.profile.data;
+  model.project = data.project.data;
+  model.proxy = data.proxy;
 
   auto apps = data.webapps.dup;
   sort!((a, b) => attributeText(a, "contextPath") < attributeText(b, "contextPath"))(apps);
@@ -176,7 +178,7 @@ ProxyModel buildProxyModel(ProfileData data) {
   return model;
 }
 
-private ProxyServer[] targetServers(Json webapp, const ProfileData data) {
+private ProxyServer[] targetServers(Json webapp, const ProjectData data) {
   ProxyServer[] servers;
   bool[string] seen;
   foreach (serverId; relationshipIds(webapp, "targets")) {
@@ -212,7 +214,7 @@ private string[] urlPaths(Json webapp) {
   return path.length == 0 || path == "/" ? ["/"] : [path];
 }
 
-private string farmOptions(const ProfileData data, string farmId) {
+private string farmOptions(const ProjectData data, string farmId) {
   if (farmId !in data.farmsById)
     return "";
   return attributeText(data.farmsById[farmId], "proxyOptions").strip;
@@ -244,19 +246,20 @@ private ServerGroup* findServerGroup(ref FarmGroup farm, string key) {
 
 /// nginx：每个 webapp 的每个 urlPath 一个 location，后端来自 server 集合。
 string renderNginx(ProxyModel model) {
-  auto profile = model.profile;
-  auto maxconn = attributeLong(profile, "maxconn", 30000);
-  auto httpPort = attributeLong(profile, "httpPort", 80);
-  auto httpsPort = attributeLong(profile, "httpsPort", 443);
-  auto hostname = attributeText(profile, "hostname").strip;
-  auto sslProtocols = attributeText(profile, "sslProtocols").strip;
-  auto sslCiphers = attributeText(profile, "sslCiphers").strip;
+  auto project = model.project;
+  auto proxy = model.proxy;
+  auto maxconn = attributeLong(proxy, "maxconn", 30000);
+  auto httpPort = attributeLong(proxy, "httpPort", 80);
+  auto httpsPort = attributeLong(proxy, "httpsPort", 443);
+  auto hostname = attributeText(project, "hostname").strip;
+  auto sslProtocols = attributeText(proxy, "sslProtocols").strip;
+  auto sslCiphers = attributeText(proxy, "sslCiphers").strip;
   if (sslProtocols.length == 0)
     sslProtocols = "TLSv1 TLSv1.1 TLSv1.2";
   if (sslCiphers.length == 0)
     sslCiphers = "HIGH:!aNULL:!MD5";
-  auto enableHttps = attributeBool(profile, "enableHttps");
-  auto forceHttps = attributeBool(profile, "forceHttps", true);
+  auto enableHttps = attributeBool(proxy, "enableHttps");
+  auto forceHttps = attributeBool(proxy, "forceHttps", true);
 
   auto out_ = appender!string;
   line(out_, "user nginx;");
@@ -364,17 +367,18 @@ string renderNginx(ProxyModel model) {
 
 /// haproxy：主配置只保留监听与 setline 接线；backend 和路由 map 由 setline agent 生成。
 string renderHaproxy(ProxyModel model) {
-  auto profile = model.profile;
-  auto maxconn = attributeLong(profile, "maxconn", 30000);
-  auto httpPort = attributeLong(profile, "httpPort", 80);
-  auto httpsPort = attributeLong(profile, "httpsPort", 443);
-  auto hostname = attributeText(profile, "hostname").strip;
-  auto sslProtocols = attributeText(profile, "sslProtocols").strip;
-  auto sslCiphers = attributeText(profile, "sslCiphers").strip;
+  auto project = model.project;
+  auto proxy = model.proxy;
+  auto maxconn = attributeLong(proxy, "maxconn", 30000);
+  auto httpPort = attributeLong(proxy, "httpPort", 80);
+  auto httpsPort = attributeLong(proxy, "httpsPort", 443);
+  auto hostname = attributeText(project, "hostname").strip;
+  auto sslProtocols = attributeText(proxy, "sslProtocols").strip;
+  auto sslCiphers = attributeText(proxy, "sslCiphers").strip;
   if (sslProtocols.length == 0)
     sslProtocols = "no-sslv3 no-tlsv10";
-  auto enableHttps = attributeBool(profile, "enableHttps");
-  auto forceHttps = attributeBool(profile, "forceHttps", true);
+  auto enableHttps = attributeBool(proxy, "enableHttps");
+  auto forceHttps = attributeBool(proxy, "forceHttps", true);
 
   auto out_ = appender!string;
   line(out_, "# HAProxy main configuration. Start it with the setline fragment directory:");

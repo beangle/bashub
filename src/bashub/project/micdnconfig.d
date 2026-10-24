@@ -6,13 +6,13 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.micdnconfig;
-/// 以 Profile 为中心的 micdn 配置聚合。
+module bashub.project.micdnconfig;
+/// 以 Project 为中心的 micdn 配置聚合。
 ///
-/// 数据库里只保存三段结构：可复用组件目录、Profile 段设置、Profile 对组件的绑定。
+/// 数据库里只保存三段结构：可复用组件目录、Project 段设置、Project 对组件的绑定。
 /// 本模块负责把三者归一、校验并渲染成稳定的 micdn.xml；页面只读写这一个聚合。
 
-import bashub.profile.resolver : dataOf, loadAll;
+import bashub.project.resolver : dataOf, loadAll;
 
 import beangle.commons.xml : escapeXml;
 import beangle.data.query : Query;
@@ -38,7 +38,7 @@ class MicdnConfigException : Exception {
   }
 }
 
-/// 一个绑定到 Profile 的组件，已经展开组件规格。
+/// 一个绑定到 Project 的组件，已经展开组件规格。
 struct BoundComponent {
   string bindingId;
   string componentId;
@@ -57,11 +57,11 @@ struct MicdnState {
   string[] bindingIds;
 }
 
-/// 一个 Profile 的完整配置视图。
-struct MicdnProfileView {
-  Json profile;
+/// 一个 Project 的完整配置视图。
+struct MicdnProjectView {
+  Json project;
   MicdnState state;
-  string profileKey;
+  string projectKey;
 }
 
 private immutable string[] logLevels = [
@@ -232,35 +232,36 @@ void validateMountName(string kind, string mountName) {
     validateSingleName(mountName, "mountName");
 }
 
-/// 读取 Profile 的完整 Micdn 聚合。Profile 不存在返回 false。
-bool loadMicdnProfile(Store store, Registry reg, string profileId, out MicdnProfileView view) {
-  Json profileDoc;
-  if (!store.fetch(reg.find("profiles"), profileId, Query.init, profileDoc))
+/// 读取 Project 的完整 Micdn 聚合。Project 不存在返回 false。
+bool loadMicdnProject(Store store, Registry reg, string projectId, out MicdnProjectView view) {
+  Json projectDoc;
+  if (!store.fetch(reg.find("projects"), projectId, Query.init, projectDoc))
     return false;
 
   MicdnState state;
-  if (!loadMicdnState(store, reg, profileId, state))
+  if (!loadMicdnState(store, reg, projectId, state))
     return false;
 
-  auto profile = Json.emptyObject;
-  auto profileKey = attributeText(profileDoc["data"], "key");
-  auto cleanKey = profileKey.strip;
-  profile["id"] = Json(profileId);
-  profile["name"] = Json(attributeText(profileDoc["data"], "name"));
-  profile["qualifiedName"] = Json(attributeText(profileDoc["data"], "qualifiedName"));
-  profile["title"] = Json(attributeText(profileDoc["data"], "title"));
-  profile["ip"] = Json(attributeText(profileDoc["data"], "ip"));
-  profile["keyMasked"] = Json(maskSecret(cleanKey));
-  profile["keySet"] = Json(cleanKey.length > 0);
+  auto project = Json.emptyObject;
+  auto projectKey = attributeText(projectDoc["data"], "key");
+  auto cleanKey = projectKey.strip;
+  project["id"] = Json(projectId);
+  project["name"] = Json(attributeText(projectDoc["data"], "name"));
+  project["qualifiedName"] = Json(attributeText(projectDoc["data"], "qualifiedName"));
+  project["title"] = Json(attributeText(projectDoc["data"], "title"));
+  auto proxies = loadAll(store, reg.find("proxy-settings"), ["project": projectId]);
+  project["ip"] = Json(proxies.length > 0 ? attributeText(proxies[0], "ip") : "");
+  project["keyMasked"] = Json(maskSecret(cleanKey));
+  project["keySet"] = Json(cleanKey.length > 0);
 
-  view = MicdnProfileView(profile, state, profileKey);
+  view = MicdnProjectView(project, state, projectKey);
   return true;
 }
 
 /// 读取配置、绑定和组件目录，供 XML 分发与页面聚合共用。
-bool loadMicdnState(Store store, Registry reg, string profileId, out MicdnState state) {
+bool loadMicdnState(Store store, Registry reg, string projectId, out MicdnState state) {
   Json config;
-  readMicdnConfig(store, reg, profileId, config);
+  readMicdnConfig(store, reg, projectId, config);
 
   auto catalog = loadAll(store, reg.find("cdn-components"));
   Json[string] byId;
@@ -272,8 +273,8 @@ bool loadMicdnState(Store store, Registry reg, string profileId, out MicdnState 
 
   Query bindingQuery;
   bindingQuery.pageSize = 100000;
-  bindingQuery.addFilter("profile", profileId);
-  auto bindings = dataOf(store.search(reg.find("profile-micdn-components"), bindingQuery));
+  bindingQuery.addFilter("project", projectId);
+  auto bindings = dataOf(store.search(reg.find("project-micdn-components"), bindingQuery));
 
   BoundComponent[] components;
   string[] bindingIds;
@@ -302,32 +303,32 @@ bool loadMicdnState(Store store, Registry reg, string profileId, out MicdnState 
   return true;
 }
 
-/// Profile 的 micdn 下载凭证（`<auth download-key>`）；未配置或读取失败时为空。
-string micdnDownloadKey(Store store, Registry reg, string profileId) {
+/// Project 的 micdn 下载凭证（`<auth download-key>`）；未配置或读取失败时为空。
+string micdnDownloadKey(Store store, Registry reg, string projectId) {
   Json config;
-  readMicdnConfig(store, reg, profileId, config);
+  readMicdnConfig(store, reg, projectId, config);
   auto auth = jsonGet(config, "auth");
   return field(auth, "downloadKey").strip;
 }
 
 /// 只读取并归一 Micdn 配置，不加载组件与绑定。配置行缺失时返回缺省配置。
-void readMicdnConfig(Store store, Registry reg, string profileId, out Json config) {
+void readMicdnConfig(Store store, Registry reg, string projectId, out Json config) {
   config = defaultMicdnConfig();
   Json configDoc;
-  if (store.fetch(reg.find("profile-micdn"), profileId, Query.init, configDoc)) {
+  if (store.fetch(reg.find("project-micdn"), projectId, Query.init, configDoc)) {
     auto attrs = jsonGet(jsonGet(configDoc, "data"), "attributes");
     config = normalizeMicdnConfig(jsonGet(attrs, "config"));
   }
 }
 
-/// 渲染 Profile 的 micdn.xml；`profileName` / `profileKey` 用于生成唯一的 blob bucket。
+/// 渲染 Project 的 micdn.xml；`projectName` / `projectKey` 用于生成唯一的 blob bucket。
 /// maskSecrets=true 时只用于页面预览，bucket key 保留首尾各两个字符。
-/// `remoteUrl` 由下载请求的 origin 推导，不进入 Profile 配置。
-string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string profileName,
-    string profileKey, bool maskSecrets = false, string remoteUrl = "") {
+/// `remoteUrl` 由下载请求的 origin 推导，不进入 Project 配置。
+string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectName,
+    string projectKey, bool maskSecrets = false, string remoteUrl = "") {
   auto config = normalizeMicdnConfig(rawConfig);
   validateMicdnConfig(config);
-  validateBlobIdentity(profileName, profileKey);
+  validateBlobIdentity(projectName, projectKey);
 
   BoundComponent[] staticBundles;
   BoundComponent[] wwwDocs;
@@ -422,14 +423,14 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   }
 
   auto blob = jsonGet(config, "blob");
-  auto key = profileKey.strip;
+  auto key = projectKey.strip;
   if (key.length > 0) {
     xml.put("  <blob");
     putAttr(xml, "base", effectiveBase(config, "blob", "/blob"));
     putAttr(xml, "max-size", field(blob, "maxSize"));
     xml.put(">\n");
     xml.put("    <bucket");
-    putAttr(xml, "name", profileName.strip);
+    putAttr(xml, "name", projectName.strip);
     putAttr(xml, "key", maskSecrets ? maskSecret(key) : key);
     if (!flag(blob, "publicImages", true))
       putAttr(xml, "publicImages", "false");
@@ -505,9 +506,9 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
 }
 
 /// 页面聚合：配置（脱敏）、绑定、组件目录和预览 XML。
-Json micdnProfileDocument(const MicdnProfileView view, string remoteUrl = "") {
+Json micdnProjectDocument(const MicdnProjectView view, string remoteUrl = "") {
   auto doc = Json.emptyObject;
-  doc["profile"] = view.profile;
+  doc["project"] = view.project;
   doc["config"] = sanitizeConfig(view.state.config);
 
   Json[] bindings;
@@ -528,28 +529,28 @@ Json micdnProfileDocument(const MicdnProfileView view, string remoteUrl = "") {
   foreach (ref resource; view.state.catalog)
     catalog ~= plainComponent(resource);
   doc["components"] = Json(catalog);
-  auto profileName = jsonText(view.profile["name"]);
-  doc["xml"] = Json(renderMicdnXml(view.state.config, view.state.components, profileName, view.profileKey,
+  auto projectName = jsonText(view.project["name"]);
+  doc["xml"] = Json(renderMicdnXml(view.state.config, view.state.components, projectName, view.projectKey,
       true, remoteUrl));
   return doc;
 }
 
-/// 保存整份 Profile 配置。`bindings` 缺省时沿用当前绑定。
-void saveMicdnProfile(Store store, Registry reg, string profileId, Json body) {
-  Json profile;
-  if (!store.fetch(reg.find("profiles"), profileId, Query.init, profile))
-    throw new MicdnConfigException("profile", "Profile 不存在: " ~ profileId);
+/// 保存整份 Project 配置。`bindings` 缺省时沿用当前绑定。
+void saveMicdnProject(Store store, Registry reg, string projectId, Json body) {
+  Json project;
+  if (!store.fetch(reg.find("projects"), projectId, Query.init, project))
+    throw new MicdnConfigException("project", "Project 不存在: " ~ projectId);
 
   MicdnState oldState;
-  if (!loadMicdnState(store, reg, profileId, oldState))
-    throw new MicdnConfigException("profile", "Profile 不存在: " ~ profileId);
+  if (!loadMicdnState(store, reg, projectId, oldState))
+    throw new MicdnConfigException("project", "Project 不存在: " ~ projectId);
 
   auto rawConfig = jsonGet(body, "config");
   if (rawConfig.type != Json.Type.object)
     throw new MicdnConfigException("config", "缺少 config 对象");
   auto config = normalizeMicdnConfig(mergeMicdnSecrets(rawConfig, oldState.config));
   validateMicdnConfig(config);
-  validateBlobIdentity(attributeText(profile["data"], "name"), attributeText(profile["data"], "key"));
+  validateBlobIdentity(attributeText(project["data"], "name"), attributeText(project["data"], "key"));
 
   Json[string] catalogById;
   foreach (ref component; oldState.catalog) {
@@ -591,14 +592,14 @@ void saveMicdnProfile(Store store, Registry reg, string profileId, Json body) {
   store.transaction({
     Row configValues;
     configValues["config"] = config;
-    store.upsertColumns(reg.find("profile-micdn"), profileId, configValues);
+    store.upsertColumns(reg.find("project-micdn"), projectId, configValues);
 
-    auto bindingRes = reg.find("profile-micdn-components");
+    auto bindingRes = reg.find("project-micdn-components");
     foreach (bindingId; oldState.bindingIds)
       store.removeColumns(bindingRes, bindingId);
     foreach (ref component; desired) {
       Row values;
-      values["profile"] = Json(profileId);
+      values["project"] = Json(projectId);
       values["component"] = Json(component.componentId);
       values["sortno"] = Json(component.sortno);
       store.insertColumns(bindingRes, values);
@@ -810,12 +811,12 @@ private void validateMicdnConfig(Json config) {
   validateSize(field(blob, "maxSize"), "blob.maxSize");
 }
 
-/// Blob 的 bucket 身份固定来自 Profile：名称取 `profile.name`，密钥取 `profile.key`。
-/// 没有 key 时不生成 Blob；有 key 时 Profile 名必须能作为 bucket 名。
-private void validateBlobIdentity(string profileName, string profileKey) {
-  if (profileKey.strip.length == 0)
+/// Blob 的 bucket 身份固定来自 Project：名称取 `project.name`，密钥取 `project.key`。
+/// 没有 key 时不生成 Blob；有 key 时 Project 名必须能作为 bucket 名。
+private void validateBlobIdentity(string projectName, string projectKey) {
+  if (projectKey.strip.length == 0)
     return;
-  validateSingleName(profileName.strip, "profile.name");
+  validateSingleName(projectName.strip, "project.name");
 }
 
 private string effectiveBase(Json config, string sectionName, string defaultSubDir) {

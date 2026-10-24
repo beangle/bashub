@@ -136,13 +136,13 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   不显示资源名那种 `/setting/config.action` 的权限串，与旧 `menu/list.ftl` 一致）；
   `join` 走列表 `include` 回来的关联数据，字段本身仍按 `refs` 参与表单与 include。多个字段用
   `separator` 连接，空值自动跳过（如菜单的「入口地址」= `entry.name` + `?` + `params`）。
-- 「当前配置」记忆（原 `ProfileHelper` + cookie `current_profile_id` 的前端对等物，见 `src/current-profile.ts`）：
-  查询条件里有 `ref`→`profiles` 字段的资源视为**配置作用域**（当前是群集管理/主机管理/应用部署），
+- 「当前配置」记忆（原 `ProjectHelper` + cookie `current_project_id` 的前端对等物，见 `src/current-project.ts`）：
+  查询条件里有 `ref`→`projects` 字段的资源视为**配置作用域**（当前是群集管理/主机管理/应用部署），
   打开页面时该查询条件自动填成记忆的配置，用户在查询条件里选中的配置会写回记忆（存 localStorage
-  `bashub.current_profile_id`），切到同类页面继续沿用；新建表单里的配置字段也默认取记忆值。
-  空值不覆盖（与旧 `ProfileHelper.remember` 一致，清空条件=看全部，不会抹掉记忆）；记忆的配置若已被删除，
-  加载选项后会被丢弃，避免下拉框显示裸 id。宿主/门户下发的 `?contextProfileId=<id>` 优先级最高
-  （参数名沿用 ems-app 的 `EMS_URL_PARAMS.contextProfileId`）。`refs`→profiles（如静态组的「针对配置」）不算，
+  `bashub.current_project_id`），切到同类页面继续沿用；新建表单里的配置字段也默认取记忆值。
+  空值不覆盖（与旧 `ProjectHelper.remember` 一致，清空条件=看全部，不会抹掉记忆）；记忆的配置若已被删除，
+  加载选项后会被丢弃，避免下拉框显示裸 id。宿主/门户下发的 `?contextProjectId=<id>` 优先级最高
+  （参数名沿用 ems-app 的 `EMS_URL_PARAMS.contextProjectId`）。`refs`→projects（如静态组的「针对配置」）不算，
   artifact/engine 的「针对配置」是可空选项、不参与记忆。
 - 必填查询条件（菜单管理的「应用」，`filters` 里标 `required: true`）：**未选定时不发列表请求**，
   数据区只显示「请先选择应用」，避免空条件把全量菜单拉回来（原 `MenuAction.indexSetting` 也是先选应用再加载）。
@@ -162,14 +162,14 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `/api/bashub/config/platforms`；写入走 JSON:API 的
   `POST/PATCH/DELETE /api/bashub/config/platform-feature-scripts`。该资源因此**没有独立列表页**，
   SPA 里也不再有对应的 schema。
-- Profile 详情页 `/config/profiles/:id`（`ProfileDetailView.vue`）：从配置列表的名称列或编辑抽屉进入，
+- Project 详情页 `/config/projects/:id`（`ProjectDetailView.vue`）：从配置列表的名称列或编辑抽屉进入，
   左侧导航切换概览、Haproxy/Nginx、Setline、证书、BAS 服务与 Micdn，右侧以卡片展示配置和关联资源；
   `?section=setline` 等查询参数可直达对应分区。
 - 资源列表保持原有页签组织方式，页签组路由带能力域前缀：
   `/config/org-config`、`/config/platform-ops`、`/config/farm-hosts`、`/ems/app-config`、
   `/ems/menu-config`。组内每个页签仍调用对应资源的 `config` / `ems` API；独立资源只有未入组的
   `engines`、`artifacts`、`webapps` 和从属页面 `servers`。Micdn 聚合页使用
-  `/micdn/profiles/:id`、`/micdn/components`，监控使用 `/monitor/agents`。
+  `/micdn/projects/:id`、`/micdn/components`，监控使用 `/monitor/agents`。
   旧的无域页签组路径和资源独立页面入口都不注册，也没有重定向。
 
 ## 接口

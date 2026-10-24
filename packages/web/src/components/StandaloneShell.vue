@@ -71,7 +71,7 @@ const groupIcons: Record<string, Component> = {
 
 /**
  * 叶子菜单图标，对齐原 BAS 左侧菜单的 FontAwesome 图标：
- * profiles=fa-user、platform-features=fa-linux、engines=fa-gear、hosts=fa-server、
+ * projects=fa-user、platform-features=fa-linux、engines=fa-gear、hosts=fa-server、
  * farms=fa-circle-nodes、artifacts=fa-app-store、webapps=fa-person-running、
  * apps=fa-app-store、menus=fa-bars。
  * 原菜单没有的页面选取语义相近的 TDesign 图标。
@@ -84,7 +84,7 @@ const itemIcons: Record<string, Component> = {
   'farm-hosts': ShareIcon,
   organizations: BuildingIcon,
   platforms: ComponentGridIcon,
-  profiles: UserIcon,
+  projects: UserIcon,
   'platform-features': DesktopIcon,
   engines: Setting1Icon,
   hosts: ServerIcon,

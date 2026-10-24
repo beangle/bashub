@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<db engine="PostgreSQL" version="0.0.8">
+<db engine="PostgreSQL" version="0.0.9">
   <schemas>
     <schema name="bas">
       <tables>
@@ -21,17 +21,17 @@
         <table name="mon_server_samples" comment="节点运行状态采样">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project ID"/>
             <column name="sampled_at" type="timestamp with time zone" nullable="false" comment="采样时刻"/>
             <column name="servers" type="jsonb" nullable="false" comment="server 状态: id -> running/stopped/error"/>
           </columns>
           <constraints>
             <primary-key name="pk_mon_server_samples" columns="id"/>
-            <unique-key name="uq_mon_server_samples_point" columns="profile_id,sampled_at"/>
-            <foreign-key name="fk_mon_server_samples_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <unique-key name="uq_mon_server_samples_point" columns="project_id,sampled_at"/>
+            <foreign-key name="fk_mon_server_samples_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
           <indexes>
-            <index name="idx_mon_server_samples_profile_time" columns="profile_id,sampled_at"/>
+            <index name="idx_mon_server_samples_project_time" columns="project_id,sampled_at"/>
           </indexes>
         </table>
         <table name="cfg_artifacts" comment="Artifact?">
@@ -46,14 +46,14 @@
             <column name="jsp_support" type="boolean" nullable="false" defaultValue="false" comment="jspSupport?"/>
             <column name="latest_version" type="varchar(255)" nullable="false" comment="latestVersion?"/>
             <column name="packaging" type="varchar(255)" nullable="false" comment="packaging?"/>
-            <column name="profile_id" type="bigint" comment="Profile?ID"/>
+            <column name="project_id" type="bigint" comment="Project?ID"/>
             <column name="resolve_support" type="boolean" nullable="false" defaultValue="false" comment="resolveSupport?"/>
             <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
             <column name="websocket_support" type="boolean" nullable="false" defaultValue="false" comment="websocketSupport?"/>
           </columns>
           <constraints>
             <primary-key name="pk_tad8i3qmw6mrbmtjttp73cdmc" columns="id"/>
-            <foreign-key name="fk_a7f49ddsu3kc6uk8vkw4xo77c" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_a7f49ddsu3kc6uk8vkw4xo77c" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
         <table name="cfg_engines" comment="Engine?">
@@ -61,7 +61,7 @@
             <column name="id" type="integer" nullable="false" comment="非业务主键:auto_increment"/>
             <column name="jsp_support" type="boolean" nullable="false" defaultValue="false" comment="jspSupport?"/>
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
-            <column name="profile_id" type="bigint" comment="Profile?ID"/>
+            <column name="project_id" type="bigint" comment="Project?ID"/>
             <column name="remark" type="varchar(255)" comment="备注"/>
             <column name="typ" type="varchar(255)" nullable="false" comment="typ?"/>
             <column name="version" type="varchar(255)" nullable="false" comment="version?"/>
@@ -69,7 +69,7 @@
           </columns>
           <constraints>
             <primary-key name="pk_acei4b9b5rgit3s9frejijynw" columns="id"/>
-            <foreign-key name="fk_pf2599235ft4eksuquro2vhfp" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_pf2599235ft4eksuquro2vhfp" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
         <table name="cfg_engines_jars" comment="jars?">
@@ -104,14 +104,14 @@
             <column name="engine_id" type="integer" nullable="false" comment="Engine?ID"/>
             <column name="max_heap_size" type="integer" nullable="false" defaultValue="0" comment="maxHeapSize?"/>
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
             <column name="proxy_options" type="varchar(255)" comment="proxyOptions?"/>
             <column name="server_options" type="varchar(255)" comment="serverOptions?"/>
           </columns>
           <constraints>
             <primary-key name="pk_9x0b7lmr0gp2idusf2n0gvldl" columns="id"/>
             <foreign-key name="fk_o5hjxilgy98qkpctvs832b9ua" column="engine_id" referenced-table="bas.cfg_engines" referenced-column="id"/>
-            <foreign-key name="fk_emp368rqvkf0kwugk8calggkq" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_emp368rqvkf0kwugk8calggkq" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
         <table name="cfg_farms_hosts" comment="hosts?">
@@ -139,13 +139,13 @@
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
             <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
             <column name="platform_version" type="varchar(255)" nullable="false" comment="platformVersion?"/>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
             <column name="setline_listen_port" type="integer" comment="setlineListenPort?"/>
             <column name="setline_admin_port" type="integer" comment="setlineAdminPort?"/>
           </columns>
           <constraints>
             <primary-key name="pk_pxfg014nyayvye1gd3xih526i" columns="id"/>
-            <foreign-key name="fk_jc0d7xlflxli8uc7j0r0xp9jo" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_jc0d7xlflxli8uc7j0r0xp9jo" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
             <foreign-key name="fk_ink15ixrk8phkxswi12nq21am" column="platform_id" referenced-table="bas.cfg_platforms" referenced-column="id"/>
           </constraints>
         </table>
@@ -228,64 +228,75 @@
             <primary-key name="pk_giwqec5q65yu05qsao5ijus8e" columns="id"/>
           </constraints>
         </table>
-        <table name="cfg_profile_micdn" comment="Profile 的 Micdn 配置">
+        <table name="cfg_project_micdn" comment="Project 的 Micdn 配置">
           <columns>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project ID"/>
             <column name="config" type="jsonb" nullable="false" comment="Micdn 配置(JSON)"/>
           </columns>
           <constraints>
-            <primary-key name="pk_cfg_profile_micdn" columns="profile_id"/>
-            <foreign-key name="fk_cfg_profile_micdn_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <primary-key name="pk_cfg_project_micdn" columns="project_id"/>
+            <foreign-key name="fk_cfg_project_micdn_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
-        <table name="cfg_profile_micdn_components" comment="Profile 的 Micdn 组件绑定">
+        <table name="cfg_project_micdn_components" comment="Project 的 Micdn 组件绑定">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
             <column name="component_id" type="bigint" nullable="false" comment="组件 ID"/>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project ID"/>
             <column name="sortno" type="integer" nullable="false" defaultValue="0" comment="排序号"/>
           </columns>
           <constraints>
-            <primary-key name="pk_cfg_profile_micdn_components" columns="id"/>
-            <unique-key name="uq_profile_micdn_component" columns="profile_id,component_id"/>
-            <foreign-key name="fk_profile_micdn_components_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
-            <foreign-key name="fk_profile_micdn_components_component" column="component_id" referenced-table="bas.cdn_components" referenced-column="id"/>
+            <primary-key name="pk_cfg_project_micdn_components" columns="id"/>
+            <unique-key name="uq_project_micdn_component" columns="project_id,component_id"/>
+            <foreign-key name="fk_project_micdn_components_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
+            <foreign-key name="fk_project_micdn_components_component" column="component_id" referenced-table="bas.cdn_components" referenced-column="id"/>
           </constraints>
           <indexes>
-            <index name="idx_cfg_profile_micdn_components_component" columns="component_id"/>
+            <index name="idx_cfg_project_micdn_components_component" columns="component_id"/>
           </indexes>
         </table>
-        <table name="cfg_profile_certificates" comment="Profile 的 HTTPS 证书">
+        <table name="cfg_project_certificates" comment="Project 的 HTTPS 证书">
           <columns>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project ID"/>
             <column name="certificate" type="text" comment="公钥证书(PEM)"/>
             <column name="private_key" type="text" comment="私钥(PEM)"/>
           </columns>
           <constraints>
-            <primary-key name="pk_cfg_profile_certificates" columns="profile_id"/>
-            <foreign-key name="fk_cfg_profile_certificates_profile" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <primary-key name="pk_cfg_project_certificates" columns="project_id"/>
+            <foreign-key name="fk_cfg_project_certificates_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
-        <table name="cfg_profiles" comment="Profile?">
+        <table name="cfg_proxy_settings" comment="Project 的代理/SETLINE 配置">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
-            <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="enableHttps?"/>
-            <column name="force_https" type="boolean" nullable="false" defaultValue="true" comment="forceHttps?"/>
-            <column name="hostname" type="varchar(255)" comment="hostname?"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
+            <column name="ip" type="varchar(255)" nullable="false" comment="内部 IP(多个用空格/逗号分隔)"/>
             <column name="proxy_by_hostname" type="boolean" nullable="false" defaultValue="false" comment="proxyByHostname?"/>
+            <column name="proxy_engine" type="varchar(255)" nullable="false" defaultValue="haproxy" comment="proxyEngine?"/>
+            <column name="maxconn" type="integer" nullable="false" defaultValue="30000" comment="maxconn?"/>
             <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="httpPort?"/>
             <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="httpsPort?"/>
-            <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>
-            <column name="&quot;key&quot;" type="varchar(255)" nullable="false" comment="key?"/>
-            <column name="local_repo" type="varchar(255)" nullable="false" comment="localRepo?"/>
-            <column name="maxconn" type="integer" nullable="false" defaultValue="30000" comment="maxconn?"/>
-            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
-            <column name="org_id" type="integer" nullable="false" comment="Organization?ID"/>
-            <column name="proxy_engine" type="varchar(255)" nullable="false" comment="proxyEngine?"/>
-            <column name="remote_repo" type="varchar(255)" nullable="false" comment="remoteRepo?"/>
-            <column name="bas_version" type="varchar(255)" nullable="false" comment="basVersion?"/>
+            <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="enableHttps?"/>
+            <column name="force_https" type="boolean" nullable="false" defaultValue="true" comment="forceHttps?"/>
             <column name="ssl_ciphers" type="varchar(255)" comment="sslCiphers?"/>
             <column name="ssl_protocols" type="varchar(255)" comment="sslProtocols?"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_proxy_settings" columns="id"/>
+            <unique-key name="uq_cfg_proxy_settings_project" columns="project_id"/>
+            <foreign-key name="fk_cfg_proxy_settings_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_projects" comment="Project?">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="hostname" type="varchar(255)" comment="hostname?"/>
+            <column name="&quot;key&quot;" type="varchar(255)" nullable="false" comment="key?"/>
+            <column name="local_repo" type="varchar(255)" nullable="false" comment="localRepo?"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
+            <column name="org_id" type="integer" nullable="false" comment="Organization?ID"/>
+            <column name="remote_repo" type="varchar(255)" nullable="false" comment="remoteRepo?"/>
+            <column name="bas_version" type="varchar(255)" nullable="false" comment="basVersion?"/>
             <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
           </columns>
           <constraints>
@@ -319,7 +330,7 @@
             <column name="artifact_id" type="bigint" nullable="false" comment="Artifact?ID"/>
             <column name="context_path" type="varchar(255)" nullable="false" comment="contextPath?"/>
             <column name="libs" type="varchar(255)" comment="libs?"/>
-            <column name="profile_id" type="bigint" nullable="false" comment="Profile?ID"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
             <column name="unpack" type="boolean" nullable="false" defaultValue="false" comment="unpack?"/>
             <column name="urls" type="jsonb" nullable="false" comment="urls?"/>
             <column name="version" type="varchar(255)" nullable="false" comment="version?"/>
@@ -327,7 +338,7 @@
           <constraints>
             <primary-key name="pk_drfaoltpyejnt1b86ynk6f4a4" columns="id"/>
             <foreign-key name="fk_61bk808awvse0xme3hlm6vrcy" column="artifact_id" referenced-table="bas.cfg_artifacts" referenced-column="id"/>
-            <foreign-key name="fk_d8tq1dhvfqudy0otroaw2nwit" column="profile_id" referenced-table="bas.cfg_profiles" referenced-column="id"/>
+            <foreign-key name="fk_d8tq1dhvfqudy0otroaw2nwit" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
         <table name="cfg_webapps_targets" comment="targets?">

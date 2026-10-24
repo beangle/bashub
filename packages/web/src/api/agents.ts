@@ -59,7 +59,7 @@ export interface AgentBasSnapshot {
   declared?: AgentInstance[]
 }
 
-/** Profile 所属机构的展示信息（监控卡片用它当大标题与 Logo）。 */
+/** Project 所属机构的展示信息（监控卡片用它当大标题与 Logo）。 */
 export interface AgentOrganization {
   name?: string
   title?: string
@@ -69,12 +69,12 @@ export interface AgentOrganization {
 
 /** `GET /api/bashub/monitor/agents/status` 里的一项：一台在线节点此刻的样子。 */
 export interface AgentStatus {
-  profile: string
-  /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
-  profileId?: string
-  /** profile 的说明（title），监控卡片的大标题。 */
-  profileTitle?: string
-  /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
+  project: string
+  /** project 的 JSON:API 主键；用于跳转到配置详情。 */
+  projectId?: string
+  /** project 的说明（title），监控卡片的大标题。 */
+  projectTitle?: string
+  /** agent 上报的服务器 IP；同一 project 下用它区分不同机器。 */
   ip?: string
   host?: string
   org?: AgentOrganization
@@ -99,12 +99,12 @@ export interface AgentHealth {
 
 /** `GET /api/bashub/monitor/agents/summary`：在线列表轮询用的轻量摘要。 */
 export interface AgentSummary {
-  profile: string
-  /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
-  profileId?: string
-  /** profile 的说明（title），监控卡片的大标题。 */
-  profileTitle?: string
-  /** agent 上报的服务器 IP；同一 profile 下用它区分不同机器。 */
+  project: string
+  /** project 的 JSON:API 主键；用于跳转到配置详情。 */
+  projectId?: string
+  /** project 的说明（title），监控卡片的大标题。 */
+  projectTitle?: string
+  /** agent 上报的服务器 IP；同一 project 下用它区分不同机器。 */
   ip?: string
   host?: string
   org?: AgentOrganization
@@ -119,18 +119,18 @@ export interface AgentSummary {
   health?: AgentHealth[]
 }
 
-/** 一个采样点：同一时刻整个 profile 的 server 状态。 */
+/** 一个采样点：同一时刻整个 project 的 server 状态。 */
 export interface AgentHistorySample {
   at: string
   servers: Record<string, AgentHealth['state']>
 }
 
 export interface AgentHistory {
-  profile: string
-  /** profile 的 JSON:API 主键；用于跳转到配置详情。 */
-  profileId?: string
-  /** profile 的说明（title），监控卡片的大标题。 */
-  profileTitle?: string
+  project: string
+  /** project 的 JSON:API 主键；用于跳转到配置详情。 */
+  projectId?: string
+  /** project 的说明（title），监控卡片的大标题。 */
+  projectTitle?: string
   from: string
   to: string
   days: number
@@ -161,40 +161,40 @@ export async function listAgents(): Promise<AgentStatus[]> {
   return result.agents ?? []
 }
 
-/** 读取节点的半年运行历史：一次取回 profile 的原始采样，按 server 聚合由页面完成。 */
+/** 读取节点的半年运行历史：一次取回 project 的原始采样，按 server 聚合由页面完成。 */
 export async function readAgentHistory(
-  profile: string,
+  project: string,
   options: { days?: number } = {},
 ): Promise<AgentHistory> {
   const query: Record<string, string> = { days: String(options.days ?? 180) }
   return apiClient.getPlain<AgentHistory>(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/history`),
+    apiPath('monitor', `/agents/${encodeURIComponent(project)}/history`),
     { query },
   )
 }
 
-/** 目标 agent 的查询参数：同一 profile 有多台在线 agent 时必填（值为 `/agents/status` 里的 `ip`）。 */
+/** 目标 agent 的查询参数：同一 project 有多台在线 agent 时必填（值为 `/agents/status` 里的 `ip`）。 */
 function agentQuery(agent?: string): string {
   return agent ? `?agent=${encodeURIComponent(agent)}` : ''
 }
 
 /** 要求在线节点立刻上报一次；202 只表示指令已入队，快照随后到达。 */
-export async function requestAgentReport(profile: string, agent?: string): Promise<void> {
+export async function requestAgentReport(project: string, agent?: string): Promise<void> {
   await apiClient.post(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/report`) + agentQuery(agent),
+    apiPath('monitor', `/agents/${encodeURIComponent(project)}/report`) + agentQuery(agent),
     {},
   )
 }
 
 /** 让节点启停一个实例；接口等到 agent 执行完才返回最终状态。 */
 export async function serviceAgentInstance(
-  profile: string,
+  project: string,
   instance: string,
   action: AgentServiceAction,
   agent?: string,
 ): Promise<AgentServiceResult> {
   const document = await apiClient.post<AgentServiceResult>(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/service/${action}`) + agentQuery(agent),
+    apiPath('monitor', `/agents/${encodeURIComponent(project)}/service/${action}`) + agentQuery(agent),
     { instance },
   )
   if (!document.data) throw new Error('节点未返回服务状态')
@@ -202,7 +202,7 @@ export async function serviceAgentInstance(
 }
 
 export function readAgentLog(
-  profile: string,
+  project: string,
   instance: string,
   from?: string,
   to?: string,
@@ -215,7 +215,7 @@ export function readAgentLog(
   if (tail && tail > 0) query.tail = String(tail)
   if (agent) query.agent = agent
   return apiClient.getPlain<AgentLogWindow>(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/log`),
+    apiPath('monitor', `/agents/${encodeURIComponent(project)}/log`),
     { query },
   )
 }
@@ -225,7 +225,7 @@ export function readAgentLog(
  * 事件由浏览器自动重连，并带上 `Last-Event-ID`，服务端会从下一条继续。
  */
 export function followAgentLog(
-  profile: string,
+  project: string,
   instance: string,
   tail = 200,
   agent?: string,
@@ -233,7 +233,7 @@ export function followAgentLog(
   const query: Record<string, string> = { instance, tail: String(tail) }
   if (agent) query.agent = agent
   const url = apiClient.resolveUrl(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/log/follow`),
+    apiPath('monitor', `/agents/${encodeURIComponent(project)}/log/follow`),
     { query },
   )
   return new EventSource(url, { withCredentials: true })
@@ -241,7 +241,7 @@ export function followAgentLog(
 
 /** 读取 basagent 自身的 console 日志；窗口参数与实例日志相同，但没有实例名。 */
 export function readAgentOwnLog(
-  profile: string,
+  project: string,
   from?: string,
   to?: string,
   tail?: number,
@@ -253,7 +253,7 @@ export function readAgentOwnLog(
   if (tail && tail > 0) query.tail = String(tail)
   if (agent) query.agent = agent
   return apiClient.getPlain<AgentLogWindow>(
-    apiPath('monitor', `/agents/${encodeURIComponent(profile)}/agent-log`),
+    apiPath('monitor', `/agents/${encodeURIComponent(project)}/agent-log`),
     { query },
   )
 }

@@ -6,13 +6,13 @@
  * (at your option) any later version.
  */
 
-module bashub.profile.peers;
+module bashub.project.peers;
 /// bashub 向 setline 发布的 peer 列表。peer 是运行 setline 的 web 节点或 micdn 节点，
 /// setline 从 `<url>/_setline/routes` 读取路由表。
 
-import bashub.profile.distribution : loadProfileData;
-import bashub.profile.micdnconfig : readMicdnConfig;
-import bashub.profile.resolver : ProfileContext;
+import bashub.project.distribution : loadProjectData;
+import bashub.project.micdnconfig : readMicdnConfig;
+import bashub.project.resolver : ProjectContext;
 
 import beangle.data.resource : Registry;
 import beangle.data.value : jsonGet, jsonText;
@@ -32,8 +32,8 @@ private struct SetlinePeer {
 }
 
 /// 输出 `{"peers": [...]}`。没有 peer 时给空数组，便于 setline pull 清空旧 peers。
-string renderPeers(Store store, Registry reg, const ProfileContext context) {
-  auto data = loadProfileData(store, reg, context);
+string renderPeers(Store store, Registry reg, const ProjectContext context) {
+  auto data = loadProjectData(store, reg, context);
   SetlinePeer[] peers;
   bool[string] urls;
   foreach (server; data.servers) {

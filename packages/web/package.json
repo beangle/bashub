@@ -1,6 +1,6 @@
 {
   "name": "@beangle/bashub-web",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "license": "GPL-3.0-or-later",
   "publishConfig": {
     "access": "public",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@beangle/bui-vue": "^0.0.5",
-    "@beangle/ems-app": "^0.0.2",
+    "@beangle/ems-app": "^0.0.3",
     "@fortawesome/fontawesome-free": "^6.7.2",
     "tdesign-icons-vue-next": "^0.4.11",
     "tdesign-vue-next": "^1.20.8",

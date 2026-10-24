@@ -3,13 +3,13 @@
     <div class="page-head">
       <div class="detail-heading">
         <div class="detail-heading__title">
-          <h2 class="page-title">{{ profileName || '配置详情' }}</h2>
+          <h2 class="page-title">{{ projectName || '配置详情' }}</h2>
           <p class="page-subtitle">
-            <span v-if="profileTitle">{{ profileTitle }} · </span>
+            <span v-if="projectTitle">{{ projectTitle }} · </span>
             <code v-if="qualifiedName">{{ qualifiedName }}</code>
             <span v-if="basVersion"> · BAS {{ basVersion }}</span>
           </p>
-          <router-link class="detail-back" to="/config/org-config?tab=profiles">← 返回配置管理</router-link>
+          <router-link class="detail-back" to="/config/org-config?tab=projects">← 返回配置管理</router-link>
         </div>
       </div>
     </div>
@@ -23,28 +23,28 @@
     />
 
     <t-loading :loading="loading" show-overlay>
-      <div v-if="profile" class="profile-detail">
-        <aside class="profile-nav">
-          <div class="profile-nav__title">配置内容</div>
+      <div v-if="project" class="project-detail">
+        <aside class="project-nav">
+          <div class="project-nav__title">配置内容</div>
           <button
             v-for="item in sectionItems"
             :key="item.key"
             type="button"
-            class="profile-nav__item"
-            :class="{ 'profile-nav__item--active': activeSection === item.key }"
+            class="project-nav__item"
+            :class="{ 'project-nav__item--active': activeSection === item.key }"
             :title="item.hint"
             @click="selectSection(item.key)"
           >
-            <component :is="item.icon" class="profile-nav__icon" />
+            <component :is="item.icon" class="project-nav__icon" />
             <span>{{ item.label }}</span>
           </button>
-          <div class="profile-nav__footer">
-            <span>Profile key</span>
+          <div class="project-nav__footer">
+            <span>Project key</span>
             <strong :class="{ 'text-warning': !keyConfigured }">{{ keyConfigured ? '已设置' : '未设置' }}</strong>
           </div>
         </aside>
 
-        <main class="profile-main">
+        <main class="project-main">
           <header class="section-head">
             <div>
               <h3>{{ activeSectionMeta?.label }}</h3>
@@ -56,7 +56,7 @@
             <article class="detail-card">
               <header class="detail-card__head">
                 <div>
-                  <h4>Profile 基本资料</h4>
+                  <h4>Project 基本资料</h4>
                   <p>配置的归属、访问入口与运行版本。</p>
                 </div>
                 <div class="tag-row">
@@ -73,7 +73,7 @@
                 </div>
                 <div class="fact">
                   <span>说明</span>
-                  <strong>{{ profileTitle || '—' }}</strong>
+                  <strong>{{ projectTitle || '—' }}</strong>
                 </div>
                 <div class="fact">
                   <span>机构</span>
@@ -102,7 +102,7 @@
               <header class="detail-card__head">
                 <div>
                   <h4>部署概况</h4>
-                  <p>来自当前 Profile 的群集、主机、应用与在线节点。</p>
+                  <p>来自当前 Project 的群集、主机、应用与在线节点。</p>
                 </div>
               </header>
               <div class="stat-grid">
@@ -136,7 +136,7 @@
                 <div class="fact"><span>最大连接数</span><strong>{{ maxconn || '默认' }}</strong></div>
               </div>
               <div class="detail-note">
-                下载到服务器的代理配置按该 Profile 下的群集、服务、主机与 setline 路由渲染；修改 Profile 后重新生成。
+                下载到服务器的代理配置按该 Project 下的群集、服务、主机与 setline 路由渲染；修改 Project 后重新生成。
               </div>
             </article>
 
@@ -155,7 +155,7 @@
               </header>
               <p v-if="warnings.proxy" class="load-error">{{ warnings.proxy }}</p>
               <pre v-else-if="proxyConfig" class="config-preview">{{ proxyConfig }}</pre>
-              <p v-else class="empty-text">当前 Profile 没有可生成的代理配置。</p>
+              <p v-else class="empty-text">当前 Project 没有可生成的代理配置。</p>
             </article>
           </div>
 
@@ -209,7 +209,7 @@
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="empty-text">当前没有 peer。请为 Profile 添加主机或 Micdn 服务器。</p>
+              <p v-else class="empty-text">当前没有 peer。请为 Project 添加主机或 Micdn 服务器。</p>
             </article>
           </div>
 
@@ -251,14 +251,14 @@
                 </div>
               </header>
               <pre v-if="certificateText" class="config-preview config-preview--certificate">{{ certificateText }}</pre>
-              <p v-else class="empty-text">当前 Profile 没有设置公钥证书。</p>
+              <p v-else class="empty-text">当前 Project 没有设置公钥证书。</p>
             </article>
 
             <article class="detail-card">
               <header class="detail-card__head">
                 <div>
                   <h4>私钥保护</h4>
-                  <p>配置下载端点使用 Profile key 鉴权，私钥只交给 setline 等受信组件。</p>
+                  <p>配置下载端点使用 Project key 鉴权，私钥只交给 setline 等受信组件。</p>
                 </div>
                 <t-tag :theme="privateKeySet ? 'success' : 'warning'" variant="light">
                   {{ privateKeySet ? '已设置' : '未设置' }}
@@ -339,7 +339,7 @@
                   </section>
                 </div>
               </template>
-              <p v-else class="empty-text">当前 Profile 还没有服务或在线节点。</p>
+              <p v-else class="empty-text">当前 Project 还没有服务或在线节点。</p>
             </article>
 
             <article class="detail-card">
@@ -362,14 +362,14 @@
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="empty-text">当前 Profile 还没有部署应用。</p>
+              <p v-else class="empty-text">当前 Project 还没有部署应用。</p>
             </article>
 
             <article class="detail-card">
               <header class="detail-card__head">
                 <div>
                   <h4>server.xml</h4>
-                  <p>basctl 从该 Profile 拉取并执行的最终配置。</p>
+                  <p>basctl 从该 Project 拉取并执行的最终配置。</p>
                 </div>
                 <div class="detail-card__actions">
                   <t-button size="small" variant="outline" :disabled="!serverConfig" @click="copyText(serverConfig, 'server.xml')">
@@ -380,7 +380,7 @@
               </header>
               <p v-if="warnings.server" class="load-error">{{ warnings.server }}</p>
               <pre v-else-if="serverConfig" class="config-preview">{{ serverConfig }}</pre>
-              <p v-else class="empty-text">当前 Profile 没有可生成的 server.xml。</p>
+              <p v-else class="empty-text">当前 Project 没有可生成的 server.xml。</p>
             </article>
           </div>
 
@@ -389,7 +389,7 @@
               <header class="detail-card__head">
                 <div>
                   <h4>Micdn 运行配置</h4>
-                  <p>Profile 是 micdn 配置与组件绑定的中心。</p>
+                  <p>Project 是 micdn 配置与组件绑定的中心。</p>
                 </div>
                 <div class="detail-card__actions">
                   <t-button size="small" theme="primary" @click="openMicdn">编辑配置</t-button>
@@ -449,9 +449,9 @@
                 <div class="fact"><span>Maven</span><strong>{{ micdn.config.maven.declared ? '已启用' : '未启用' }}</strong></div>
                 <div class="fact"><span>NPM</span><strong>{{ micdn.config.npm.declared ? '已启用' : '未启用' }}</strong></div>
                 <div class="fact"><span>Native</span><strong>{{ micdn.config.native.declared ? '已启用' : '未启用' }}</strong></div>
-                <div class="fact"><span>Blob</span><strong>{{ micdn.profile.keySet ? '已启用' : '未启用' }}</strong></div>
-                <div class="fact"><span>Bucket</span><strong>{{ micdn.profile.name || '—' }}</strong></div>
-                <div class="fact"><span>Bucket Key</span><strong>{{ micdn.profile.keySet ? micdn.profile.keyMasked : '未设置' }}</strong></div>
+                <div class="fact"><span>Blob</span><strong>{{ micdn.project.keySet ? '已启用' : '未启用' }}</strong></div>
+                <div class="fact"><span>Bucket</span><strong>{{ micdn.project.name || '—' }}</strong></div>
+                <div class="fact"><span>Bucket Key</span><strong>{{ micdn.project.keySet ? micdn.project.keyMasked : '未设置' }}</strong></div>
               </div>
             </article>
 
@@ -521,14 +521,14 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listAgents, type AgentInstance, type AgentStatus } from '@/api/agents'
-import { getMicdnProfile, type MicdnBinding, type MicdnProfileDocument } from '@/api/micdn'
+import { getMicdnProject, type MicdnBinding, type MicdnProjectDocument } from '@/api/micdn'
 import {
-  readProfileCertificate,
-  readProfileConfig,
+  readProjectCertificate,
+  readProjectConfig,
   readSetlinePeers,
-  saveProfileCertificate,
+  saveProjectCertificate,
   type SetlinePeer,
-} from '@/api/profile-detail'
+} from '@/api/project-detail'
 import {
   attributeText,
   getResourceDetail,
@@ -538,7 +538,7 @@ import {
   type ResourceRow,
 } from '@/api/resource'
 
-const PROFILES_PATH = '/profiles'
+const PROJECTS_PATH = '/projects'
 
 type SectionKey = 'overview' | 'proxy' | 'setline' | 'certificate' | 'bas' | 'micdn'
 
@@ -581,7 +581,7 @@ interface IpGroup {
 }
 
 const sectionItems: SectionItem[] = [
-  { key: 'overview', label: '概览', hint: 'Profile 的归属、版本与部署概况', icon: DashboardIcon },
+  { key: 'overview', label: '概览', hint: 'Project 的归属、版本与部署概况', icon: DashboardIcon },
   { key: 'proxy', label: 'Haproxy / Nginx', hint: '负载均衡监听与渲染后的代理配置', icon: InternetIcon },
   { key: 'setline', label: 'Setline', hint: 'setline 的 peer 列表与路由来源', icon: LinkIcon },
   { key: 'certificate', label: '证书', hint: 'HTTPS、公钥证书与私钥保护', icon: CertificateIcon },
@@ -591,9 +591,10 @@ const sectionItems: SectionItem[] = [
 
 const route = useRoute()
 const router = useRouter()
-const profileId = String(route.params.id || '')
+const projectId = String(route.params.id || '')
 
-const profile = ref<ResourceRow>()
+const project = ref<ResourceRow>()
+const proxy = ref<ResourceRow>()
 const included = ref<Map<string, ResourceRow>>(new Map())
 const farms = ref<ResourceRow[]>([])
 const servers = ref<ResourceRow[]>([])
@@ -603,35 +604,35 @@ const agents = ref<AgentStatus[]>([])
 const proxyConfig = ref('')
 const serverConfig = ref('')
 const setlinePeers = ref<SetlinePeer[]>([])
-const micdn = ref<MicdnProfileDocument>()
+const micdn = ref<MicdnProjectDocument>()
 const loading = ref(false)
 const loadError = ref('')
 const warnings = reactive<Record<string, string>>({})
 const activeSection = ref<SectionKey>(initialSection())
 
-const organization = computed(() => related(profile.value, 'org', 'organizations'))
+const organization = computed(() => related(project.value, 'org', 'organizations'))
 const organizationName = computed(() => attrOf(organization.value, 'name'))
-const name = computed(() => attrOf(profile.value, 'name'))
-const qualifiedName = computed(() => attrOf(profile.value, 'qualifiedName') || [organizationName.value, name.value].filter(Boolean).join('.'))
-const profileName = computed(() => qualifiedName.value || name.value)
-const profileTitle = computed(() => attrOf(profile.value, 'title'))
-const basVersion = computed(() => attrOf(profile.value, 'basVersion'))
-const ip = computed(() => attrOf(profile.value, 'ip'))
-const hostname = computed(() => attrOf(profile.value, 'hostname'))
-const proxyByHostname = computed(() => boolOf(profile.value?.attributes.proxyByHostname))
-const httpPort = computed(() => attrOf(profile.value, 'httpPort'))
-const httpsPort = computed(() => attrOf(profile.value, 'httpsPort'))
-const enableHttps = computed(() => boolOf(profile.value?.attributes.enableHttps))
-const forceHttps = computed(() => boolOf(profile.value?.attributes.forceHttps))
-const maxconn = computed(() => attrOf(profile.value, 'maxconn'))
-const proxyEngine = computed(() => attrOf(profile.value, 'proxyEngine'))
+const name = computed(() => attrOf(project.value, 'name'))
+const qualifiedName = computed(() => attrOf(project.value, 'qualifiedName') || [organizationName.value, name.value].filter(Boolean).join('.'))
+const projectName = computed(() => qualifiedName.value || name.value)
+const projectTitle = computed(() => attrOf(project.value, 'title'))
+const basVersion = computed(() => attrOf(project.value, 'basVersion'))
+const ip = computed(() => attrOf(proxy.value, 'ip'))
+const hostname = computed(() => attrOf(project.value, 'hostname'))
+const proxyByHostname = computed(() => boolOf(proxy.value?.attributes.proxyByHostname))
+const httpPort = computed(() => attrOf(proxy.value, 'httpPort'))
+const httpsPort = computed(() => attrOf(proxy.value, 'httpsPort'))
+const enableHttps = computed(() => boolOf(proxy.value?.attributes.enableHttps))
+const forceHttps = computed(() => boolOf(proxy.value?.attributes.forceHttps))
+const maxconn = computed(() => attrOf(proxy.value, 'maxconn'))
+const proxyEngine = computed(() => attrOf(proxy.value, 'proxyEngine'))
 const proxyEngineLabel = computed(() => {
   if (proxyEngine.value === 'haproxy') return 'HAProxy'
   if (proxyEngine.value === 'nginx') return 'Nginx'
   return proxyEngine.value || '未设置'
 })
-const sslProtocols = computed(() => attrOf(profile.value, 'sslProtocols'))
-const sslCiphers = computed(() => attrOf(profile.value, 'sslCiphers'))
+const sslProtocols = computed(() => attrOf(proxy.value, 'sslProtocols'))
+const sslCiphers = computed(() => attrOf(proxy.value, 'sslCiphers'))
 const certificateText = ref('')
 const privateKeySet = ref(false)
 const certificateVisible = ref(false)
@@ -639,7 +640,7 @@ const certificateDraft = ref('')
 const privateKeyDraft = ref('')
 const savingCertificate = ref(false)
 const certificateError = ref('')
-const keyConfigured = computed(() => Boolean(attrOf(profile.value, 'key')) || micdn.value?.profile.keySet === true)
+const keyConfigured = computed(() => Boolean(attrOf(project.value, 'key')) || micdn.value?.project.keySet === true)
 const setlineHosts = computed(() =>
   hosts.value
     .map((host) => ({
@@ -663,12 +664,12 @@ const organizationText = computed(() => {
 })
 
 const onlineAgents = computed(() =>
-  agents.value.filter((agent) => agent.profile === qualifiedName.value || agent.profile === name.value),
+  agents.value.filter((agent) => agent.project === qualifiedName.value || agent.project === name.value),
 )
 const instanceRows = computed<InstanceRow[]>(() =>
   onlineAgents.value
     .flatMap((agent) => instancesOf(agent).map((instance) => ({ agent, instance, running: isRunning(instance) })))
-    .sort((a, b) => (a.agent.host || a.agent.profile).localeCompare(b.agent.host || b.agent.profile)),
+    .sort((a, b) => (a.agent.host || a.agent.project).localeCompare(b.agent.host || b.agent.project)),
 )
 const runningInstanceCount = computed(() => instanceRows.value.filter((row) => row.running).length)
 const stoppedInstanceCount = computed(() => instanceRows.value.filter((row) => !row.running).length)
@@ -795,7 +796,7 @@ watch(activeSection, (value) => {
 })
 
 function openMicdn() {
-  void router.push(`/micdn/profiles/${profileId}`)
+  void router.push(`/micdn/projects/${projectId}`)
 }
 
 function attrOf(row: ResourceRow | undefined, key: string): string {
@@ -896,7 +897,7 @@ async function saveCertificate() {
   }
   savingCertificate.value = true
   try {
-    const info = await saveProfileCertificate(profileId, {
+    const info = await saveProjectCertificate(projectId, {
       certificate: certificateDraft.value,
       privateKey: privateKeyDraft.value,
     })
@@ -918,41 +919,45 @@ async function load() {
 
   let detail: Awaited<ReturnType<typeof getResourceDetail>>
   try {
-    detail = await getResourceDetail(PROFILES_PATH, profileId, ['org'])
+    detail = await getResourceDetail(PROJECTS_PATH, projectId, ['org'])
   } catch (error) {
-    loadError.value = `加载 Profile 失败：${errorText(error)}`
+    loadError.value = `加载 Project 失败：${errorText(error)}`
     loading.value = false
     return
   }
 
-  profile.value = detail.row
+  project.value = detail.row
   const includedRows = [...detail.included]
 
   const [
     farmsResult, hostsResult, webappsResult, agentsResult, proxyResult, serverResult, peersResult,
-    micdnResult, certificateResult,
+    micdnResult, certificateResult, proxySettingResult,
   ] =
     await Promise.allSettled([
       listResource('/farms', {
-        filters: { 'farm.profile.id': profileId },
+        filters: { 'farm.project.id': projectId },
         include: ['engine'],
         pageSize: 500,
       }),
       listResource('/hosts', {
-        filters: { 'host.profile.id': profileId },
+        filters: { 'host.project.id': projectId },
         pageSize: 500,
       }),
       listResource('/webapps', {
-        filters: { 'webapp.profile.id': profileId },
+        filters: { 'webapp.project.id': projectId },
         include: ['artifact'],
         pageSize: 1000,
       }),
       listAgents(),
-      readProfileConfig(profileId, 'proxy'),
-      readProfileConfig(profileId, 'server'),
-      readSetlinePeers(profileId),
-      getMicdnProfile(profileId),
-      readProfileCertificate(profileId),
+      readProjectConfig(projectId, 'proxy'),
+      readProjectConfig(projectId, 'server'),
+      readSetlinePeers(projectId),
+      getMicdnProject(projectId),
+      readProjectCertificate(projectId),
+      listResource('/proxy-settings', {
+        filters: { 'proxySetting.project.id': projectId },
+        pageSize: 1,
+      }),
     ])
 
   if (farmsResult.status === 'fulfilled') {
@@ -981,6 +986,8 @@ async function load() {
 
   if (proxyResult.status === 'fulfilled') proxyConfig.value = proxyResult.value
   else warning('proxy', '代理配置', proxyResult.reason)
+  if (proxySettingResult.status === 'fulfilled') proxy.value = proxySettingResult.value.rows[0]
+  else warning('proxySetting', '代理设置', proxySettingResult.reason)
 
   if (serverResult.status === 'fulfilled') serverConfig.value = serverResult.value
   else warning('server', 'server.xml', serverResult.reason)
@@ -1061,14 +1068,14 @@ onMounted(load)
   margin-bottom: 12px;
 }
 
-.profile-detail {
+.project-detail {
   display: grid;
   grid-template-columns: 198px minmax(0, 1fr);
   align-items: start;
   gap: 16px;
 }
 
-.profile-nav {
+.project-nav {
   position: sticky;
   top: 16px;
   padding: 7px;
@@ -1077,14 +1084,14 @@ onMounted(load)
   background: var(--td-bg-color-container);
 }
 
-.profile-nav__title {
+.project-nav__title {
   padding: 7px 10px 9px;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
   font-weight: 500;
 }
 
-.profile-nav__item {
+.project-nav__item {
   display: flex;
   width: 100%;
   align-items: center;
@@ -1100,22 +1107,22 @@ onMounted(load)
   cursor: pointer;
 }
 
-.profile-nav__item:hover {
+.project-nav__item:hover {
   background: var(--td-bg-color-container-hover);
 }
 
-.profile-nav__item--active {
+.project-nav__item--active {
   background: var(--td-brand-color-light);
   color: var(--td-brand-color);
   font-weight: 600;
 }
 
-.profile-nav__icon {
+.project-nav__icon {
   flex: none;
   font-size: 16px;
 }
 
-.profile-nav__footer {
+.project-nav__footer {
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -1126,7 +1133,7 @@ onMounted(load)
   font-size: 12px;
 }
 
-.profile-nav__footer strong {
+.project-nav__footer strong {
   color: var(--td-text-color-primary);
   font-weight: 500;
 }
@@ -1135,7 +1142,7 @@ onMounted(load)
   color: var(--td-warning-color) !important;
 }
 
-.profile-main {
+.project-main {
   min-width: 0;
 }
 
@@ -1538,23 +1545,23 @@ onMounted(load)
 }
 
 @media (max-width: 900px) {
-  .profile-detail {
+  .project-detail {
     grid-template-columns: 1fr;
   }
 
-  .profile-nav {
+  .project-nav {
     position: static;
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
   }
 
-  .profile-nav__title,
-  .profile-nav__footer {
+  .project-nav__title,
+  .project-nav__footer {
     display: none;
   }
 
-  .profile-nav__item {
+  .project-nav__item {
     width: auto;
   }
 }
