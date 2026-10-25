@@ -131,6 +131,7 @@
         <table name="cfg_hosts" comment="Host?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="agent_group" type="varchar(64)" nullable="false" defaultValue="default_group" comment="agent 组网分组"/>
             <column name="arch" type="integer" nullable="false" comment="arch?"/>
             <column name="cores" type="integer" nullable="false" defaultValue="0" comment="cores?"/>
             <column name="cpu" type="varchar(200)" nullable="false" comment="cpu?"/>
@@ -297,6 +298,7 @@
             <column name="org_id" type="integer" nullable="false" comment="Organization?ID"/>
             <column name="remote_repo" type="varchar(255)" nullable="false" comment="remoteRepo?"/>
             <column name="bas_version" type="varchar(255)" nullable="false" comment="basVersion?"/>
+            <column name="agent_listen_port" type="integer" nullable="false" defaultValue="19080" comment="agent 统一监听端口"/>
             <column name="title" type="varchar(255)" nullable="false" comment="title?"/>
           </columns>
           <constraints>

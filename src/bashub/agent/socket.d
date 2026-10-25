@@ -12,15 +12,19 @@ module bashub.agent.socket;
 /// `scope WebSocket` 只活在这个回调里：登记册保存快照与出站队列，循环负责把队列发给
 /// socket，并抄下 agent 发来的现状。外部请求（如 `report:now`）因此不必持有 socket。
 
-import bashub.agent.channel : Envelope, parse, ping, reportHealth, reportNow;
+import bashub.agent.channel : Envelope, parse, ping, render, reportHealth, reportNow;
 import bashub.agent.registry : AgentRegistry, AgentSession;
 
 import vibe.core.log : logDebug, logWarn;
+import vibe.data.json : Json;
 import vibe.http.server : HTTPServerRequest, HTTPServerResponse;
 import vibe.http.websockets : WebSocket, handleWebSockets;
 
 import core.time : Duration, MonoTime, msecs, seconds;
+import std.algorithm : canFind;
 import std.datetime : Clock, SysTime;
+import std.string : strip;
+import std.conv : to;
 
 /// 保活节拍：agent 沉默 150s 就重连，60s 一次 `ping` 留一次丢失的余量。
 enum HeartbeatInterval = 60.seconds;
@@ -56,12 +60,18 @@ struct HealthSchedule {
 /// 完成 HTTP → WebSocket 升级并跑连接循环。调用方必须已经验证过 Bearer 与 `ip` 头。
 void serveAgentSocket(AgentRegistry registry, string project, string projectId, string ip,
     HTTPServerRequest req, HTTPServerResponse res, HealthSchedule health = HealthSchedule.init,
-    Duration heartbeatInterval = HeartbeatInterval) {
+    Duration heartbeatInterval = HeartbeatInterval, bool relay = false, const(string)[] allowedAgents = null,
+    string groupName = "default_group", ushort listenPort = 19080) {
   auto name = project.idup;
   auto id = projectId.idup;
   auto agentIp = ip.idup;
+  auto allowed = allowedAgents.dup;
   auto handler = handleWebSockets((scope WebSocket socket) nothrow {
-      runAgentLoop(registry, name, id, agentIp, socket, health, heartbeatInterval);
+      if (relay)
+        runRelayLoop(registry, name, id, agentIp, socket, health, heartbeatInterval, allowed,
+            groupName, listenPort);
+      else
+        runAgentLoop(registry, name, id, agentIp, socket, health, heartbeatInterval);
   });
   handler(req, res);
 }
@@ -86,8 +96,8 @@ void runAgentLoop(AgentRegistry registry, string project, string projectId, stri
     auto lastPing = MonoTime.currTime;
     auto lastHealth = lastPing;
     while (socket.connected) {
-      if (session.superseded) {
-        socket.close(session.closeCode, session.closeReason);
+      if (session.queue.superseded) {
+        socket.close(session.queue.closeCode, session.queue.closeReason);
         return;
       }
 
@@ -121,6 +131,106 @@ void runAgentLoop(AgentRegistry registry, string project, string projectId, stri
     }
   } catch (Exception e) {
     logWarn("%s: agent channel error: %s", project, e.msg);
+  }
+}
+
+/**
+ * relay master 的物理连接循环：master 自己 + 若干逻辑 follower 共享一条队列。
+ *
+ * 上行消息用 `agent` 字段标明逻辑主机；下行命令也带 `agent`，由 master 转发给对应 follower。
+ * 只接受 `allowedAgents`（当前 project 的 Host.ip）里的逻辑身份。
+ */
+void runRelayLoop(AgentRegistry registry, string project, string projectId, string ip,
+    scope WebSocket socket, HealthSchedule health, Duration heartbeatInterval,
+    const(string)[] allowedAgents, string groupName = "default_group", ushort listenPort = 19080) nothrow {
+  AgentSession master;
+  scope (exit) {
+    if (master !is null)
+      registry.detach(project, ip, master);
+    closeQuietly(project, socket);
+  }
+
+  try {
+    master = registry.attachRelay(project, projectId, ip, groupName);
+    logDebug("%s@%s: relay master connected", project, ip);
+    auto lastPing = MonoTime.currTime;
+    while (socket.connected) {
+      if (master.queue.superseded) {
+        socket.close(master.queue.closeCode, master.queue.closeReason);
+        return;
+      }
+      foreach (message; master.queue.take()) {
+        if (!socket.connected)
+          break;
+        socket.send(message);
+      }
+      auto current = MonoTime.currTime;
+      if (master.role == "master")
+        registry.refreshMaster(project, groupName, master.ip, 60.seconds);
+      if (heartbeatInterval > Duration.zero && current - lastPing >= heartbeatInterval) {
+        master.offer(ping());
+        lastPing = current;
+      }
+      if (!socket.waitForData(PollInterval))
+        continue;
+      Envelope message;
+      if (!parse(socket.receiveText(), message)) {
+        logWarn("%s: unreadable relay message dropped", project);
+        continue;
+      }
+      if (message.typ == "recommend") {
+        auto candidate = "";
+        if (message.body.type == Json.Type.object) {
+          auto value = message.body["candidate"];
+          if (value.type == Json.Type.string)
+            candidate = value.get!string;
+            candidate = candidate.strip;
+        }
+        auto lease = registry.recommendMaster(project, groupName, candidate, 60.seconds);
+        if (lease.ip.length > 0) {
+          auto candidateSession = registry.find(project, lease.ip);
+          if (candidateSession !is null) {
+            candidateSession.role = "master";
+            auto masterBody = Json.emptyObject;
+            masterBody["master"] = Json(lease.ip);
+            masterBody["port"] = Json(listenPort.to!string);
+            masterBody["term"] = Json(lease.term);
+            candidateSession.offer(render("become-master", "", masterBody));
+          }
+          foreach (session; registry.sessionsOfGroup(project, groupName)) {
+            if (session.ip == lease.ip || session.master !is null)
+              continue;
+            if (session.role == "master")
+              registry.dropChildren(session);
+            session.role = "follower";
+            auto followerBody = Json.emptyObject;
+            followerBody["master"] = Json(lease.ip);
+            followerBody["port"] = Json(listenPort.to!string);
+            followerBody["term"] = Json(lease.term);
+            session.offer(render("become-follower", "", followerBody));
+          }
+        }
+        continue;
+      }
+      if (message.typ == "agent:offline" && message.agent.length > 0) {
+        registry.detachRelayChild(master, message.agent);
+        continue;
+      }
+      AgentSession target;
+      if (message.agent.length == 0) {
+        target = master;
+      } else if (master.role == "master" && allowedAgents.canFind(message.agent)) {
+        target = registry.attachRelayChild(master, message.agent);
+      } else {
+        logWarn("%s: relay message for undeclared agent %s dropped", project, message.agent);
+        continue;
+      }
+      target.accept(message);
+      if (message.typ == "report:health" && target.healthKnown)
+        registry.recordProjectHealth(project, projectId);
+    }
+  } catch (Exception e) {
+    logWarn("%s: relay channel error: %s", project, e.msg);
   }
 }
 

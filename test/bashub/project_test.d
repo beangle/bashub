@@ -124,8 +124,8 @@ unittest {
   assert(xml.canFind(`<listener class-name="org.beangle.bas.listener.StartupListener"/>`));
   assert(xml.canFind(`<jar uri="org.beangle:beangle-webmvc:4.6.0"/>`));
 
-  assert(xml.canFind(`<host name="host01" ip="10.0.0.11" setline-listen-port="8080" setline-admin-port="10080"/>`));
-  assert(xml.canFind(`<host name="host02" ip="10.0.0.12" setline-listen-port="8082" setline-admin-port="10081"/>`));
+  assert(xml.canFind(`<host name="host01" ip="10.0.0.11" agent-group="default_group" setline-listen-port="8080" setline-admin-port="10080"/>`));
+  assert(xml.canFind(`<host name="host02" ip="10.0.0.12" agent-group="default_group" setline-listen-port="8082" setline-admin-port="10081"/>`));
   assert(xml.canFind(`<farm name="prod-farm" engine="tomcat" max-heap-size="2048M">`));
   assert(xml.canFind(`<server name="app1" host="host01" http="8080" proxy-http-port="9080"`));
 

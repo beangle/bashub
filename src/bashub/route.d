@@ -26,7 +26,7 @@ import beangle.security.session : Session, SessionRepo, nowSeconds;
 import bashub.artifactversion : refreshArtifactVersions;
 import bashub.agent.channel : bearer;
 import bashub.agent.registry : AgentRegistry, AgentSession, RequestOutcome;
-import bashub.agent.socket : HealthSchedule, serveAgentSocket;
+import bashub.agent.socket : HealthSchedule, HeartbeatInterval, serveAgentSocket;
 import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
@@ -857,7 +857,30 @@ class HubService {
     }
     auto health = HealthSchedule(cfg.agentHealthIntervalSeconds, cfg.agentHealthStartMinute,
         cfg.agentHealthEndMinute);
-    serveAgentSocket(agents, name, project.id, agentIp, req, res, health);
+    auto groupName = req.headers.get("X-Bas-Group", "").strip;
+    if (groupName.length == 0)
+      groupName = "default_group";
+    // 自动组网：agent 都先以候选身份连 hub；组网模式复用 relay 循环。
+    auto relay = req.headers.get("X-Bas-Role", "").strip == "relay"
+        || req.headers.get("X-Bas-Group", "").length > 0;
+    string[] allowed;
+    if (relay) {
+      Query hq;
+      hq.pageSize = 100000;
+      hq.addFilter("project", project.id);
+      foreach (host; dataOf(store.search(reg.find("hosts"), hq))) {
+        auto hostIp = attributeText(host, "ip").strip;
+        if (hostIp.length)
+          allowed ~= hostIp;
+      }
+    }
+    ushort listenPort = 19080;
+    try
+      listenPort = attributeText(project.data, "agentListenPort").strip.to!ushort;
+    catch (Exception) {
+    }
+    serveAgentSocket(agents, name, project.id, agentIp, req, res, health,
+        HeartbeatInterval, relay, allowed, groupName, listenPort);
   }
 
   /// `org.name` → 机构展示信息（标题/简称/Logo）；监控卡片用它替掉主机名当大标题。

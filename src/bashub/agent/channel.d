@@ -23,12 +23,13 @@ import std.format : format;
 import std.string : strip, toLower;
 
 /// agent → hub 的原语。
-enum AgentPrimitives = ["hello", "report:os", "report:bas", "report:health", "result", "pong"];
+enum AgentPrimitives = ["hello", "report:os", "report:bas", "report:health", "result", "pong", "agent:offline",
+  "recommend"];
 
 /// hub → agent 的原语。
 enum HubPrimitives = [
   "ping", "report:now", "report:health", "log:read", "agent:log", "service:start", "service:stop",
-  "service:restart"
+  "service:restart", "become-master", "become-follower"
 ];
 
 /// 请求号上限；与 basctl 的 `bas.channel.maxRequestIdLength` 保持一致。
@@ -39,6 +40,8 @@ struct Envelope {
   string typ;
   string id;
   string at;
+  /// relay master 上行的逻辑 agent（follower 的 host/ip）；直连时为空。
+  string agent;
   Json body = Json.emptyObject;
 
   bool isRequest() const {
@@ -77,6 +80,9 @@ bool parse(string text, out Envelope envelope) {
     if (parsed.id.length && !validRequestId(parsed.id))
       return false;
     parsed.at = textOf(doc, "at");
+    parsed.agent = textOf(doc, "agent");
+    if (parsed.agent.length > 255)
+      return false;
     auto body = doc["body"];
     parsed.body = body.type == Json.Type.object ? body : Json.emptyObject;
     envelope = parsed;
@@ -100,59 +106,61 @@ private bool validRequestId(string id) @safe pure nothrow {
 }
 
 /// 渲染一条消息；`id` 非空即请求。
-string render(string typ, string id, Json body) {
+string render(string typ, string id, Json body, string agent = "") {
   auto message = Json.emptyObject;
   message["type"] = Json(typ);
   if (id.length > 0)
     message["id"] = Json(id);
+  if (agent.length > 0)
+    message["agent"] = Json(agent);
   message["at"] = Json(now());
   message["body"] = body.type == Json.Type.object ? body : Json.emptyObject;
   return message.toString;
 }
 
 /// 保活；agent 沉默超时会重连，所以按期发是 hub 的责任。
-string ping() {
-  return render("ping", "", Json.emptyObject);
+string ping(string agent = "") {
+  return render("ping", "", Json.emptyObject, agent);
 }
 
 /// 请 agent 立刻报一次；报告本身就是回执，因此不带 `id`。
-string reportNow() {
-  return render("report:now", "", Json.emptyObject);
+string reportNow(string agent = "") {
+  return render("report:now", "", Json.emptyObject, agent);
 }
 
 /// 请 agent 立刻报一次轻量实例状态；报告本身就是回执，因此不带 `id`。
-string reportHealth() {
-  return render("report:health", "", Json.emptyObject);
+string reportHealth(string agent = "") {
+  return render("report:health", "", Json.emptyObject, agent);
 }
 
 /// 读实例日志的一段，带 `id`，agent 用 `result` 应答。`tail` 大于 0 时用于首次定位尾部。
-string logRead(string id, string instance, long from, long to, long tail = 0) {
+string logRead(string id, string instance, long from, long to, long tail = 0, string agent = "") {
   auto body = Json.emptyObject;
   body["instance"] = Json(instance);
   body["from"] = Json(from);
   body["to"] = Json(to);
   if (tail > 0)
     body["tail"] = Json(tail);
-  return render("log:read", id, body);
+  return render("log:read", id, body, agent);
 }
 
 /// 读 basagent 自身日志，不带实例名；窗口语义与 `log:read` 相同。
-string agentLog(string id, long from, long to, long tail = 0) {
+string agentLog(string id, long from, long to, long tail = 0, string agent = "") {
   auto body = Json.emptyObject;
   body["from"] = Json(from);
   body["to"] = Json(to);
   if (tail > 0)
     body["tail"] = Json(tail);
-  return render("agent:log", id, body);
+  return render("agent:log", id, body, agent);
 }
 
 /// 服务动作：basctl 在 `hello.supports` 里申报后，hub 才能下发。
-string service(string action, string id, string instance) {
+string service(string action, string id, string instance, string agent = "") {
   if (action != "start" && action != "stop" && action != "restart")
     return "";
   auto body = Json.emptyObject;
   body["instance"] = Json(instance);
-  return render("service:" ~ action, id, body);
+  return render("service:" ~ action, id, body, agent);
 }
 
 /// 对所有带 `id` 请求的应答。

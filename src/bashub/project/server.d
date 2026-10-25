@@ -58,6 +58,7 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
   xml.put("xsi:noNamespaceSchemaLocation=\"http://beangle.github.io/schema/bas-1.0.0.xsd\" version=\"");
   xml.put(escapeXml(attributeText(context.data, "basVersion")));
   xml.put("\"");
+  putAttr(xml, "agent-listen-port", attributeText(context.data, "agentListenPort"));
   if (setlineEnabled && attributeBool(data.proxy, "proxyByHostname")) {
     auto hostname = attributeText(context.data, "hostname").strip;
     if (hostname.length == 0)
@@ -109,6 +110,7 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
     xml.put("    <host");
     putAttr(xml, "name", attributeText(host, "name"));
     putAttr(xml, "ip", attributeText(host, "ip"));
+    putAttr(xml, "agent-group", attributeText(host, "agentGroup"));
     auto listenPort = hostSetlinePortText(host, "setlineListenPort", "Host.setlineListenPort");
     auto adminPort = hostSetlinePortText(host, "setlineAdminPort", "Host.setlineAdminPort");
     if (listenPort.length > 0 && adminPort.length > 0) {
@@ -120,6 +122,7 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
     xml.put("/>\n");
   }
   xml.put("  </hosts>\n\n");
+
 
   xml.put("  <farms>\n");
   foreach (farm; farms) {

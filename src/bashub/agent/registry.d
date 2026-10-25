@@ -64,6 +64,27 @@ private final class PendingRequest {
   RequestOutcome outcome = RequestOutcome.ok;
 }
 
+/** 一条物理 WebSocket 的出站队列；relay master 与它的逻辑子会话共享。 */
+final class AgentQueue {
+  private string[] outbound;
+  bool superseded;
+  short closeCode;
+  string closeReason;
+
+  bool offer(string message) {
+    if (message.length == 0)
+      return false;
+    outbound ~= message;
+    return true;
+  }
+
+  string[] take() {
+    auto messages = outbound;
+    outbound = null;
+    return messages;
+  }
+}
+
 /// 一条 agent 通道的现状快照。
 final class AgentSession {
   immutable string project;
@@ -90,24 +111,29 @@ final class AgentSession {
   bool healthKnown;
   string healthAt;
 
-  /// 出站队列：保活、立即上报与未来的请求都从这里交给 socket 循环。
-  private string[] outbound;
+  /// 物理连接队列；relay 子会话与 master 共享。
+  AgentQueue queue;
+  /// 子会话的 master；master/直连为 null。
+  AgentSession master;
+  /// relay 上行的逻辑 agent；直连为空。
+  string agent;
+  bool relayMaster;
+  /// 组网分组与当前角色（candidate/master/follower）。
+  string groupName = "default_group";
+  string role = "candidate";
 
   /// 请求号 → 等待者。请求发起后由 socket 循环在 `result` 到达时唤醒。
   private PendingRequest[string] pending;
   private TaskMutex pendingLock;
   private TaskCondition pendingChanged;
 
-  /// 新连接踢旧连接时只打标记，旧循环自己关自己的 socket。
-  bool superseded;
-  bool closeRequested;
-  short closeCode;
-  string closeReason;
-
-  this(string project, string projectId = "", string ip = "") {
+  this(string project, string projectId = "", string ip = "", string groupName = "default_group",
+      AgentQueue sharedQueue = null) {
     this.project = project;
     this.projectId = projectId;
     this.ip = ip;
+    this.groupName = groupName;
+    this.queue = sharedQueue is null ? new AgentQueue : sharedQueue;
     this.connectedAt = channel.now();
     this.startedAt = MonoTime.currTime;
     this.lastSeenAt = connectedAt;
@@ -148,10 +174,7 @@ final class AgentSession {
 
   /// 投递一条出站消息。实际发送由持有 socket 的循环完成。
   bool offer(string message) {
-    if (message.length == 0)
-      return false;
-    outbound ~= message;
-    return true;
+    return queue.offer(message);
   }
 
   /// agent 是否在 `hello.supports` 里声明支持某个原语。
@@ -161,17 +184,26 @@ final class AgentSession {
 
   /// 取走当前积压；返回后队列为空。
   string[] takeOutbound() {
-    auto messages = outbound;
-    outbound = null;
-    return messages;
+    return queue.take();
+  }
+
+  @property bool superseded() const {
+    return queue.superseded;
+  }
+
+  @property short closeCode() const {
+    return queue.closeCode;
+  }
+
+  @property string closeReason() const {
+    return queue.closeReason;
   }
 
   /// 被同一 project 的新连接取代。
   void supersede() {
-    superseded = true;
-    closeRequested = true;
-    closeCode = 1008;
-    closeReason = "superseded";
+    queue.superseded = true;
+    queue.closeCode = 1008;
+    queue.closeReason = "superseded";
   }
 
   /// 发起一条带 `id` 的请求并等 `result`；超时、断连或发送失败都收敛成 `AgentReply`。
@@ -194,7 +226,7 @@ final class AgentSession {
     pending[id] = waiter;
     pendingLock.unlock();
 
-    if (offer(channel.render(typ, id, body)))
+    if (offer(channel.render(typ, id, body, agent)))
       return id;
     removePending(id);
     return "";
@@ -250,6 +282,9 @@ final class AgentSession {
     item["project"] = Json(project);
     item["projectId"] = Json(projectId);
     item["ip"] = Json(ip);
+    item["group"] = Json(groupName);
+    item["role"] = Json(role);
+    item["master"] = Json(master is null ? "" : master.ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
     item["bas"] = Json(basVersion);
@@ -275,6 +310,9 @@ final class AgentSession {
     item["project"] = Json(project);
     item["projectId"] = Json(projectId);
     item["ip"] = Json(ip);
+    item["group"] = Json(groupName);
+    item["role"] = Json(role);
+    item["master"] = Json(master is null ? "" : master.ip);
     item["host"] = Json(host);
     item["basctl"] = Json(basctlVersion);
     item["bas"] = Json(basVersion);
@@ -449,6 +487,13 @@ private enum SupersedeChurnSeconds = 60;
 /// 重连告警的间隔：同一 `project@ip` 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
 private enum SupersedeWarnSeconds = 60;
 
+/// 一个 (project, group) 的 master 租约。
+struct GroupMaster {
+  string ip;
+  long term;
+  MonoTime expires;
+}
+
 /// 在线 agent 登记册：一个 project 可以有多台机器，按上报的 `ip` 区分；
 /// 同一个 `project@ip` 只保留最新一条连接（旧连接被顶掉），不同 IP 的连接互不影响。
 final class AgentRegistry {
@@ -459,6 +504,8 @@ final class AgentRegistry {
   private MonoTime[string] lastSupersedeAt;
   /// `project@ip` → 上次重连告警的时刻，用于限流。
   private MonoTime[string] lastSupersedeWarnAt;
+  /// `project\0group` → master 租约。
+  private GroupMaster[string] groupMasters;
 
   this(AgentHistoryStore historyStore = null) {
     this.historyStore = historyStore;
@@ -478,6 +525,50 @@ final class AgentRegistry {
     }
     (*byIp)[ip] = session;
     return session;
+  }
+
+  /// 登记一条 relay master 的物理连接。
+  AgentSession attachRelay(string project, string projectId, string ip, string groupName = "default_group") {
+    auto session = new AgentSession(project, projectId, ip, groupName);
+    session.relayMaster = true;
+    auto byIp = project in sessions;
+    if (byIp is null) {
+      sessions[project] = [ip: session];
+    } else {
+      if (auto previous = ip in *byIp) {
+        (*previous).supersede();
+        noteSupersede(project, ip, *previous);
+        // 同一 master 重连：它名下的逻辑子会话也必须一起换掉，不能留下旧队列的僵尸。
+        string[] stale;
+        foreach (childIp, child; *byIp)
+          if (child.master is *previous) {
+            child.disconnect();
+            stale ~= childIp;
+          }
+        foreach (childIp; stale)
+          (*byIp).remove(childIp);
+      }
+      (*byIp)[ip] = session;
+    }
+    return session;
+  }
+
+  /// 在 master 物理连接上登记一个逻辑 follower；同一 project@ip 的旧逻辑会话被替换。
+  AgentSession attachRelayChild(AgentSession master, string agentIp) {
+    auto byIp = master.project in sessions;
+    if (byIp is null)
+      return null;
+    if (auto previous = agentIp in *byIp) {
+      (*previous).disconnect();
+      (*byIp).remove(agentIp);
+    }
+    auto child = new AgentSession(master.project, master.projectId, agentIp, master.groupName, master.queue);
+    child.master = master;
+    child.agent = agentIp;
+    child.role = "follower";
+    child.groupName = master.groupName;
+    (*byIp)[agentIp] = child;
+    return child;
   }
 
   /**
@@ -509,6 +600,29 @@ final class AgentRegistry {
 
   /// 摘除一条连接；只摘自己那条，旧连接迟到的关闭不能把新连接挤掉。
   void detach(string project, string ip, AgentSession session) nothrow {
+    if (session.role == "master") {
+      auto key = project ~ "\0" ~ session.groupName;
+      if (auto found = key in groupMasters)
+        if ((*found).ip == session.ip)
+          groupMasters.remove(key);
+    }
+    if (session.relayMaster) {
+      if (auto byIp = project in sessions) {
+        string[] children;
+        foreach (childIp, child; *byIp)
+          if (child.master is session) {
+            child.disconnect();
+            children ~= childIp;
+          }
+        foreach (childIp; children)
+          (*byIp).remove(childIp);
+        if ((*byIp).length == 0)
+          sessions.remove(project);
+      }
+      session.queue.superseded = true;
+      session.disconnect();
+      return;
+    }
     if (auto byIp = project in sessions) {
       if (auto found = ip in *byIp) {
         if (*found is session) {
@@ -519,6 +633,32 @@ final class AgentRegistry {
       }
     }
     session.disconnect();
+  }
+
+  /// relay follower 断开：只摘除该 master 名下的逻辑子会话。
+  void detachRelayChild(AgentSession master, string ip) nothrow {
+    if (auto byIp = master.project in sessions) {
+      if (auto found = ip in *byIp) {
+        if ((*found).master is master) {
+          (*found).disconnect();
+          (*byIp).remove(ip);
+        }
+      }
+    }
+  }
+
+  /// 从 master 降级时摘掉其名下的逻辑 follower。
+  void dropChildren(AgentSession master) nothrow {
+    if (auto byIp = master.project in sessions) {
+      string[] children;
+      foreach (childIp, child; *byIp)
+        if (child.master is master)
+          children ~= childIp;
+      foreach (childIp; children) {
+        (*byIp)[childIp].disconnect();
+        (*byIp).remove(childIp);
+      }
+    }
   }
 
   /// 主动作废该 project 的全部连接（例如重置 Project.key 之后）。
@@ -629,12 +769,58 @@ final class AgentRegistry {
     return historyStore.query(projectId, projectName, daysCount);
   }
 
+  /// 组内登记/推荐 master；已有有效租约时返回当前 master。
+  GroupMaster recommendMaster(string project, string group, string candidate, Duration ttl) {
+    auto key = project ~ "\0" ~ group;
+    auto now = MonoTime.currTime;
+    if (auto found = key in groupMasters) {
+      if ((*found).expires > now && (*found).ip.length > 0)
+        return *found;
+    }
+    auto found = find(project, candidate);
+    if (found is null || found.groupName != group || found.role == "follower")
+      return GroupMaster.init;
+    long term = 1;
+    if (auto old = key in groupMasters)
+      term = (*old).term + 1;
+    GroupMaster lease = GroupMaster(candidate, term, now + ttl);
+    groupMasters[key] = lease;
+    found.role = "master";
+    return lease;
+  }
+
+  GroupMaster masterOf(string project, string group) {
+    auto key = project ~ "\0" ~ group;
+    if (auto found = key in groupMasters) {
+      if ((*found).expires > MonoTime.currTime)
+        return *found;
+    }
+    return GroupMaster.init;
+  }
+
+  void refreshMaster(string project, string group, string ip, Duration ttl) {
+    auto key = project ~ "\0" ~ group;
+    if (auto found = key in groupMasters) {
+      if ((*found).ip == ip)
+        (*found).expires = MonoTime.currTime + ttl;
+    }
+  }
+
+  AgentSession[] sessionsOfGroup(string project, string group) {
+    AgentSession[] list;
+    if (auto byIp = project in sessions)
+      foreach (_, session; *byIp)
+        if (session.groupName == group)
+          list ~= session;
+    return list;
+  }
+
   /// 请某个在线 agent 立即上报；不在线返回 false。
   bool reportNow(string project, string ip = "") {
     auto session = resolve(project, ip);
     if (session is null || !session.supportsPrimitive("report:now"))
       return false;
-    return session.offer(channel.reportNow());
+    return session.offer(channel.reportNow(session.agent));
   }
 
   /// 下发 `log:read` 并等待 agent 的 `result`。
@@ -696,6 +882,6 @@ final class AgentRegistry {
   /// 给所有在线连接投递一条保活；没有连接时什么也不做。
   void pingAll() {
     foreach (session; online())
-      session.offer(channel.ping());
+      session.offer(channel.ping(session.agent));
   }
 }

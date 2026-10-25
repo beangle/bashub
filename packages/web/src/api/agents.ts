@@ -77,6 +77,9 @@ export interface AgentStatus {
   /** agent 上报的服务器 IP；同一 project 下用它区分不同机器。 */
   ip?: string
   host?: string
+  group?: string
+  role?: 'candidate' | 'master' | 'follower'
+  master?: string
   org?: AgentOrganization
   basctl?: string
   bas?: string
@@ -107,6 +110,9 @@ export interface AgentSummary {
   /** agent 上报的服务器 IP；同一 project 下用它区分不同机器。 */
   ip?: string
   host?: string
+  group?: string
+  role?: 'candidate' | 'master' | 'follower'
+  master?: string
   org?: AgentOrganization
   basctl?: string
   bas?: string

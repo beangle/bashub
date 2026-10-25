@@ -43,6 +43,7 @@ Registry hubRegistry() {
         Column("name", "name", Kind.text),
         Column("title", "title", Kind.text),
         Column("bas_version", "basVersion", Kind.text),
+        Column("agent_listen_port", "agentListenPort", Kind.number),
         Column("hostname", "hostname", Kind.text),
         Column("local_repo", "localRepo", Kind.text),
         Column("remote_repo", "remoteRepo", Kind.text),
@@ -147,6 +148,7 @@ Registry hubRegistry() {
         Column("cpu", "cpu", Kind.text),
         Column("platform_version", "platformVersion", Kind.text),
         Column("arch", "arch", Kind.number),
+        Column("agent_group", "agentGroup", Kind.text),
         Column("setline_listen_port", "setlineListenPort", Kind.number),
         Column("setline_admin_port", "setlineAdminPort", Kind.number),
       ],
@@ -335,7 +337,7 @@ private string[] requiredOf(string path) {
   case "servers":
     return ["name", "farm", "host"];
   case "hosts":
-    return ["name", "ip", "project", "platform", "platformVersion", "memory", "arch", "cores", "cpu"];
+    return ["name", "ip", "project", "agentGroup", "platform", "platformVersion", "memory", "arch", "cores", "cpu"];
   case "artifacts":
     return ["title", "artifactId", "groupId", "packaging", "latestVersion"];
   case "webapps":

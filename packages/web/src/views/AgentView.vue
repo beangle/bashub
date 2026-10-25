@@ -17,6 +17,40 @@
 
     <t-alert v-if="error" theme="error" :message="error" class="agent-alert" />
 
+    <section v-if="topology.length" class="topology-card">
+      <header class="topology-card__head">
+        <div>
+          <h3>本地组网拓扑</h3>
+          <p>同一组网分组内自动选主，follower 通过 master 中继。</p>
+        </div>
+      </header>
+      <div class="topology-list">
+        <div v-for="item in topology" :key="item.group" class="topology-group">
+          <div class="topology-group__name">{{ item.group }}</div>
+          <div class="topology-group__flow">
+            <div class="topology-master">
+              <span class="topology-role">Master</span>
+              <strong>{{ item.master ? agentLabel(item.master) : '选举中…' }}</strong>
+            </div>
+            <span class="topology-arrow">→</span>
+            <div class="topology-followers">
+              <span class="topology-role">Follower</span>
+              <t-tag v-for="agent in item.followers" :key="agent.ip" variant="light">
+                {{ agentLabel(agent) }}
+              </t-tag>
+              <span v-if="!item.followers.length" class="topology-empty">暂无</span>
+            </div>
+            <div v-if="item.candidates.length" class="topology-candidates">
+              <span class="topology-role">候选</span>
+              <t-tag v-for="agent in item.candidates" :key="agent.ip" variant="outline">
+                {{ agentLabel(agent) }}
+              </t-tag>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div v-if="!loading && agents.length === 0" class="agent-empty">
       <t-empty description="没有在线节点，请先在生产机启动 basctl agent。" />
     </div>
@@ -422,6 +456,27 @@ const activeGroup = computed<AgentGroup | undefined>(() => {
   if (!list.length) return undefined
   return list.find((group) => group.project === selectedProject.value) ?? list[0]
 })
+
+/** 当前 project 的本地组网拓扑：按 group 汇总 master/follower/候选。 */
+const topology = computed(() => {
+  const map = new Map<string, { group: string; master?: AgentStatus; followers: AgentStatus[]; candidates: AgentStatus[] }>()
+  for (const agent of activeGroup.value?.agents ?? []) {
+    const groupName = agent.group || 'default_group'
+    let item = map.get(groupName)
+    if (!item) {
+      item = { group: groupName, followers: [], candidates: [] }
+      map.set(groupName, item)
+    }
+    if (agent.role === 'master') item.master = agent
+    else if (agent.role === 'follower') item.followers.push(agent)
+    else item.candidates.push(agent)
+  }
+  return [...map.values()].sort((a, b) => a.group.localeCompare(b.group))
+})
+
+function agentLabel(agent: AgentStatus): string {
+  return agent.host || agent.ip || agent.project
+}
 
 /** 卡片模板按数组渲染，但只放当前选中的那个 project。 */
 const visibleGroups = computed(() => (activeGroup.value ? [activeGroup.value] : []))
@@ -1077,6 +1132,75 @@ onBeforeUnmount(() => {
 .project-select {
   width: 420px;
   max-width: 100%;
+}
+
+.topology-card {
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: var(--td-bg-color-container);
+}
+
+.topology-card__head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.topology-card__head p {
+  margin: 4px 0 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
+}
+
+.topology-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topology-group {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding-top: 10px;
+  border-top: 1px dashed var(--td-component-stroke);
+}
+
+.topology-group__name {
+  min-width: 90px;
+  font-weight: 600;
+}
+
+.topology-group__flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.topology-master,
+.topology-followers,
+.topology-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.topology-role {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.topology-arrow {
+  color: var(--td-text-color-placeholder);
+}
+
+.topology-empty {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
 }
 
 .agent-project {

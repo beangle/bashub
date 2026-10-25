@@ -18,6 +18,7 @@ import vibe.data.json : Json, parseJsonString;
 
 import std.algorithm.searching : canFind;
 import std.algorithm.sorting : sort;
+import std.conv : to;
 
 private Envelope envelope(string typ, string at, string body) {
   Envelope message;
@@ -147,6 +148,44 @@ private final class RecordingHistory : AgentHistoryStore {
   assert(history.projectId == "1001");
   assert(history.project == "demo");
   assert(doc["days"].get!long == 180);
+}
+
+@("relay master owns logical child sessions on one queue") unittest {
+  auto registry = new AgentRegistry();
+  auto master = registry.attachRelay("openurp.prod", "1001", "10.0.0.10");
+  auto child = registry.attachRelayChild(master, "10.0.0.11");
+
+  assert(registry.find("openurp.prod", "10.0.0.11") is child);
+  assert(registry.sessionsOf("openurp.prod").length == 2);
+
+  auto id = child.startRequest("log:read", parseJsonString(`{"instance":"app"}`));
+  assert(id.length > 0);
+  auto outbound = master.takeOutbound();
+  assert(outbound.length == 1, outbound.length.to!string);
+  assert(outbound[0].canFind(`"agent":"10.0.0.11"`), outbound[0]);
+
+  // master 断开时，其逻辑子会话一并摘除。
+  registry.detach("openurp.prod", "10.0.0.10", master);
+  assert(registry.find("openurp.prod", "10.0.0.11") is null);
+}
+
+@("group master recommendation is atomic and scoped by group") unittest {
+  auto registry = new AgentRegistry();
+  auto a = registry.attachRelay("demo", "1", "10.0.0.10", "site-a");
+  auto b = registry.attachRelay("demo", "1", "10.0.0.11", "site-a");
+  auto lease = registry.recommendMaster("demo", "site-a", "10.0.0.10", seconds(60));
+  assert(lease.ip == "10.0.0.10");
+  assert(lease.term == 1);
+  assert(a.role == "master");
+
+  // another recommendation keeps the valid lease
+  auto again = registry.recommendMaster("demo", "site-a", "10.0.0.11", seconds(60));
+  assert(again.ip == "10.0.0.10");
+  assert(again.term == 1);
+
+  // follower role is not a candidate
+  b.role = "follower";
+  assert(registry.recommendMaster("demo", "site-a", "10.0.0.11", seconds(60)).ip == "10.0.0.10");
 }
 
 @("a new login supersedes the old connection")

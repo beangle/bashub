@@ -106,6 +106,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'basVersion', label: '版本', required: true, width: '8%' },
       { key: 'key', label: 'Key', column: false, wide: true },
       { key: 'hostname', label: '域名', width: '16%' },
+      { key: 'agentListenPort', label: 'Agent 监听端口', type: 'number', defaultValue: 19080, help: '项目内所有 agent 共用的组网端口' },
       { key: 'localRepo', label: '本地仓库', column: false, help: '默认 ~/.m2/repository' },
       { key: 'remoteRepo', label: '远程仓库', column: false, width: 260 },
     ],
@@ -252,6 +253,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'arch', label: '体系结构', columnTitle: '平台', type: 'select', options: archOptions, required: true, width: '10%' },
       { key: 'cores', label: 'CPU 核心数', columnTitle: 'CPU核心', type: 'number', required: true, width: '8%' },
       { key: 'cpu', label: 'CPU 规格', columnTitle: 'CPU规格', required: true, width: '20%', cell: { type: 'text', style: 'font-size:0.8em' } },
+      { key: 'agentGroup', label: '组网分组', type: 'text', required: true, defaultValue: 'default_group', help: '同一分组内的 agent 自动选主；不同分组互不组网' },
       {
         key: 'setlineEnabled', label: '启用 Setline', type: 'radio', column: false,
         options: setlineEnabledOptions, defaultValue: 'no', virtual: true,
