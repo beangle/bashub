@@ -71,7 +71,7 @@
                 <h3>{{ groupHeading(group) }}</h3>
                 <t-tag theme="success" variant="light">{{ group.agents.length }} 个 agent</t-tag>
                 <span class="agent-project">
-                  <template v-if="groupSubtitle(group)">{{ groupSubtitle(group) }} · </template>
+                  <template v-if="groupQualifiedName(group)">{{ groupQualifiedName(group) }} · </template>
                   {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
                 </span>
               </div>
@@ -433,17 +433,16 @@ function readSelectedProject(): string {
 /** 多个 project 同时在线时只展示一个，用右上角下拉切换。 */
 const selectedProject = ref(readSelectedProject())
 
-/** 大标题与下拉框共用：org.name · project.name。 */
+/** 大标题：org.title · project.title。 */
 function groupHeading(group: AgentGroup): string {
-  const org = group.org?.name?.trim()
-  return org ? `${org} · ${group.project}` : group.project
+  const org = groupOrgTitle(group)
+  const project = groupSubtitle(group)
+  return org === project ? project : `${org} · ${project}`
 }
 
-/** 下拉框在前面放 (org.name · project.name)，有说明时再接括号。 */
+/** 选择框：左侧 qualifiedName，右侧机构/项目标题。 */
 function projectLabel(group: AgentGroup): string {
-  const heading = groupHeading(group)
-  const title = groupSubtitle(group)
-  return title && title !== heading ? `${heading}（${title}）` : heading
+  return `${groupQualifiedName(group)}  ${groupHeading(group)}`
 }
 
 const projectOptions = computed(() =>
@@ -459,19 +458,23 @@ const activeGroup = computed<AgentGroup | undefined>(() => {
 
 /** 当前 project 的本地组网拓扑：按 group 汇总 master/follower/候选。 */
 const topology = computed(() => {
-  const map = new Map<string, { group: string; master?: AgentStatus; followers: AgentStatus[]; candidates: AgentStatus[] }>()
+  const map = new Map<string, { group: string; master?: AgentStatus; followers: AgentStatus[]; candidates: AgentStatus[]; total: number }>()
   for (const agent of activeGroup.value?.agents ?? []) {
     const groupName = agent.group || 'default_group'
     let item = map.get(groupName)
     if (!item) {
-      item = { group: groupName, followers: [], candidates: [] }
+      item = { group: groupName, followers: [], candidates: [], total: 0 }
       map.set(groupName, item)
     }
+    item.total++
     if (agent.role === 'master') item.master = agent
     else if (agent.role === 'follower') item.followers.push(agent)
     else item.candidates.push(agent)
   }
-  return [...map.values()].sort((a, b) => a.group.localeCompare(b.group))
+  // 单机组网没有中继信息；不展示只有一个 agent 的组。
+  return [...map.values()]
+    .filter((item) => item.total > 1)
+    .sort((a, b) => a.group.localeCompare(b.group))
 })
 
 function agentLabel(agent: AgentStatus): string {
@@ -572,14 +575,20 @@ async function refreshNow() {
 /** 加载失败的 Logo 按 project 记住，避免每次重渲染都再请求一次坏地址。 */
 const failedLogos = ref<Record<string, boolean>>({})
 
-/** 卡片大标题：机构标题优先；没有机构信息时退回 project。 */
+/** 机构标题；没有机构信息时退回 project。 */
 function groupOrgTitle(group: AgentGroup): string {
   return group.org?.title || group.org?.shortTitle || group.project
 }
 
-/** 卡片副标题：project 的说明；没有时留空。 */
+/** project 的说明；没有时退回 project 名称。 */
 function groupSubtitle(group: AgentGroup): string {
-  return group.agents[0]?.projectTitle?.trim() || ''
+  return group.agents[0]?.projectTitle?.trim() || group.project
+}
+
+/** org.name.project.name，用于选择框左侧与副标题。 */
+function groupQualifiedName(group: AgentGroup): string {
+  const org = group.org?.name?.trim()
+  return org ? `${org}.${group.project}` : group.project
 }
 
 function groupLogo(group: AgentGroup): string {
