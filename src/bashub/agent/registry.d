@@ -280,6 +280,7 @@ final class AgentSession {
   Json status() {
     auto item = Json.emptyObject;
     item["project"] = Json(project);
+    item["qualifiedName"] = Json(project);
     item["projectId"] = Json(projectId);
     item["ip"] = Json(ip);
     item["group"] = Json(groupName);
@@ -308,6 +309,7 @@ final class AgentSession {
   Json summary() {
     auto item = Json.emptyObject;
     item["project"] = Json(project);
+    item["qualifiedName"] = Json(project);
     item["projectId"] = Json(projectId);
     item["ip"] = Json(ip);
     item["group"] = Json(groupName);

@@ -70,6 +70,8 @@ export interface AgentOrganization {
 /** `GET /api/bashub/monitor/agents/status` 里的一项：一台在线节点此刻的样子。 */
 export interface AgentStatus {
   project: string
+  /** 后端提供的 org.name.project.name；SPA 不再拼接。 */
+  qualifiedName?: string
   /** project 的 JSON:API 主键；用于跳转到配置详情。 */
   projectId?: string
   /** project 的说明（title），监控卡片的大标题。 */
@@ -103,6 +105,8 @@ export interface AgentHealth {
 /** `GET /api/bashub/monitor/agents/summary`：在线列表轮询用的轻量摘要。 */
 export interface AgentSummary {
   project: string
+  /** 后端提供的 org.name.project.name；SPA 不再拼接。 */
+  qualifiedName?: string
   /** project 的 JSON:API 主键；用于跳转到配置详情。 */
   projectId?: string
   /** project 的说明（title），监控卡片的大标题。 */

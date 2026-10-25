@@ -440,9 +440,9 @@ function groupHeading(group: AgentGroup): string {
   return org === project ? project : `${org} · ${project}`
 }
 
-/** 选择框：左侧 qualifiedName，右侧机构/项目标题。 */
+/** 选择框：标题在前，qualifiedName 放在最后。 */
 function projectLabel(group: AgentGroup): string {
-  return `${groupQualifiedName(group)}  ${groupHeading(group)}`
+  return `${groupHeading(group)}  ${groupQualifiedName(group)}`
 }
 
 const projectOptions = computed(() =>
@@ -585,10 +585,9 @@ function groupSubtitle(group: AgentGroup): string {
   return group.agents[0]?.projectTitle?.trim() || group.project
 }
 
-/** org.name.project.name，用于选择框左侧与副标题。 */
+/** 后端约定的 org.name.project.name；SPA 不自行拼接。 */
 function groupQualifiedName(group: AgentGroup): string {
-  const org = group.org?.name?.trim()
-  return org ? `${org}.${group.project}` : group.project
+  return group.agents[0]?.qualifiedName?.trim() || ''
 }
 
 function groupLogo(group: AgentGroup): string {
