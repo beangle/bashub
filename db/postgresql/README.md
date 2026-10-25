@@ -6,7 +6,8 @@
 
 0.0.8 提供项目/代理结构调整的增量迁移：全新库直接执行 `init/*.sql`；已有 0.0.8 旧结构
 执行 `migrate/0.0.8-project-proxy.sql` 升级；agent 中继再执行
-`migrate/0.0.8-agent-relay.sql`。当前结构以 `db.xml` 与 `init/` 为准。
+`migrate/0.0.8-agent-relay.sql`，native engine 再执行
+`migrate/0.0.8-native-engine.sql`。当前结构以 `db.xml` 与 `init/` 为准。
 
 ```bash
 for f in init/*.sql; do

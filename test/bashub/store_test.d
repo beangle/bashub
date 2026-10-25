@@ -17,7 +17,7 @@ import beangle.data.resource : Registry, Resource, ValueList;
 import beangle.data.value : Row, jsonText;
 import beangle.jsonapi.store : Store, StoreException;
 
-import bashub.demo : demoDao;
+import test.bashub.fixture : testDao;
 import bashub.resources : hubRegistry;
 import bashub.store : createHubStore;
 
@@ -28,7 +28,7 @@ import std.string : replace;
 
 private Store newStore(out Registry reg) {
   reg = hubRegistry();
-  return createHubStore(reg, demoDao(reg));
+  return createHubStore(reg, testDao(reg));
 }
 
 @("demo data covers the console resources")

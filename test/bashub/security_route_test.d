@@ -10,7 +10,7 @@ module test.bashub.security_route_test;
 /// M4 验收：未登录、会话过期、无权限、合法用户、CAS ticket、configs 免登录与 CORS。
 
 import bashub.config;
-import bashub.demo;
+import test.bashub.fixture;
 import bashub.resources;
 import bashub.route;
 import bashub.security : HubSecurity;
@@ -142,7 +142,7 @@ private Session sessionOf(string id, string[] authorities, long lastAccessAt = -
 
 private HTTPServerRequestHandler securedRouter(HubConfig cfg, SessionRepo repo, AuthorityDomain domain) {
   auto reg = hubRegistry();
-  auto dao = demoDao(reg);
+  auto dao = testDao(reg);
   auto security = new HubSecurity(cfg, repo, domain);
   return buildHubRouter(cfg, reg, createHubStore(reg, dao), repo, null, security);
 }
@@ -349,7 +349,7 @@ unittest {
   cfg.emsBase = "https://sas.openurp.net";
   cfg.authRequired = false;
   auto reg = hubRegistry();
-  auto router = publicRouter(cfg, reg, demoDao(reg));
+  auto router = publicRouter(cfg, reg, testDao(reg));
 
   auto preflight = call(router, HTTPMethod.OPTIONS, "http://localhost/api/bashub/config/projects/search", null,
       ["Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET",
@@ -374,7 +374,7 @@ unittest {
   cfg.apiPrefix = "/api/bashub";
   cfg.emsBase = "https://sas.openurp.net";
   auto reg = hubRegistry();
-  auto router = publicRouter(cfg, reg, demoDao(reg));
+  auto router = publicRouter(cfg, reg, testDao(reg));
   auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/configs");
   assert(ex.status == 200);
   assert(ex.contentTypeOptions == "nosniff");

@@ -15,6 +15,7 @@ comment on column bas.cfg_artifacts.id is '非业务主键:datetime';
 comment on column bas.cfg_artifacts.jsp_support is 'jspSupport?';
 comment on column bas.cfg_artifacts.latest_version is 'latestVersion?';
 comment on column bas.cfg_artifacts.packaging is 'packaging?';
+comment on column bas.cfg_artifacts.exec is 'native 可执行文件相对路径';
 comment on column bas.cfg_artifacts.project_id is 'Project?ID';
 comment on column bas.cfg_artifacts.resolve_support is 'resolveSupport?';
 comment on column bas.cfg_artifacts.title is 'title?';

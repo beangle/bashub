@@ -11,7 +11,7 @@ module test.bashub.session_route_test;
 /// 退出登录只 evict（CAS 那边的会话让它自己过期）。这里 HTTP 客户端走默认的 curl，服务端是假 CAS。
 
 import bashub.config;
-import bashub.demo;
+import test.bashub.fixture;
 import bashub.resources;
 import bashub.route;
 import bashub.store;
@@ -85,7 +85,7 @@ unittest {
 
   auto cfg = casConfig(true);
   auto reg = hubRegistry();
-  auto router = newRouter(cfg, repo, reg, demoDao(reg));
+  auto router = newRouter(cfg, repo, reg, testDao(reg));
 
   auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-1");
   assert(ex.status == 200);
@@ -105,7 +105,7 @@ unittest {
   auto repo = new CasSessionRepo(CasConfig.of("http://127.0.0.1:" ~ cas.start().to!string));
   auto cfg = casConfig(true);
   auto reg = hubRegistry();
-  auto router = newRouter(cfg, repo, reg, demoDao(reg));
+  auto router = newRouter(cfg, repo, reg, testDao(reg));
 
   auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions");
   assert(ex.status == 401);
@@ -122,7 +122,7 @@ unittest {
 @("不要鉴权时没会话仍给演示用户（没配 cas 的部署照旧）")
 unittest {
   auto reg = hubRegistry();
-  auto ex = call(newRouter(casConfig(false), null, reg, demoDao(reg)), HTTPMethod.GET,
+  auto ex = call(newRouter(casConfig(false), null, reg, testDao(reg)), HTTPMethod.GET,
       "http://localhost/api/bashub/ems/sessions");
   assert(ex.status == 200);
   assert(parseJson(ex.body)["code"].get!string == "demo");
@@ -138,7 +138,7 @@ unittest {
 
   auto cfg = casConfig(true);
   auto reg = hubRegistry();
-  auto router = newRouter(cfg, repo, reg, demoDao(reg));
+  auto router = newRouter(cfg, repo, reg, testDao(reg));
 
   assert(call(router, HTTPMethod.GET, "http://localhost/api/bashub/ems/sessions", "EMS_SID=SID-1").status == 200);
   auto ex = call(router, HTTPMethod.POST, "http://localhost/api/bashub/ems/sessions/logout", "EMS_SID=SID-1");

@@ -284,3 +284,7 @@ sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自�
   多个 project 同时在线时**一次只展示一个**：右上角下拉切换，选择记在浏览器 localStorage，当前 project
   离线后自动退回列表里的第一个。运行历史是独立页面 `/monitor/agents/:project/history`；卡片头部的
   “配置”按 `projectId` 跳到该 project 的配置详情。
+
+## native engine
+
+见 [native-engine.md](native-engine.md)。

@@ -170,6 +170,7 @@ Registry hubRegistry() {
         Column("group_id", "groupId", Kind.text),
         Column("latest_version", "latestVersion", Kind.text),
         Column("packaging", "packaging", Kind.text),
+        Column("exec", "exec", Kind.text),
         Column("title", "title", Kind.text),
         Column("arch", "arch", Kind.number),
         Column("jsp_support", "jspSupport", Kind.boolean),

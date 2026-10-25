@@ -6,9 +6,8 @@
  * (at your option) any later version.
  */
 
-module bashub.demo;
-/// 内存后端的演示数据：与 `db/postgresql/init` 里的四张表对应。
-/// 只供测试显式使用；可执行程序不会在数据库不可用时自动退回这里。
+module test.bashub.fixture;
+/// 路由与安全测试用的最小内存数据；只存在于 test/，不进入 bashub 可执行程序。
 
 import beangle.data.dao.memory : MemoryDao;
 import beangle.data.resource : Registry;
@@ -17,7 +16,7 @@ import beangle.data.value : Row;
 import vibe.data.json : Json;
 
 /// 灌好四张表演示数据的内存后端。
-MemoryDao demoDao(Registry reg) {
+MemoryDao testDao(Registry reg) {
   auto dao = new MemoryDao(reg);
   foreach (row; orgRows())
     dao.seed(reg.find("organizations"), row);

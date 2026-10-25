@@ -46,6 +46,7 @@
             <column name="jsp_support" type="boolean" nullable="false" defaultValue="false" comment="jspSupport?"/>
             <column name="latest_version" type="varchar(255)" nullable="false" comment="latestVersion?"/>
             <column name="packaging" type="varchar(255)" nullable="false" comment="packaging?"/>
+            <column name="exec" type="varchar(255)" comment="native 可执行文件相对路径"/>
             <column name="project_id" type="bigint" comment="Project?ID"/>
             <column name="resolve_support" type="boolean" nullable="false" defaultValue="false" comment="resolveSupport?"/>
             <column name="title" type="varchar(255)" nullable="false" comment="title?"/>

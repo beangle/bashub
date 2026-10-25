@@ -76,6 +76,10 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
   if (downloadKey.length > 0)
     putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
   xml.put("/>\n");
+  xml.put("  <native-repo remote=\"${bas_remote_url}/native\"");
+  if (downloadKey.length > 0)
+    putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
+  xml.put("/>\n");
 
   xml.put("  <engines>\n");
   foreach (engineId; engineIds) {
@@ -175,6 +179,9 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
     xml.put("    <webapp");
     putAttr(xml, "uri", "gav://" ~ artifactGav(artifact, attributeText(webapp, "version")));
     putAttr(xml, "path", attributeText(webapp, "contextPath"));
+    auto exec = attributeText(artifact, "exec").strip;
+    if (exec.length)
+      putAttr(xml, "exec", exec);
     string[] runAt;
     foreach (serverId; relationshipIds(webapp, "targets")) {
       if (serverId !in data.serversById)

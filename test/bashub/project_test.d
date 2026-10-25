@@ -9,7 +9,7 @@
 module test.bashub.project_test;
 /// Project 配置分发：配置名与来源 IP 的解析、server.xml 的关键结构。
 
-import bashub.demo : demoDao;
+import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
@@ -38,7 +38,7 @@ import std.string : indexOf;
 
 private Store newStore(out Registry reg) {
   reg = hubRegistry();
-  return createHubStore(reg, demoDao(reg));
+  return createHubStore(reg, testDao(reg));
 }
 
 private MicdnConfigException expectConfigError(scope void delegate() action) {
@@ -338,7 +338,7 @@ unittest {
 @("proxy model handles url overrides and single/multi-server groups")
 unittest {
   auto reg = hubRegistry();
-  auto dao = demoDao(reg);
+  auto dao = testDao(reg);
   auto servers = reg.find("servers");
   dao.seed(servers, [
     "id": Json("5003"), "name": Json("app3"), "farm": Json("4001"), "host": Json("2001"),

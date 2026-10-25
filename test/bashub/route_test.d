@@ -11,7 +11,7 @@ module test.bashub.route_test;
 /// 通用 CRUD 由 beangle.jsonapi 提供，这里验的是 bas hub 自己的端点与装配（资源名是路由参数）。
 
 import bashub.config;
-import bashub.demo;
+import test.bashub.fixture;
 import bashub.resources;
 import bashub.route;
 import bashub.store;
@@ -131,7 +131,7 @@ private string multipartBody(string appId, string xml) {
 
 private HTTPServerRequestHandler newRouter(bool authRequired = false, AgentRegistry agents = null) {
   auto reg = hubRegistry();
-  return newRouterWith(reg, createHubStore(reg, demoDao(reg)), authRequired, agents);
+  return newRouterWith(reg, createHubStore(reg, testDao(reg)), authRequired, agents);
 }
 
 private HTTPServerRequestHandler newRouterWith(Registry reg, Store store, bool authRequired = false,
@@ -579,7 +579,7 @@ unittest {
 @("SPA can view server, proxy and setline config by project id without the machine token")
 unittest {
   auto reg = hubRegistry();
-  auto store = createHubStore(reg, demoDao(reg));
+  auto store = createHubStore(reg, testDao(reg));
   auto router = newRouterWith(reg, store);
   auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/server");
   assert(ex.status == 200, ex.body);
@@ -633,7 +633,7 @@ unittest {
 @("project config/setline-peers requires the project key and follows the project")
 unittest {
   auto reg = hubRegistry();
-  auto store = createHubStore(reg, demoDao(reg));
+  auto store = createHubStore(reg, testDao(reg));
   auto router = newRouterWith(reg, store);
   auto ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/setline-peers",
@@ -854,7 +854,7 @@ unittest {
 @("webapp libs folds pasted newlines into commas")
 unittest {
   auto reg = hubRegistry();
-  auto store = createHubStore(reg, demoDao(reg));
+  auto store = createHubStore(reg, testDao(reg));
   auto router = newRouterWith(reg, store);
   auto body = parseJsonString(`{"data":{"type":"webapps","id":"7001","attributes":{"libs":"a:b:1\nc:d:2"}}}`);
   auto ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/webapps/7001", body.toString);
@@ -879,7 +879,7 @@ unittest {
 @("project certificates live outside project and are downloadable by token")
 unittest {
   auto reg = hubRegistry();
-  auto store = createHubStore(reg, demoDao(reg));
+  auto store = createHubStore(reg, testDao(reg));
   auto cert = "-----BEGIN CERTIFICATE-----\nCERT\n-----END CERTIFICATE-----";
   auto cert2 = "-----BEGIN CERTIFICATE-----\nCERT2\n-----END CERTIFICATE-----";
   auto key = "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----";
