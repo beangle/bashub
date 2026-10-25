@@ -819,8 +819,8 @@ final class AgentRegistry {
 
   /// 让所有在线 agent 重新拉取 server.xml 并上报；配置写操作后调用。
   void refreshConfigAll() {
-    foreach (_, byIp; sessions)
-      foreach (_, session; byIp)
+    foreach (projectName, byIp; sessions)
+      foreach (ip, session; byIp)
         session.offer(channel.render("config:refresh", "", Json.emptyObject, session.agent));
   }
 
