@@ -112,3 +112,8 @@ hub 在原子操作中：
 - hub 是单实例仲裁者；hub 重启会重新选主
 - 一个 group 只有一个 master；若组内网络被防火墙切成互不连通的分区，需要人工调整 group
 - 没有自动抢占：已有有效 master 时，新 agent 只作为 follower
+
+## 9. 配置变更
+
+配置资源写入后，hub 会向在线 agent 发送 `config:refresh`；agent 重新拉取 `server.xml`，
+再上报实例清单。监控只展示当前声明过的 server，配置中已删除的 server 不再显示。

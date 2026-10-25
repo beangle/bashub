@@ -1143,7 +1143,12 @@ class HubService {
     return null;
   }
 
-  /// `POST /api/bashub/monitor/agents/{project}/report`：要求在线 agent 立即上报一次。
+  /// 配置资源写入后，让在线 agent 重新拉 server.xml。
+  void configChanged() {
+    agents.refreshConfigAll();
+  }
+
+  /// `POST /api/bashub/monitor/agents/{project}/report`：要求在线 agent 立即刷新配置并上报。
   ///
   /// `report:now` 没有 body 回执，真正的 `report:os` / `report:bas` 会随后到达并覆盖快照；
   /// 因此这里只表示「指令已入队」，返回 202。
@@ -1155,8 +1160,8 @@ class HubService {
     auto session = pickAgent(req, res, project);
     if (session is null)
       return;
-    if (!session.supportsPrimitive("report:now")) {
-      writeJsonApi(res, errorDocument(409, "节点不支持该指令", "unsupported:report:now"),
+    if (!session.supportsPrimitive("config:refresh") && !session.supportsPrimitive("report:now")) {
+      writeJsonApi(res, errorDocument(409, "节点不支持该指令", "unsupported:config:refresh"),
           HTTPStatus.conflict);
       return;
     }
@@ -2136,7 +2141,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   }
   auto configOpts = opts;
   configOpts.prefix = api.config;
-  (new JsonApiService(reg, store, configOpts, configResources)).register(router);
+  (new JsonApiService(reg, store, configOpts, configResources, &hub.configChanged)).register(router);
   auto emsOpts = opts;
   emsOpts.prefix = api.ems;
   (new JsonApiService(reg, store, emsOpts, emsResources)).register(router);

@@ -29,7 +29,7 @@ enum AgentPrimitives = ["hello", "report:os", "report:bas", "report:health", "re
 /// hub → agent 的原语。
 enum HubPrimitives = [
   "ping", "report:now", "report:health", "log:read", "agent:log", "service:start", "service:stop",
-  "service:restart", "become-master", "become-follower"
+  "service:restart", "become-master", "become-follower", "config:refresh"
 ];
 
 /// 请求号上限；与 basctl 的 `bas.channel.maxRequestIdLength` 保持一致。

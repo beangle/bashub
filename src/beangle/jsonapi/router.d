@@ -64,13 +64,22 @@ class JsonApiService {
   private Store store;
   private RouteOptions opts;
   private string[] resources;
+  private void delegate() onWrite;
 
   /// `resources` 非空时只允许这些资源名；关系目标仍由完整 `Registry` 解析。
-  this(Registry reg, Store store, in RouteOptions opts, string[] resources = null) {
+  /// `onWrite` 在成功新建/修改/删除后调用，用于刷新依赖这份配置的在线 agent。
+  this(Registry reg, Store store, in RouteOptions opts, string[] resources = null,
+      void delegate() onWrite = null) {
     this.reg = reg;
     this.store = store;
     this.opts = opts;
     this.resources = resources;
+    this.onWrite = onWrite;
+  }
+
+  private void changed() {
+    if (onWrite !is null)
+      onWrite();
   }
 
   /// `GET {prefix}/{resource}/search`
@@ -119,6 +128,7 @@ class JsonApiService {
       return;
     try {
       writeJsonApi(res, store.create(res0, body), HTTPStatus.created);
+      changed();
     } catch (Exception e) {
       reportError(res, e);
     }
@@ -139,8 +149,10 @@ class JsonApiService {
       Json doc;
       if (!store.update(res0, id, body, doc))
         writeNotFound(res, res0, id);
-      else
+      else {
         writeJsonApi(res, doc, HTTPStatus.ok);
+        changed();
+      }
     } catch (Exception e) {
       reportError(res, e);
     }
@@ -157,8 +169,10 @@ class JsonApiService {
     try {
       if (!store.remove(res0, id))
         writeNotFound(res, res0, id);
-      else
+      else {
         writeJsonApi(res, okDocument(), HTTPStatus.ok);
+        changed();
+      }
     } catch (Exception e) {
       reportError(res, e);
     }

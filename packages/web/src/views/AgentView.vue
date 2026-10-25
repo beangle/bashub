@@ -919,14 +919,23 @@ function resetLog() {
 }
 
 function instancesOf(agent: AgentStatus): AgentInstance[] {
-  const running = agent.basReport?.instances ?? []
-  const declared = agent.basReport?.declared ?? []
-  if (running.length === 0 && declared.length === 0) {
-    return (agent.health ?? []).map((item) => ({
-      id: item.id,
-      state: item.state,
-    }))
+  const report = agent.basReport
+  const running = report?.instances ?? []
+  // 当前 server.xml 已经声明过（含空数组）时，只展示声明项；配置里删掉的
+  // server 即使进程还在，也不再作为监控行展示。
+  const declaredKnown = Array.isArray(report?.declared)
+  if (!declaredKnown) {
+    if (running.length === 0) {
+      return (agent.health ?? []).map((item) => ({
+        id: item.id,
+        state: item.state,
+      }))
+    }
+    return running
+      .map((instance) => ({ ...instance, state: 'running' as const }))
+      .sort(compareInstances)
   }
+  const declared = report?.declared ?? []
   const runningById = new Map<string, AgentInstance>()
   for (const instance of running) {
     if (instance.id) runningById.set(instance.id, instance)
@@ -942,15 +951,13 @@ function instancesOf(agent: AgentStatus): AgentInstance[] {
       merged.push({ ...instance, state: 'stopped' })
     }
   }
-  for (const instance of running) {
-    if (!instance.id || runningById.has(instance.id)) {
-      merged.push({ ...instance, state: 'running' })
-    }
-  }
-  return merged.sort(
-    (left, right) =>
-      (left.id || '').localeCompare(right.id || '', 'zh-CN', { numeric: true, sensitivity: 'base' }) ||
-      (left.pid ?? 0) - (right.pid ?? 0),
+  return merged.sort(compareInstances)
+}
+
+function compareInstances(left: AgentInstance, right: AgentInstance): number {
+  return (
+    (left.id || '').localeCompare(right.id || '', 'zh-CN', { numeric: true, sensitivity: 'base' }) ||
+    (left.pid ?? 0) - (right.pid ?? 0)
   )
 }
 

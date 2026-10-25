@@ -817,10 +817,21 @@ final class AgentRegistry {
     return list;
   }
 
-  /// 请某个在线 agent 立即上报；不在线返回 false。
+  /// 让所有在线 agent 重新拉取 server.xml 并上报；配置写操作后调用。
+  void refreshConfigAll() {
+    foreach (_, byIp; sessions)
+      foreach (_, session; byIp)
+        session.offer(channel.render("config:refresh", "", Json.emptyObject, session.agent));
+  }
+
+  /// 请某个在线 agent 立即刷新配置并上报；不在线返回 false。
   bool reportNow(string project, string ip = "") {
     auto session = resolve(project, ip);
-    if (session is null || !session.supportsPrimitive("report:now"))
+    if (session is null)
+      return false;
+    if (session.supportsPrimitive("config:refresh"))
+      return session.offer(channel.render("config:refresh", "", Json.emptyObject, session.agent));
+    if (!session.supportsPrimitive("report:now"))
       return false;
     return session.offer(channel.reportNow(session.agent));
   }
