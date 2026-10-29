@@ -16,6 +16,7 @@ const farmRef: ResourceRef = { path: '/farms', type: 'farms', labelFields: ['nam
 const hostRef: ResourceRef = { path: '/hosts', type: 'hosts', labelFields: ['name', 'ip'] }
 const serverRef: ResourceRef = { path: '/servers', type: 'servers', labelFields: ['displayName'], sort: 'name' }
 const artifactRef: ResourceRef = { path: '/artifacts', type: 'artifacts', labelFields: ['title', 'artifactId'] }
+const endpointRef: ResourceRef = { path: '/endpoints', type: 'endpoints', labelFields: ['name'] }
 
 /**
  * 引擎类型，取值与 basctl 的 creator 同名。
@@ -141,6 +142,32 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'httpsPort', label: 'HTTPS 端口', type: 'number' },
       { key: 'sslCiphers', label: 'SSL 加密套件', help: '不填写时由代理使用默认套件' },
       { key: 'sslProtocols', label: 'SSL 协议' },
+    ],
+  },
+  {
+    key: 'endpoints',
+    alias: 'endpoint',
+    path: '/endpoints',
+    type: 'endpoints',
+    title: '代理点',
+    group: '平台配置',
+    description: 'server.xml 的 proxy endpoint；每台代理机一个 setline agent',
+    sort: 'name',
+    filters: [{ key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true }],
+    fields: [
+      { key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true, column: false },
+      { key: 'name', label: '名称', required: true, help: 'webapp endpoints 引用它；项目内唯一' },
+      { key: 'ips', label: '内网 IP', required: true, help: '逗号分隔；代理机内网地址，不是域名公网地址' },
+      { key: 'domain', label: '域名', help: '可选且项目内唯一；空表示无域名代理' },
+      { key: 'enableHttps', label: '使用 HTTPS', type: 'boolean' },
+      { key: 'forceHttps', label: '强制 HTTPS', type: 'boolean' },
+      { key: 'httpPort', label: 'HTTP 端口', type: 'number' },
+      { key: 'httpsPort', label: 'HTTPS 端口', type: 'number' },
+      { key: 'maxconn', label: '最大连接数', type: 'number' },
+      { key: 'sslCiphers', label: 'SSL 加密套件', column: false },
+      { key: 'sslProtocols', label: 'SSL 协议', column: false },
+      { key: 'certificate', label: '证书', type: 'textarea', rows: 4, column: false, help: '可留空，由 setline agent 从 bashub 拉取' },
+      { key: 'privateKey', label: '私钥', type: 'textarea', rows: 4, column: false, help: '可留空，由 setline agent 从 bashub 拉取' },
     ],
   },
   {
@@ -354,6 +381,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，反代与 setline 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
       { key: 'unpack', label: '解压执行', type: 'boolean', width: 70 },
       { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, help: '只能选择配置了 Setline 监听端口的主机上的服务' },
+      { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, help: '可多选；留空表示不做负载代理' },
       { key: 'libs', label: '扩展库', type: 'textarea', rows: 6, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
     ],
   },
@@ -508,6 +536,7 @@ export const resourceTabGroups: ResourceTabGroup[] = [
     tabs: [
       { key: 'projects', label: '配置管理' },
       { key: 'proxy-settings', label: '代理配置' },
+      { key: 'endpoints', label: '代理点' },
       { key: 'organizations', label: '机构管理' },
     ],
   },

@@ -23,6 +23,10 @@ alter table bas.cfg_proxy_settings add constraint pk_cfg_proxy_settings primary 
 alter table bas.cfg_proxy_settings add constraint uq_cfg_proxy_settings_project unique (project_id);
 alter table bas.cfg_servers add constraint pk_n1kin1jg3pxkwhq69v9oodwgn primary key (id);
 alter table bas.cfg_webapps add constraint pk_drfaoltpyejnt1b86ynk6f4a4 primary key (id);
+alter table bas.cfg_endpoints add constraint pk_cfg_endpoints primary key (id);
+alter table bas.cfg_endpoints add constraint uq_cfg_endpoints_project_name unique (project_id,name);
+alter table bas.cfg_endpoints add constraint uq_cfg_endpoints_project_domain unique (project_id,domain);
+alter table bas.cfg_webapps_endpoints add constraint pk_cfg_webapps_endpoints primary key (webapp_id,endpoint_id);
 alter table bas.cfg_webapps_targets add constraint pk_5x2tbawi1eus1x8tgrrfng3e3 primary key (webapp_id,server_id);
 alter table bas.ems_app_groups add constraint pk_fbmgaea8dkl0rnp9yfuwc0cc0 primary key (id);
 alter table bas.ems_apps add constraint pk_8cahbt1b85c9wpnrl7ehx43hd primary key (id);

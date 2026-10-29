@@ -25,7 +25,7 @@ import beangle.jsonapi.store : Store;
 import vibe.data.json : Json;
 
 import std.algorithm : sort;
-import std.array : appender, join;
+import std.array : appender, join, split;
 import std.conv : to;
 import std.string : strip;
 
@@ -80,6 +80,43 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
   if (downloadKey.length > 0)
     putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
   xml.put("/>\n");
+
+  auto endpoints = data.endpoints.dup;
+  sort!((a, b) => attributeText(a, "name") < attributeText(b, "name"))(endpoints);
+  string[string] endpointNames;
+  if (endpoints.length) {
+    string[string] domains;
+    string[string] noDomainIp;
+    xml.put("  <proxies>\n");
+    foreach (endpoint; endpoints) {
+      auto name = attributeText(endpoint, "name").strip;
+      auto ips = attributeText(endpoint, "ips").strip;
+      auto domain = attributeText(endpoint, "domain").strip;
+      endpointNames[jsonText(endpoint["id"])] = name;
+      if (domain.length) {
+        if (auto previous = domain in domains)
+          throw new Exception("duplicate endpoint domain " ~ domain ~ " (" ~ *previous ~ ", " ~ name ~ ")");
+        domains[domain] = name;
+      } else {
+        foreach (raw; ips.split(",")) {
+          auto ip = raw.strip;
+          if (ip.length == 0)
+            throw new Exception("endpoint " ~ name ~ " has an empty ip");
+          if (auto previous = ip in noDomainIp)
+            throw new Exception("ip " ~ ip ~ " is shared by no-domain endpoints "
+                ~ *previous ~ " and " ~ name);
+          noDomainIp[ip] = name;
+        }
+      }
+      xml.put("    <proxy");
+      putAttr(xml, "name", name);
+      putAttr(xml, "ip", ips);
+      if (domain.length)
+        putAttr(xml, "domain", domain);
+      xml.put("/>\n");
+    }
+    xml.put("  </proxies>\n");
+  }
 
   xml.put("  <engines>\n");
   foreach (engineId; engineIds) {
@@ -192,6 +229,13 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
       runAt ~= farmName ~ "." ~ attributeText(server, "name");
     }
     putAttr(xml, "run-at", runAt.join(","));
+    string[] endpointRefs;
+    foreach (endpointId; relationshipIds(webapp, "endpoints")) {
+      if (auto name = endpointId in endpointNames)
+        endpointRefs ~= *name;
+    }
+    if (endpointRefs.length)
+      putAttr(xml, "endpoints", endpointRefs.join(","));
     if (hasAttribute(webapp, "libs"))
       putAttr(xml, "libs", attributeText(webapp, "libs"));
     if (attributeBool(webapp, "unpack"))

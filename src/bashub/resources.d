@@ -74,6 +74,26 @@ Registry hubRegistry() {
       [Relation("project", "project_id", "projects")],
       [],
       "id"),
+    /// 代理 endpoint：同一 project 下 name/domain 唯一；ips 是代理机内网地址列表。
+    Resource(
+      "endpoints", "endpoints", "bas.cfg_endpoints", "id",
+      [
+        Column("name", "name", Kind.text),
+        Column("ips", "ips", Kind.text),
+        Column("domain", "domain", Kind.text),
+        Column("force_https", "forceHttps", Kind.boolean),
+        Column("certificate", "certificate", Kind.text),
+        Column("private_key", "privateKey", Kind.text),
+        Column("http_port", "httpPort", Kind.number),
+        Column("https_port", "httpsPort", Kind.number),
+        Column("enable_https", "enableHttps", Kind.boolean),
+        Column("maxconn", "maxconn", Kind.number),
+        Column("ssl_ciphers", "sslCiphers", Kind.text),
+        Column("ssl_protocols", "sslProtocols", Kind.text),
+      ],
+      [Relation("project", "project_id", "projects")],
+      [],
+      "name"),
     /// 证书单独成表：project 的列表/详情不再携带大字段；只给专用端点内部使用。
     Resource(
       "project-certificates", "projectCertificates", "bas.cfg_project_certificates", "project_id",
@@ -196,7 +216,8 @@ Registry hubRegistry() {
       [],
       "context_path",
       [],
-      [ManyRelation("targets", "servers", "bas.cfg_webapps_targets", "webapp_id", "server_id")]),
+      [ManyRelation("targets", "servers", "bas.cfg_webapps_targets", "webapp_id", "server_id"),
+       ManyRelation("endpoints", "endpoints", "bas.cfg_webapps_endpoints", "webapp_id", "endpoint_id")]),
     Resource(
       "platform-features", "platformFeatures", "bas.cfg_platform_features", "id",
       [
@@ -329,6 +350,8 @@ private string[] requiredOf(string path) {
     return ["name"];
   case "projects":
     return ["name", "title", "basVersion"];
+  case "endpoints":
+    return ["project", "name", "ips"];
   case "proxy-settings":
     return ["project", "proxyEngine", "ip"];
   case "engines":

@@ -28,12 +28,14 @@ struct ProjectData {
   Json proxy;
   Json[] farms;
   Json[] hosts;
+  Json[] endpoints;
   Json[] webapps;
   Json[] servers;
   Json[] engines;
   Json[] artifacts;
   Json[string] farmsById;
   Json[string] hostsById;
+  Json[string] endpointsById;
   Json[string] serversById;
   Json[string] enginesById;
   Json[string] artifactsById;
@@ -50,6 +52,7 @@ ProjectData loadProjectData(Store store, Registry reg, const ProjectContext cont
     data.proxy = proxyRows[0];
   data.farms = loadAll(store, reg.find("farms"), ["project": context.id]);
   data.hosts = loadAll(store, reg.find("hosts"), ["project": context.id]);
+  data.endpoints = loadAll(store, reg.find("endpoints"), ["project": context.id]);
   data.webapps = loadAll(store, reg.find("webapps"), ["project": context.id]);
 
   auto engineIds = referencedIds(data.farms, "engine", false);
@@ -64,6 +67,7 @@ ProjectData loadProjectData(Store store, Registry reg, const ProjectContext cont
 
   data.farmsById = index(data.farms);
   data.hostsById = index(data.hosts);
+  data.endpointsById = index(data.endpoints);
   data.serversById = index(data.servers);
   data.enginesById = index(data.engines);
   data.artifactsById = index(data.artifacts);

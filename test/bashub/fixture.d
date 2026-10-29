@@ -38,6 +38,8 @@ MemoryDao testDao(Registry reg) {
     dao.seed(reg.find("artifacts"), row);
   foreach (row; webappRows())
     dao.seed(reg.find("webapps"), row);
+  foreach (row; endpointRows())
+    dao.seed(reg.find("endpoints"), row);
   foreach (row; featureRows())
     dao.seed(reg.find("platform-features"), row);
   foreach (row; scriptRows())
@@ -70,6 +72,7 @@ MemoryDao testDao(Registry reg) {
 
   auto webapps = reg.find("webapps");
   dao.seedMany(webapps, "targets", "7001", ["5001", "5002"]);
+  dao.seedMany(webapps, "endpoints", "7001", ["9001", "9002"]);
 
   auto features = reg.find("platform-features");
   dao.seedMany(features, "dependencies", "8002", ["8001"]);
@@ -219,6 +222,25 @@ private Row[] webappRows() {
       "artifact": Json("6001"), "project": Json("1002"), "version": Json("0.0.8"),
       "context_path": Json("/bas"), "urls": Json([Json("/bas")]), "unpack": Json(false),
       "libs": Json(""),
+    ]),
+  ];
+}
+
+private Row[] endpointRows() {
+  return [
+    row("9001", [
+      "project": Json("1002"), "name": Json("edge-web"), "ips": Json("10.0.0.20"),
+      "domain": Json("www.openurp.net"), "force_https": Json(true),
+      "certificate": Json(""), "private_key": Json(""),
+      "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(true),
+      "maxconn": Json(30000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
+    ]),
+    row("9002", [
+      "project": Json("1002"), "name": Json("edge-ip"), "ips": Json("10.0.0.30"),
+      "domain": Json(""), "force_https": Json(false),
+      "certificate": Json(""), "private_key": Json(""),
+      "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(false),
+      "maxconn": Json(30000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
     ]),
   ];
 }

@@ -25,6 +25,9 @@ alter table bas.cfg_servers add constraint fk_nbm1wemgp4l7srr9c62963yqt foreign 
 alter table bas.cfg_webapps add constraint fk_61bk808awvse0xme3hlm6vrcy foreign key (artifact_id) references bas.cfg_artifacts (id);
 alter table bas.cfg_webapps add constraint fk_d8tq1dhvfqudy0otroaw2nwit foreign key (project_id) references bas.cfg_projects (id);
 alter table bas.cfg_webapps_targets add constraint fk_1fdi9tds8uijp1hp1rq2c6gwp foreign key (server_id) references bas.cfg_servers (id);
+alter table bas.cfg_endpoints add constraint fk_cfg_endpoints_project foreign key (project_id) references bas.cfg_projects (id);
+alter table bas.cfg_webapps_endpoints add constraint fk_cfg_webapps_endpoints_webapp foreign key (webapp_id) references bas.cfg_webapps (id);
+alter table bas.cfg_webapps_endpoints add constraint fk_cfg_webapps_endpoints_endpoint foreign key (endpoint_id) references bas.cfg_endpoints (id);
 alter table bas.cfg_webapps_targets add constraint fk_26axwe4ib5in1ow603l0fbcv3 foreign key (webapp_id) references bas.cfg_webapps (id);
 alter table bas.ems_apps add constraint fk_o095x400ixmsly9dqrvpyq3ty foreign key (group_id) references bas.ems_app_groups (id);
 alter table bas.ems_channels add constraint fk_fnfitp6dm7fobk5b0bw67oc7d foreign key (app_id) references bas.ems_apps (id);

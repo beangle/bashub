@@ -289,6 +289,45 @@
             <foreign-key name="fk_cfg_proxy_settings_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
           </constraints>
         </table>
+        <table name="cfg_endpoints" comment="Project 的代理 endpoint">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
+            <column name="name" type="varchar(255)" nullable="false" comment="endpoint 唯一名称"/>
+            <column name="ips" type="varchar(1024)" nullable="false" comment="代理机内网 IP，逗号分隔"/>
+            <column name="domain" type="varchar(255)" comment="域名；可选且唯一"/>
+            <column name="force_https" type="boolean" nullable="false" defaultValue="false" comment="是否强制 HTTPS"/>
+            <column name="certificate" type="text" comment="PEM 证书"/>
+            <column name="private_key" type="text" comment="PEM 私钥"/>
+            <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="HTTP 端口"/>
+            <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="HTTPS 端口"/>
+            <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="是否启用 HTTPS"/>
+            <column name="maxconn" type="integer" nullable="false" defaultValue="30000" comment="最大连接数"/>
+            <column name="ssl_ciphers" type="varchar(255)" comment="SSL ciphers"/>
+            <column name="ssl_protocols" type="varchar(255)" comment="SSL protocols"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_endpoints" columns="id"/>
+            <unique-key name="uq_cfg_endpoints_project_name" columns="project_id,name"/>
+            <unique-key name="uq_cfg_endpoints_project_domain" columns="project_id,domain"/>
+            <foreign-key name="fk_cfg_endpoints_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
+          </constraints>
+        </table>
+        <table name="cfg_webapps_endpoints" comment="Webapp 与代理 endpoint 的关系">
+          <columns>
+            <column name="endpoint_id" type="bigint" nullable="false" comment="Endpoint?ID"/>
+            <column name="webapp_id" type="bigint" nullable="false" comment="Webapp?ID"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_webapps_endpoints" columns="webapp_id,endpoint_id"/>
+            <foreign-key name="fk_cfg_webapps_endpoints_webapp" column="webapp_id" referenced-table="bas.cfg_webapps" referenced-column="id"/>
+            <foreign-key name="fk_cfg_webapps_endpoints_endpoint" column="endpoint_id" referenced-table="bas.cfg_endpoints" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_cfg_webapps_endpoints_webapp" columns="webapp_id"/>
+            <index name="idx_cfg_webapps_endpoints_endpoint" columns="endpoint_id"/>
+          </indexes>
+        </table>
         <table name="cfg_projects" comment="Project?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
