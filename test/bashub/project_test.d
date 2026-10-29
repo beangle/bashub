@@ -13,7 +13,7 @@ import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
-import bashub.project.proxy : renderProxy;
+import bashub.project.proxy : renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
 import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
@@ -312,6 +312,12 @@ unittest {
   assert(nginx.canFind("ssl_certificate /etc/setline/certs/cert.pem;"));
   assert(nginx.canFind("ssl_certificate_key /etc/setline/certs/key.pem;"));
   assert(!nginx.canFind("/etc/nginx/prod.openurp.net"));
+
+  auto endpointNginx = renderProxyForEndpoint(store, reg, project, "edge-web");
+  assert(endpointNginx.canFind("server_name  www.openurp.net;"));
+  assert(endpointNginx.canFind("ssl_certificate /etc/setline/certs/edge-web.pem;"));
+  assert(endpointNginx.canFind("location /bas {"));
+  assertThrown!Exception(renderProxyForEndpoint(store, reg, project, "missing"));
 
   assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
   assert(findProject(reg, store, "openurp.prod", project));

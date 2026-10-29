@@ -35,7 +35,7 @@ import bashub.project.manifest : renderSetlineManifest;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
-import bashub.project.proxy : renderProxy;
+import bashub.project.proxy : renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, dataOf, findProject, findProjectById, ipHeaderAddresses,
   loadAll, matchHostIp, resolveHostProject, resolveSetlineProject;
 import bashub.project.script : renderHostScript;
@@ -237,6 +237,30 @@ class HubService {
 
   /// `GET /api/bashub/config/{project}/proxy`：按 Project 的 `proxyEngine` 输出 haproxy / nginx。
   /// 机器下载与 `config/server` 使用同一个 Project key；未知引擎与不存在的 Project 一样返回 404。
+  void projectEndpointProxy(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+    try {
+      auto text = renderProxyForEndpoint(store, reg, project, req.params.get("endpoint", ""));
+      if (text.length == 0) {
+        res.writeBody("", HTTPStatus.notFound);
+        return;
+      }
+      res.writeBody(text, HTTPStatus.ok, "text/plain");
+    } catch (Exception e) {
+      logError("Render endpoint proxy config failed: %s", e.msg);
+      res.writeBody("", HTTPStatus.internalServerError);
+    }
+  }
+
   void projectProxy(HTTPServerRequest req, HTTPServerResponse res) {
     auto projectName = req.params.get("project", "");
     ProjectContext project;
@@ -249,7 +273,8 @@ class HubService {
       return;
     }
     try {
-      auto text = renderProxy(store, reg, project);
+      auto endpoint = req.query.get("endpoint", "");
+      auto text = renderProxyForEndpoint(store, reg, project, endpoint);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -417,7 +442,8 @@ class HubService {
       return;
     }
     try {
-      auto text = renderProxy(store, reg, project);
+      auto endpoint = req.query.get("endpoint", "");
+      auto text = renderProxyForEndpoint(store, reg, project, endpoint);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -2083,6 +2109,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/:project/certificate", &hub.projectCertificate);
   router.get(api.config ~ "/:project/certificate-key", &hub.projectCertificateKey);
   router.get(api.config ~ "/:project/setline-peers", &hub.projectPeers);
+  router.get(api.config ~ "/:project/proxy/:endpoint", &hub.projectEndpointProxy);
   router.get(api.config ~ "/:project/setline-manifest", &hub.projectManifest);
   router.get(api.config ~ "/:project/script/:host", &hub.projectHostScript);
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);

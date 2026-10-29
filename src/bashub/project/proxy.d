@@ -22,7 +22,7 @@ import beangle.jsonapi.store : Store;
 
 import vibe.data.json : Json;
 
-import std.algorithm : sort;
+import std.algorithm : canFind, sort;
 import std.array : appender, join, split;
 import std.conv : to;
 import std.string : replace, strip;
@@ -64,6 +64,8 @@ struct ProxyBackend {
 struct ProxyModel {
   Json project;
   Json proxy;
+  string hostname;
+  string endpointName;
   ProxyWebapp[] webapps;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
@@ -86,11 +88,17 @@ private struct FarmGroup {
 /// setline pull 的证书落点。公钥/私钥分开给 nginx；haproxy 读拼接后的 bundle。
 private enum certificateDir = "/etc/setline/certs";
 
-/// 按 `project.proxyEngine` 渲染；未知引擎返回空串（路由按 404 处理）。
+/// 按 `project.proxyEngine` 渲染项目级单代理（旧接口）；未知引擎返回空串。
 string renderProxy(Store store, Registry reg, const ProjectContext context) {
+  return renderProxyForEndpoint(store, reg, context, "");
+}
+
+/// 按 endpoint 渲染；endpointName 为空时使用旧的项目级单代理。
+string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext context,
+    string endpointName) {
   auto data = loadProjectData(store, reg, context);
   auto engine = attributeText(data.proxy, "proxyEngine").strip;
-  auto model = buildProxyModel(data);
+  auto model = buildProxyModel(data, endpointName);
   if (engine == "nginx")
     return renderNginx(model);
   if (engine == "haproxy")
@@ -98,11 +106,36 @@ string renderProxy(Store store, Registry reg, const ProjectContext context) {
   return "";
 }
 
-/// 从共享 Project 快照建立反代模型。
-ProxyModel buildProxyModel(ProjectData data) {
+/// 从共享 Project 快照建立反代模型；指定 endpoint 时只保留引用它的 webapp。
+ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   ProxyModel model;
   model.project = data.project.data;
   model.proxy = data.proxy;
+
+  string endpointId;
+  if (endpointName.length) {
+    foreach (endpoint; data.endpoints) {
+      if (attributeText(endpoint, "name") == endpointName) {
+        endpointId = jsonText(endpoint["id"]);
+        model.endpointName = endpointName;
+        model.hostname = attributeText(endpoint, "domain").strip;
+        auto proxy = data.proxy;
+        proxy["maxconn"] = Json(attributeLong(endpoint, "maxconn", 30000));
+        proxy["httpPort"] = Json(attributeLong(endpoint, "httpPort", 80));
+        proxy["httpsPort"] = Json(attributeLong(endpoint, "httpsPort", 443));
+        proxy["enableHttps"] = Json(attributeBool(endpoint, "enableHttps"));
+        proxy["forceHttps"] = Json(attributeBool(endpoint, "forceHttps"));
+        proxy["sslCiphers"] = Json(attributeText(endpoint, "sslCiphers"));
+        proxy["sslProtocols"] = Json(attributeText(endpoint, "sslProtocols"));
+        model.proxy = proxy;
+        break;
+      }
+    }
+    if (endpointId.length == 0)
+      throw new Exception("unknown endpoint " ~ endpointName);
+  } else {
+    model.hostname = attributeText(data.project.data, "hostname").strip;
+  }
 
   auto apps = data.webapps.dup;
   sort!((a, b) => attributeText(a, "contextPath") < attributeText(b, "contextPath"))(apps);
@@ -110,6 +143,8 @@ ProxyModel buildProxyModel(ProjectData data) {
   ProxyWebapp[] normalApps;
   ProxyWebapp[] rootApps;
   foreach (app; apps) {
+    if (endpointId.length && !relationshipIds(app, "endpoints").canFind(endpointId))
+      continue;
     ProxyWebapp item;
     item.id = jsonText(app["id"]);
     item.contextPath = attributeText(app, "contextPath").strip;
@@ -251,7 +286,7 @@ string renderNginx(ProxyModel model) {
   auto maxconn = attributeLong(proxy, "maxconn", 30000);
   auto httpPort = attributeLong(proxy, "httpPort", 80);
   auto httpsPort = attributeLong(proxy, "httpsPort", 443);
-  auto hostname = attributeText(project, "hostname").strip;
+  auto hostname = model.hostname;
   auto sslProtocols = attributeText(proxy, "sslProtocols").strip;
   auto sslCiphers = attributeText(proxy, "sslCiphers").strip;
   if (sslProtocols.length == 0)
@@ -328,9 +363,13 @@ string renderNginx(ProxyModel model) {
     line(out_, "        listen " ~ httpsPort.to!string ~ " ssl;");
   if (hostname.length > 0)
     line(out_, "        server_name  " ~ hostname ~ ";");
-  if (enableHttps && hostname.length > 0) {
-    line(out_, "        ssl_certificate " ~ certificateDir ~ "/cert.pem;");
-    line(out_, "        ssl_certificate_key " ~ certificateDir ~ "/key.pem;");
+  if (enableHttps) {
+    auto cert = model.endpointName.length
+        ? certificateDir ~ "/" ~ model.endpointName ~ ".pem" : certificateDir ~ "/cert.pem";
+    auto key = model.endpointName.length
+        ? certificateDir ~ "/" ~ model.endpointName ~ ".key.pem" : certificateDir ~ "/key.pem";
+    line(out_, "        ssl_certificate " ~ cert ~ ";");
+    line(out_, "        ssl_certificate_key " ~ key ~ ";");
     line(out_, "        ssl_protocols      " ~ sslProtocols ~ ";");
     line(out_, "        ssl_ciphers       " ~ sslCiphers ~ ";");
     line(out_, "        keepalive_timeout   70;");
@@ -372,7 +411,7 @@ string renderHaproxy(ProxyModel model) {
   auto maxconn = attributeLong(proxy, "maxconn", 30000);
   auto httpPort = attributeLong(proxy, "httpPort", 80);
   auto httpsPort = attributeLong(proxy, "httpsPort", 443);
-  auto hostname = attributeText(project, "hostname").strip;
+  auto hostname = model.hostname;
   auto sslProtocols = attributeText(proxy, "sslProtocols").strip;
   auto sslCiphers = attributeText(proxy, "sslCiphers").strip;
   if (sslProtocols.length == 0)
@@ -423,7 +462,9 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "frontend main");
   line(out_, "    bind *:" ~ httpPort.to!string);
   if (enableHttps) {
-    auto bind = "    bind *:" ~ httpsPort.to!string ~ " ssl crt " ~ certificateDir ~ "/bundle.pem ";
+    auto bundle = model.endpointName.length
+        ? certificateDir ~ "/" ~ model.endpointName ~ ".bundle.pem" : certificateDir ~ "/bundle.pem";
+    auto bind = "    bind *:" ~ httpsPort.to!string ~ " ssl crt " ~ bundle;
     if (sslCiphers.length > 0)
       bind ~= "ciphers " ~ sslCiphers ~ " ";
     bind ~= sslProtocols;
@@ -431,7 +472,7 @@ string renderHaproxy(ProxyModel model) {
     line(out_, "    http-request set-header X-Forwarded-Proto https if { ssl_fc }");
     line(out_, "    http-request set-header X-Forwarded-Port %[dst_port]");
   }
-  if (enableHttps && forceHttps && hostname.length > 0) {
+  if (enableHttps && forceHttps) {
     line(out_, "    redirect scheme https if !{ ssl_fc } { hdr_beg(host) " ~ hostname ~ " }");
   }
   line(out_, "");
