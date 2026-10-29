@@ -155,7 +155,7 @@ void runRelayLoop(AgentRegistry registry, string project, string projectId, stri
     logDebug("%s@%s: relay master connected", project, ip);
     auto lastPing = MonoTime.currTime;
     while (socket.connected) {
-      if (master.queue.superseded) {
+      if (master.queue.superseded || !registry.isCurrent(master)) {
         socket.close(master.queue.closeCode, master.queue.closeReason);
         return;
       }
@@ -178,6 +178,45 @@ void runRelayLoop(AgentRegistry registry, string project, string projectId, stri
         logWarn("%s: unreadable relay message dropped", project);
         continue;
       }
+      if (!registry.isCurrent(master)) {
+        socket.close(master.queue.closeCode, master.queue.closeReason);
+        return;
+      }
+      if (message.typ == "link:claim") {
+        auto target = "";
+        auto ttlSeconds = 60L;
+        if (message.body.type == Json.Type.object) {
+          auto value = message.body["target"];
+          if (value.type == Json.Type.string)
+            target = value.get!string.strip;
+          auto ttl = message.body["ttl"];
+          if (ttl.type == Json.Type.int_ || ttl.type == Json.Type.bigInt)
+            ttlSeconds = ttl.get!long;
+        }
+        if (ttlSeconds < 60)
+          ttlSeconds = 60;
+        if (ttlSeconds > 300)
+          ttlSeconds = 300;
+        auto lease = registry.claimLink(project, groupName, master.ip, target, seconds(ttlSeconds));
+        auto body = Json.emptyObject;
+        body["ok"] = Json(lease.owner == master.ip);
+        body["granted"] = Json(lease.owner == master.ip);
+        body["owner"] = Json(lease.owner);
+        body["target"] = Json(lease.target);
+        body["term"] = Json(0L);
+        master.offer(render("result", message.id, body));
+        continue;
+      }
+      if (message.typ == "link:release") {
+        registry.releaseLink(project, groupName, master.ip);
+        if (message.id.length) {
+          auto body = Json.emptyObject;
+          body["ok"] = Json(true);
+          master.offer(render("result", message.id, body));
+        }
+        continue;
+      }
+
       if (message.typ == "recommend") {
         auto candidate = "";
         if (message.body.type == Json.Type.object) {

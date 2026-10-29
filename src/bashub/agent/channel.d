@@ -24,7 +24,7 @@ import std.string : strip, toLower;
 
 /// agent → hub 的原语。
 enum AgentPrimitives = ["hello", "report:os", "report:bas", "report:health", "result", "pong", "agent:offline",
-  "recommend"];
+  "recommend", "link:claim", "link:release"];
 
 /// hub → agent 的原语。
 enum HubPrimitives = [

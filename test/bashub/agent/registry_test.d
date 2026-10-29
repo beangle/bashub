@@ -430,3 +430,61 @@ unittest {
   assert(request["type"].get!string == "agent:log");
   assert(request["body"]["tail"].get!long == 100);
 }
+
+@("link mutex is owned by one agent and only the owner can release it") unittest {
+  auto registry = new AgentRegistry();
+  auto a = registry.attachRelay("demo", "1", "10.0.0.10", "site-a");
+  auto b = registry.attachRelay("demo", "1", "10.0.0.11", "site-a");
+  auto first = registry.claimLink("demo", "site-a", a.ip, b.ip, seconds(60));
+  assert(first.owner == a.ip && first.target == b.ip);
+  auto second = registry.claimLink("demo", "site-a", b.ip, a.ip, seconds(60));
+  assert(second.owner == a.ip && second.target == b.ip);
+  registry.releaseLink("demo", "site-a", b.ip);
+  assert(registry.claimLink("demo", "site-a", b.ip, a.ip, seconds(60)).owner == a.ip);
+  registry.releaseLink("demo", "site-a", a.ip);
+  assert(registry.claimLink("demo", "site-a", b.ip, a.ip, seconds(60)).owner == b.ip);
+}
+
+
+@("link mutex rejects target outside the owner group") unittest {
+  auto registry = new AgentRegistry();
+  auto a = registry.attachRelay("demo", "1", "10.0.0.10", "site-a");
+  auto b = registry.attachRelay("demo", "2", "10.0.0.11", "site-b");
+  auto claim = registry.claimLink("demo", "site-a", a.ip, b.ip, seconds(60));
+  assert(claim.owner.length == 0);
+}
+
+@("link mutex rejects owner as target") unittest {
+  auto registry = new AgentRegistry();
+  auto a = registry.attachRelay("demo", "1", "10.0.0.10", "site-a");
+  auto claim = registry.claimLink("demo", "site-a", a.ip, a.ip, seconds(60));
+  assert(claim.owner.length == 0);
+}
+
+@("stale session detach keeps the new session link mutex") unittest {
+  auto registry = new AgentRegistry();
+  auto oldOwner = registry.attachRelay("demo", "1", "10.0.0.10", "site-a");
+  auto target = registry.attachRelay("demo", "2", "10.0.0.11", "site-a");
+  assert(registry.claimLink("demo", "site-a", oldOwner.ip, target.ip, seconds(60)).owner == oldOwner.ip);
+  auto newOwner = registry.attachRelay("demo", "3", "10.0.0.10", "site-a");
+  assert(registry.claimLink("demo", "site-a", newOwner.ip, target.ip, seconds(60)).owner == newOwner.ip);
+  registry.detach("demo", oldOwner.ip, oldOwner);
+  auto after = registry.claimLink("demo", "site-a", target.ip, oldOwner.ip, seconds(60));
+  assert(after.owner == newOwner.ip);
+}
+
+@("status exposes the current group link mutex on its owner") unittest {
+  auto registry = new AgentRegistry();
+  auto a = registry.attachRelay("demo", "1", "10.0.0.10", "site-a");
+  auto b = registry.attachRelay("demo", "2", "10.0.0.11", "site-a");
+  registry.claimLink("demo", "site-a", a.ip, b.ip, seconds(60));
+  auto status = registry.status.get!(Json[]);
+  auto owner = status[0];
+  assert(owner["ip"].get!string == a.ip);
+  assert(owner["linkMutex"]["owner"].get!string == a.ip);
+  assert(owner["linkMutex"]["target"].get!string == b.ip);
+  assert(owner["linkMutex"]["expiresIn"].get!long > 0);
+  auto target = status[1];
+  assert(target["ip"].get!string == b.ip);
+  assert(target["linkMutex"].type == Json.Type.undefined);
+}

@@ -21,30 +21,32 @@
       <header class="topology-card__head">
         <div>
           <h3>本地组网拓扑</h3>
-          <p>同一组网分组内自动选主，follower 通过 master 中继。</p>
+          <p>同组 master 通过 LinkMutex 协商 target，follower 由 master 中继。</p>
         </div>
       </header>
       <div class="topology-list">
         <div v-for="item in topology" :key="item.group" class="topology-group">
           <div class="topology-group__name">{{ item.group }}</div>
           <div class="topology-group__flow">
-            <div class="topology-master">
-              <span class="topology-role">Master</span>
-              <strong>{{ item.master ? agentLabel(item.master) : '选举中…' }}</strong>
+            <div class="topology-masters">
+              <span class="topology-role">Master / 中继</span>
+              <t-tag v-for="agent in item.masters" :key="agent.ip" variant="light">
+                {{ agentLabel(agent) }}
+              </t-tag>
+              <span v-if="!item.masters.length" class="topology-empty">暂无</span>
             </div>
             <span class="topology-arrow">→</span>
             <div class="topology-followers">
               <span class="topology-role">Follower</span>
-              <t-tag v-for="agent in item.followers" :key="agent.ip" variant="light">
+              <t-tag v-for="agent in item.followers" :key="agent.ip" variant="outline">
                 {{ agentLabel(agent) }}
               </t-tag>
               <span v-if="!item.followers.length" class="topology-empty">暂无</span>
             </div>
-            <div v-if="item.candidates.length" class="topology-candidates">
-              <span class="topology-role">候选</span>
-              <t-tag v-for="agent in item.candidates" :key="agent.ip" variant="outline">
-                {{ agentLabel(agent) }}
-              </t-tag>
+            <div v-if="item.linkMutex" class="topology-link-mutex">
+              <span class="topology-role">LinkMutex</span>
+              <span>{{ item.linkMutex.owner }} → {{ item.linkMutex.target }}</span>
+              <span class="topology-expire">{{ item.linkMutex.expiresIn }}s</span>
             </div>
           </div>
         </div>
@@ -330,6 +332,7 @@ import {
   serviceAgentInstance,
   type AgentDiskInfo,
   type AgentInstance,
+  type AgentLinkMutex,
   type AgentLogEvent,
   type AgentLogWindow,
   type AgentOrganization,
@@ -456,20 +459,20 @@ const activeGroup = computed<AgentGroup | undefined>(() => {
   return list.find((group) => group.project === selectedProject.value) ?? list[0]
 })
 
-/** 当前 project 的本地组网拓扑：按 group 汇总 master/follower/候选。 */
+/** 当前 project 的本地组网拓扑：按 group 汇总 master/follower 和 LinkMutex。 */
 const topology = computed(() => {
-  const map = new Map<string, { group: string; master?: AgentStatus; followers: AgentStatus[]; candidates: AgentStatus[]; total: number }>()
+  const map = new Map<string, { group: string; masters: AgentStatus[]; followers: AgentStatus[]; linkMutex?: AgentLinkMutex; total: number }>()
   for (const agent of activeGroup.value?.agents ?? []) {
     const groupName = agent.group || 'default_group'
     let item = map.get(groupName)
     if (!item) {
-      item = { group: groupName, followers: [], candidates: [], total: 0 }
+      item = { group: groupName, masters: [], followers: [], total: 0 }
       map.set(groupName, item)
     }
     item.total++
-    if (agent.role === 'master') item.master = agent
+    if (agent.role === 'master') item.masters.push(agent)
     else if (agent.role === 'follower') item.followers.push(agent)
-    else item.candidates.push(agent)
+    if (agent.linkMutex) item.linkMutex = agent.linkMutex
   }
   // 单机组网没有中继信息；不展示只有一个 agent 的组。
   return [...map.values()]
@@ -1195,13 +1198,29 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-.topology-master,
-.topology-followers,
-.topology-candidates {
+.topology-masters,
+.topology-followers {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+.topology-link-mutex {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--td-warning-color);
+  border-radius: 4px;
+  color: var(--td-warning-color);
+  font-size: 12px;
+  background: var(--td-warning-color-light);
+}
+
+.topology-expire {
+  color: var(--td-text-color-placeholder);
 }
 
 .topology-role {

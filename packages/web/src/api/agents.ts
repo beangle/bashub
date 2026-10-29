@@ -80,8 +80,10 @@ export interface AgentStatus {
   ip?: string
   host?: string
   group?: string
-  role?: 'candidate' | 'master' | 'follower'
+  role?: 'master' | 'follower'
   master?: string
+  /** 当前组 LinkMutex（仅 owner 节点携带）。 */
+  linkMutex?: AgentLinkMutex
   org?: AgentOrganization
   basctl?: string
   bas?: string
@@ -95,6 +97,13 @@ export interface AgentStatus {
   basReport?: AgentBasSnapshot
   healthAt?: string
   health?: AgentHealth[]
+}
+
+/** 当前组正在进行的 LinkMutex 连接尝试。 */
+export interface AgentLinkMutex {
+  owner: string
+  target: string
+  expiresIn: number
 }
 
 export interface AgentHealth {
@@ -115,7 +124,7 @@ export interface AgentSummary {
   ip?: string
   host?: string
   group?: string
-  role?: 'candidate' | 'master' | 'follower'
+  role?: 'master' | 'follower'
   master?: string
   org?: AgentOrganization
   basctl?: string

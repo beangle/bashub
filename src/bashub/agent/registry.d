@@ -118,9 +118,9 @@ final class AgentSession {
   /// relay 上行的逻辑 agent；直连为空。
   string agent;
   bool relayMaster;
-  /// 组网分组与当前角色（candidate/master/follower）。
+  /// 组网分组与当前角色（master/follower）。
   string groupName = "default_group";
-  string role = "candidate";
+  string role = "master";
 
   /// 请求号 → 等待者。请求发起后由 socket 循环在 `result` 到达时唤醒。
   private PendingRequest[string] pending;
@@ -489,7 +489,14 @@ private enum SupersedeChurnSeconds = 60;
 /// 重连告警的间隔：同一 `project@ip` 每分钟最多一条，避免 10 秒一轮的重连把日志刷满。
 private enum SupersedeWarnSeconds = 60;
 
-/// 一个 (project, group) 的 master 租约。
+/// 一个 (project, group) 的 LinkMutex：owner 正在连接 target。
+struct LinkMutex {
+  string owner;
+  string target;
+  MonoTime expires;
+}
+
+/// 一个 (project, group) 的 master 租约（旧协议保留）。
 struct GroupMaster {
   string ip;
   long term;
@@ -506,8 +513,10 @@ final class AgentRegistry {
   private MonoTime[string] lastSupersedeAt;
   /// `project@ip` → 上次重连告警的时刻，用于限流。
   private MonoTime[string] lastSupersedeWarnAt;
-  /// `project\0group` → master 租约。
+  /// `project\0group` → master 租约（旧协议保留）。
   private GroupMaster[string] groupMasters;
+  /// `project\0group` → 当前连接尝试的互斥量。
+  private LinkMutex[string] linkMutexes;
 
   this(AgentHistoryStore historyStore = null) {
     this.historyStore = historyStore;
@@ -600,8 +609,25 @@ final class AgentRegistry {
         (now - previous.startedAt).total!"seconds");
   }
 
+  /// 当前 session 是否仍是该 project/IP 的活跃连接（旧连接迟到消息应被丢弃）。
+  bool isCurrent(AgentSession session) nothrow {
+    if (auto byIp = session.project in sessions)
+      if (auto current = session.ip in *byIp)
+        return *current is session;
+    return false;
+  }
+
   /// 摘除一条连接；只摘自己那条，旧连接迟到的关闭不能把新连接挤掉。
   void detach(string project, string ip, AgentSession session) nothrow {
+    // 同一 IP 快速重连时，旧连接的延迟 detach 不能清理新连接持有的锁/租约。
+    if (auto byIp = project in sessions)
+      if (auto current = session.ip in *byIp)
+        if (*current !is session)
+          return;
+    auto linkKey = project ~ "\0" ~ session.groupName;
+    if (auto link = linkKey in linkMutexes)
+      if ((*link).owner == session.ip)
+        linkMutexes.remove(linkKey);
     if (session.role == "master") {
       auto key = project ~ "\0" ~ session.groupName;
       if (auto found = key in groupMasters)
@@ -709,8 +735,22 @@ final class AgentRegistry {
   /// `GET /api/bashub/monitor/agents/status` 的数组。
   Json status() {
     Json[] items;
-    foreach (session; online())
-      items ~= session.status;
+    auto now = MonoTime.currTime;
+    foreach (session; online()) {
+      auto item = session.status;
+      auto key = session.project ~ "\0" ~ session.groupName;
+      if (auto link = key in linkMutexes) {
+        auto remaining = ((*link).expires - now).total!"seconds";
+        if ((*link).owner == session.ip && remaining > 0) {
+          auto linkJson = Json.emptyObject;
+          linkJson["owner"] = Json((*link).owner);
+          linkJson["target"] = Json((*link).target);
+          linkJson["expiresIn"] = Json(remaining);
+          item["linkMutex"] = linkJson;
+        }
+      }
+      items ~= item;
+    }
     return Json(items);
   }
 
@@ -769,6 +809,34 @@ final class AgentRegistry {
     if (historyStore is null)
       throw new Exception("agent history is not configured");
     return historyStore.query(projectId, projectName, daysCount);
+  }
+
+  /// 原子 claim LinkMutex；已有有效 owner 时返回当前记录。
+  LinkMutex claimLink(string project, string group, string owner, string target, Duration ttl) {
+    auto key = project ~ "\0" ~ group;
+    auto now = MonoTime.currTime;
+    auto session = find(project, owner);
+    if (session is null || session.role != "master" || target.length == 0 || target == owner)
+      return LinkMutex.init;
+    // 迁移目标必须是同组在线 master；owner 自己不是合法 target。
+    auto targetSession = find(project, target);
+    if (targetSession is null || targetSession.groupName != group
+        || targetSession.role != "master" || targetSession.master !is null)
+      return LinkMutex.init;
+    if (auto found = key in linkMutexes) {
+      if ((*found).expires > now && (*found).owner != owner)
+        return *found;
+    }
+    LinkMutex link = LinkMutex(owner, target, now + ttl);
+    linkMutexes[key] = link;
+    return link;
+  }
+
+  void releaseLink(string project, string group, string owner) {
+    auto key = project ~ "\0" ~ group;
+    if (auto found = key in linkMutexes)
+      if ((*found).owner == owner)
+        linkMutexes.remove(key);
   }
 
   /// 组内登记/推荐 master；已有有效租约时返回当前 master。
