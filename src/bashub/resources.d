@@ -83,7 +83,6 @@ Registry hubRegistry() {
         Column("domain", "domain", Kind.text),
         Column("force_https", "forceHttps", Kind.boolean),
         Column("certificate", "certificate", Kind.text),
-        Column("private_key", "privateKey", Kind.text),
         Column("http_port", "httpPort", Kind.number),
         Column("https_port", "httpsPort", Kind.number),
         Column("enable_https", "enableHttps", Kind.boolean),

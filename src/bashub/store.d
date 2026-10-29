@@ -24,10 +24,11 @@ import bashub.project.resolver : dataOf;
 import vibe.data.json : Json;
 
 import std.algorithm : canFind;
+import std.array : join;
 import std.conv : ConvException, to;
 import std.digest : toHexString;
 import std.random : uniform;
-import std.string : endsWith, replace, strip, toLower;
+import std.string : endsWith, replace, split, strip, toLower;
 
 /// 建服务层，并装上 bas hub 的默认值钩子。
 Store createHubStore(Registry reg, Dao dao) {
@@ -117,6 +118,31 @@ private void normalizeHubWrite(Store store, Registry reg, const Resource res, st
   }
   if (res.path == "servers") {
     validateServerTargetHost(store, reg, id, values);
+    return;
+  }
+  if (res.path == "endpoints") {
+    if (auto value = "name" in values) {
+      auto name = jsonText(*value).strip;
+      if (name.length == 0 || name.canFind(","))
+        throw new StoreException("name", "endpoint 名称不能为空或包含逗号");
+      values["name"] = Json(name);
+    }
+    if (auto value = "domain" in values)
+      values["domain"] = Json(jsonText(*value).strip.toLower);
+    if (auto value = "ips" in values) {
+      string[] ips;
+      foreach (part; jsonText(*value).split(",")) {
+        auto ip = part.strip;
+        if (ip.length == 0)
+          throw new StoreException("ips", "endpoint 内网 IP 不能为空");
+        if (ips.canFind(ip))
+          throw new StoreException("ips", "endpoint 内网 IP 不能重复");
+        ips ~= ip;
+      }
+      if (ips.length == 0)
+        throw new StoreException("ips", "endpoint 至少需要一个内网 IP");
+      values["ips"] = Json(ips.join(","));
+    }
     return;
   }
   if (res.path == "webapps") {
@@ -223,8 +249,69 @@ private void validateServerTargetHost(Store store, Registry reg, string id, ref 
 }
 
 private void validateHubAfterWrite(Store store, Registry reg, const Resource res, string id) {
-  if (res.path == "webapps")
+  if (res.path == "endpoints")
+    validateEndpointUniqueness(store, reg, id);
+  if (res.path == "webapps") {
     validateWebappTargets(store, reg, id);
+    validateWebappEndpoints(store, reg, id);
+  }
+}
+
+/// 同一 project 下 domain 唯一；无域名 endpoint 的 IP 集合两两不相交。
+private void validateEndpointUniqueness(Store store, Registry reg, string id) {
+  Json document;
+  if (!store.fetch(reg.find("endpoints"), id, Query.init, document))
+    return;
+  auto endpoint = jsonGet(document, "data");
+  auto projectId = relationshipId(endpoint, "project");
+  if (projectId.length == 0)
+    return;
+  auto currentName = attributeText(endpoint, "name");
+  auto currentDomain = attributeText(endpoint, "domain").strip.toLower;
+  auto currentIps = endpointIps(endpoint);
+  Query query;
+  query.addFilter("project", projectId);
+  foreach (item; dataOf(store.search(reg.find("endpoints"), query))) {
+    auto otherId = jsonText(item["id"]);
+    if (otherId == id)
+      continue;
+    auto otherName = attributeText(item, "name");
+    auto otherDomain = attributeText(item, "domain").strip.toLower;
+    if (currentDomain.length && otherDomain == currentDomain)
+      throw new StoreException("domain", "域名 " ~ currentDomain ~ " 已被 endpoint " ~ otherName ~ " 使用");
+    if (!currentDomain.length) {
+      foreach (ip; currentIps)
+        if (endpointIps(item).canFind(ip))
+          throw new StoreException("ips", "无域名 endpoint 的 IP " ~ ip
+              ~ " 已被 " ~ otherName ~ " 使用");
+    }
+  }
+}
+
+private string[] endpointIps(Json endpoint) {
+  string[] ips;
+  foreach (part; attributeText(endpoint, "ips").split(",")) {
+    auto ip = part.strip;
+    if (ip.length)
+      ips ~= ip;
+  }
+  return ips;
+}
+
+/// webapp endpoints 必须存在且属于同一个 project。
+private void validateWebappEndpoints(Store store, Registry reg, string id) {
+  Json document;
+  if (!store.fetch(reg.find("webapps"), id, Query.init, document))
+    return;
+  auto webapp = jsonGet(document, "data");
+  auto projectId = relationshipId(webapp, "project");
+  foreach (endpointId; relationshipIds(webapp, "endpoints")) {
+    Json endpointDoc;
+    if (!store.fetch(reg.find("endpoints"), endpointId, Query.init, endpointDoc))
+      throw new StoreException("endpoints", "代理点不存在: " ~ endpointId);
+    if (projectId.length && relationshipId(jsonGet(endpointDoc, "data"), "project") != projectId)
+      throw new StoreException("endpoints", "代理点不属于当前项目: " ~ endpointId);
+  }
 }
 
 /// Webapp.targets 最终会写成 server.xml 的 run-at；目标 server 所在主机必须部署 setline。
