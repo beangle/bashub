@@ -45,6 +45,28 @@ alter table bas.cfg_webapps_endpoints
 create index idx_cfg_webapps_endpoints_webapp on bas.cfg_webapps_endpoints (webapp_id);
 create index idx_cfg_webapps_endpoints_endpoint on bas.cfg_webapps_endpoints (endpoint_id);
 
+-- 旧项目保持原代理行为：把 proxy_settings 迁成一个 default endpoint，
+-- 并把该项目现有 webapp 全部关联到它。新项目不会自动创建。
+insert into bas.cfg_endpoints
+  (id, project_id, name, ips, domain, force_https, http_port, https_port,
+   enable_https, maxconn, ssl_ciphers, ssl_protocols)
+select p.id, p.project_id, 'default', replace(p.ip, ' ', ','),
+       case when p.proxy_by_hostname then nullif(trim(pr.hostname), '') else null end,
+       p.force_https, p.http_port, p.https_port, p.enable_https, p.maxconn,
+       p.ssl_ciphers, p.ssl_protocols
+from bas.cfg_proxy_settings p
+join bas.cfg_projects pr on pr.id = p.project_id
+where not exists (select 1 from bas.cfg_endpoints e where e.project_id = p.project_id);
+
+insert into bas.cfg_webapps_endpoints (webapp_id, endpoint_id)
+select w.id, e.id
+from bas.cfg_webapps w
+join bas.cfg_endpoints e on e.project_id = w.project_id and e.name = 'default'
+where not exists (
+  select 1 from bas.cfg_webapps_endpoints we
+  where we.webapp_id = w.id and we.endpoint_id = e.id
+);
+
 comment on table bas.cfg_endpoints is 'Project 的代理 endpoint';
 comment on column bas.cfg_endpoints.name is 'endpoint 唯一名称';
 comment on column bas.cfg_endpoints.ips is '代理机内网 IP，逗号分隔';

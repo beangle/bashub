@@ -14,7 +14,7 @@ module bashub.route;
 
 import beangle.data.dao : DaoException;
 import beangle.data.query : Query, QueryException, parseQuery;
-import beangle.jsonapi.document : attributeText, errorDocument, okDocument, unauthorizedDocument;
+import beangle.jsonapi.document : attributeBool, attributeLong, attributeText, errorDocument, okDocument, unauthorizedDocument;
 import beangle.data.resource : Registry, Resource;
 import beangle.jsonapi.router : JsonApiService, RouteOptions, collectParams, requireAuth, withFormatSuffix,
   writeJsonApi;
@@ -233,6 +233,105 @@ class HubService {
       logError("Render server.xml failed: %s", e.msg);
       res.writeBody("", HTTPStatus.internalServerError);
     }
+  }
+
+  /// `GET /api/bashub/config/{project}/endpoints?ip=...`：setline agent 按 project+IP 查询 endpoint。
+  void projectEndpoints(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+    auto ip = req.query.get("ip", "").strip;
+    if (ip.length == 0) {
+      writeJsonApi(res, errorDocument(400, "缺少 IP", "ip is required", "ip"), HTTPStatus.badRequest);
+      return;
+    }
+    auto endpoints = dataOf(store.search(reg.find("endpoints"), projectEndpointQuery(project.id)));
+    Json[] result;
+    foreach (endpoint; endpoints)
+      if (endpointContainsIp(endpoint, ip))
+        result ~= endpointJson(endpoint);
+    auto doc = Json.emptyObject;
+    doc["ip"] = Json(ip);
+    doc["endpoints"] = Json(result);
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// `GET /api/bashub/config/{project}/endpoints/{name}/certificate`：endpoint 公钥证书。
+  void projectEndpointCertificate(HTTPServerRequest req, HTTPServerResponse res) {
+    writeEndpointCertificate(req, res, false);
+  }
+
+  /// `GET /api/bashub/config/{project}/endpoints/{name}/certificate-key`：endpoint 私钥。
+  void projectEndpointCertificateKey(HTTPServerRequest req, HTTPServerResponse res) {
+    writeEndpointCertificate(req, res, true);
+  }
+
+  private void writeEndpointCertificate(HTTPServerRequest req, HTTPServerResponse res, bool privateKey) {
+    auto projectName = req.params.get("project", "");
+    auto endpointName = req.params.get("name", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+    Json endpoints;
+    auto query = projectEndpointQuery(project.id);
+    foreach (endpoint; dataOf(store.search(reg.find("endpoints"), query))) {
+      if (attributeText(endpoint, "name") == endpointName) {
+        endpoints = endpoint;
+        break;
+      }
+    }
+    if (endpoints.type == Json.Type.undefined) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    auto id = jsonText(endpoints["id"]);
+    Row row;
+    string text;
+    if (store.fetchRaw(reg.find("endpoints"), id, row))
+      text = jsonText(rowGet(row, privateKey ? "private_key" : "certificate"));
+    res.headers["Cache-Control"] = "no-store";
+    res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
+  }
+
+  private Query projectEndpointQuery(string projectId) {
+    Query query;
+    query.addFilter("project", projectId);
+    return query;
+  }
+
+  private bool endpointContainsIp(Json endpoint, string ip) {
+    foreach (part; attributeText(endpoint, "ips").split(","))
+      if (part.strip == ip)
+        return true;
+    return false;
+  }
+
+  private Json endpointJson(Json endpoint) {
+    auto item = Json.emptyObject;
+    item["name"] = Json(attributeText(endpoint, "name"));
+    item["ips"] = Json(attributeText(endpoint, "ips"));
+    item["domain"] = Json(attributeText(endpoint, "domain"));
+    item["forceHttps"] = Json(attributeBool(endpoint, "forceHttps"));
+    item["httpPort"] = Json(attributeLong(endpoint, "httpPort"));
+    item["httpsPort"] = Json(attributeLong(endpoint, "httpsPort"));
+    item["enableHttps"] = Json(attributeBool(endpoint, "enableHttps"));
+    item["maxconn"] = Json(attributeLong(endpoint, "maxconn"));
+    item["sslCiphers"] = Json(attributeText(endpoint, "sslCiphers"));
+    item["sslProtocols"] = Json(attributeText(endpoint, "sslProtocols"));
+    return item;
   }
 
   /// `GET /api/bashub/config/{project}/proxy`：按 Project 的 `proxyEngine` 输出 haproxy / nginx。
@@ -2110,6 +2209,9 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/:project/certificate-key", &hub.projectCertificateKey);
   router.get(api.config ~ "/:project/setline-peers", &hub.projectPeers);
   router.get(api.config ~ "/:project/proxy/:endpoint", &hub.projectEndpointProxy);
+  router.get(api.config ~ "/:project/endpoints", &hub.projectEndpoints);
+  router.get(api.config ~ "/:project/endpoints/:name/certificate", &hub.projectEndpointCertificate);
+  router.get(api.config ~ "/:project/endpoints/:name/certificate-key", &hub.projectEndpointCertificateKey);
   router.get(api.config ~ "/:project/setline-manifest", &hub.projectManifest);
   router.get(api.config ~ "/:project/script/:host", &hub.projectHostScript);
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);

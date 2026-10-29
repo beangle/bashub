@@ -1397,3 +1397,22 @@ private bool isHex(string text) {
   }
   return true;
 }
+
+@("project endpoints resolve by project and internal ip")
+unittest {
+  auto router = newRouter();
+  auto ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/endpoints?ip=10.0.0.20",
+      ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
+  assert(ex.status == 200, ex.body);
+  auto body = parseJson(ex.body);
+  assert(body["ip"].get!string == "10.0.0.20");
+  assert(body["endpoints"].get!(Json[]).length == 1);
+  assert(body["endpoints"][0]["name"].get!string == "edge-web");
+
+  ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/endpoints?ip=10.0.0.99",
+      ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["endpoints"].get!(Json[]).length == 0);
+}
