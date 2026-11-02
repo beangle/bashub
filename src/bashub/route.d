@@ -1069,7 +1069,9 @@ class HubService {
 
     string[string] artifactTitles;
     string[string] artifactGavs;
-    foreach (ref item; document["included"]) {
+    auto included = document["included"];
+    if (included.type == Json.Type.array)
+      foreach (ref item; included) {
       if (jsonText(item["type"]) != "artifacts")
         continue;
       auto id = jsonText(item["id"]);
@@ -1077,11 +1079,13 @@ class HubService {
       artifactTitles[id] = jsonText(attrs["title"]);
       auto group = jsonText(attrs["groupId"]);
       auto name = jsonText(attrs["artifactId"]);
-      if (group.length > 0 && name.length > 0)
-        artifactGavs[id] = group ~ ":" ~ name;
-    }
+        if (group.length > 0 && name.length > 0)
+          artifactGavs[id] = group ~ ":" ~ name;
+      }
 
-    foreach (ref row; document["data"]) {
+    auto data = document["data"];
+    if (data.type == Json.Type.array)
+      foreach (ref row; data) {
       if (row.type != Json.Type.object)
         continue;
       auto artifactData = jsonGet(jsonGet(jsonGet(row, "relationships"), "artifact"), "data");
@@ -1113,6 +1117,8 @@ class HubService {
 
   /// 一组实例里有没有 webapps 数组；运行中的 instances 与声明的 declared 都要看。
   private static bool hasWebappArray(Json items) {
+    if (items.type != Json.Type.array)
+      return false;
     foreach (ref item; items) {
       if (jsonGet(item, "webapps").type == Json.Type.array)
         return true;
@@ -1122,6 +1128,8 @@ class HubService {
 
   /// 给一组实例的 webapp 补 `title`：先按 gav 反查，再按 context。
   private static void addWebappTitles(Json items, const WebappTitles titles) {
+    if (items.type != Json.Type.array)
+      return;
     foreach (ref instance; items) {
       if (instance.type != Json.Type.object)
         continue;
