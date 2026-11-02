@@ -125,7 +125,7 @@ export const resourceSchemas: ResourceSchema[] = [
     title: '代理配置',
     group: '平台配置',
     description: '每个项目一份代理/SETLINE 配置；IP 是 setline 下载用的内部地址',
-    sort: 'project.qualifiedName',
+    sort: 'project.name',
     filters: [{ key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true }],
     fields: [
       { key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true, column: false },
