@@ -1409,6 +1409,7 @@ unittest {
   assert(body["ip"].get!string == "10.0.0.20");
   assert(body["endpoints"].get!(Json[]).length == 1);
   assert(body["endpoints"][0]["name"].get!string == "edge-web");
+  assert(body["endpoints"][0]["engine"].get!string == "nginx");
 
   ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/endpoints?ip=10.0.0.99",

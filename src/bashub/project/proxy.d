@@ -66,6 +66,7 @@ struct ProxyModel {
   Json proxy;
   string hostname;
   string endpointName;
+  string engine;
   ProxyWebapp[] webapps;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
@@ -97,11 +98,10 @@ string renderProxy(Store store, Registry reg, const ProjectContext context) {
 string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext context,
     string endpointName) {
   auto data = loadProjectData(store, reg, context);
-  auto engine = attributeText(data.proxy, "proxyEngine").strip;
   auto model = buildProxyModel(data, endpointName);
-  if (engine == "nginx")
+  if (model.engine == "nginx")
     return renderNginx(model);
-  if (engine == "haproxy")
+  if (model.engine == "haproxy")
     return renderHaproxy(model);
   return "";
 }
@@ -111,6 +111,7 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   ProxyModel model;
   model.project = data.project.data;
   model.proxy = data.proxy;
+  model.engine = attributeText(data.proxy, "proxyEngine").strip;
 
   string endpointId;
   if (endpointName.length) {
@@ -119,6 +120,9 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
         endpointId = jsonText(endpoint["id"]);
         model.endpointName = endpointName;
         model.hostname = attributeText(endpoint, "domain").strip;
+        auto endpointEngine = attributeText(endpoint, "engine").strip;
+        if (endpointEngine.length)
+          model.engine = endpointEngine;
         auto proxy = data.proxy;
         proxy["maxconn"] = Json(attributeLong(endpoint, "maxconn", 30000));
         proxy["httpPort"] = Json(attributeLong(endpoint, "httpPort", 80));

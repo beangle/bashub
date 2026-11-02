@@ -39,13 +39,13 @@ bool resolveSetlineProject(Registry reg, Store store, string qualifiedName, stri
   auto requested = ipHeaderAddresses(ipHeader);
   if (requested.length == 0)
     return false;
-  auto proxies = loadAll(store, reg.find("proxy-settings"), ["project": context.id]);
-  if (proxies.length == 0)
-    return false;
-  auto configured = splitIps(attributeText(proxies[0], "ip"));
-  foreach (ip; requested)
-    if (configured.canFind(ip))
-      return true;
+  auto endpoints = loadAll(store, reg.find("endpoints"), ["project": context.id]);
+  foreach (endpoint; endpoints) {
+    auto configured = splitIps(attributeText(endpoint, "ips"));
+    foreach (ip; requested)
+      if (configured.canFind(ip))
+        return true;
+  }
   return false;
 }
 

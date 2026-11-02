@@ -116,7 +116,7 @@ unittest {
   assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
   assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
   assert(xml.canFind(`<proxy name="edge-web" ip="10.0.0.20" domain="www.openurp.net"/>`));
-  assert(xml.canFind(`<proxy name="edge-ip" ip="10.0.0.30"/>`));
+  assert(xml.canFind(`<proxy name="edge-ip" ip="10.0.0.30,10.0.0.10"/>`));
   assert(xml.canFind(`endpoints="edge-web,edge-ip"`));
   assert(!xml.canFind("<hub"));
   assert(xml.canFind(`setline-hostname="prod.openurp.net"`));

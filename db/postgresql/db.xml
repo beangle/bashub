@@ -297,6 +297,7 @@
             <column name="ips" type="varchar(1024)" nullable="false" comment="代理机内网 IP，逗号分隔"/>
             <column name="domain" type="varchar(255)" comment="域名；可选且唯一"/>
             <column name="force_https" type="boolean" nullable="false" defaultValue="false" comment="是否强制 HTTPS"/>
+            <column name="engine" type="varchar(255)" nullable="false" defaultValue="haproxy" comment="代理引擎：haproxy / nginx"/>
             <column name="certificate" type="text" comment="PEM 证书"/>
             <column name="private_key" type="text" comment="PEM 私钥"/>
             <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="HTTP 端口"/>

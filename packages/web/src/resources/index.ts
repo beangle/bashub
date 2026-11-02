@@ -159,6 +159,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'name', label: '名称', required: true, help: 'webapp endpoints 引用它；项目内唯一' },
       { key: 'ips', label: '内网 IP', required: true, help: '逗号分隔；代理机内网地址，不是域名公网地址' },
       { key: 'domain', label: '域名', help: '可选且项目内唯一；空表示无域名代理' },
+      { key: 'engine', label: '代理类型', type: 'select', required: true, options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
       { key: 'enableHttps', label: '使用 HTTPS', type: 'boolean' },
       { key: 'forceHttps', label: '强制 HTTPS', type: 'boolean' },
       { key: 'httpPort', label: 'HTTP 端口', type: 'number' },

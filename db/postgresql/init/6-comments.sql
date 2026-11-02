@@ -189,6 +189,7 @@ comment on column bas.cfg_endpoints.name is 'endpoint 唯一名称';
 comment on column bas.cfg_endpoints.ips is '代理机内网 IP，逗号分隔';
 comment on column bas.cfg_endpoints.domain is '域名；可选且唯一';
 comment on column bas.cfg_endpoints.force_https is '是否强制 HTTPS';
+comment on column bas.cfg_endpoints.engine is '代理引擎：haproxy / nginx';
 comment on column bas.cfg_endpoints.certificate is 'PEM 证书';
 comment on column bas.cfg_endpoints.private_key is 'PEM 私钥';
 comment on column bas.cfg_endpoints.http_port is 'HTTP 端口';

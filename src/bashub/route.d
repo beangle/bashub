@@ -324,6 +324,7 @@ class HubService {
     item["name"] = Json(attributeText(endpoint, "name"));
     item["ips"] = Json(attributeText(endpoint, "ips"));
     item["domain"] = Json(attributeText(endpoint, "domain"));
+    item["engine"] = Json(attributeText(endpoint, "engine"));
     item["forceHttps"] = Json(attributeBool(endpoint, "forceHttps"));
     item["httpPort"] = Json(attributeLong(endpoint, "httpPort"));
     item["httpsPort"] = Json(attributeLong(endpoint, "httpsPort"));

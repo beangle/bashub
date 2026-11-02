@@ -230,14 +230,14 @@ private Row[] endpointRows() {
   return [
     row("9001", [
       "project": Json("1002"), "name": Json("edge-web"), "ips": Json("10.0.0.20"),
-      "domain": Json("www.openurp.net"), "force_https": Json(true),
+      "domain": Json("www.openurp.net"), "engine": Json("nginx"), "force_https": Json(true),
       "certificate": Json(""), "private_key": Json(""),
       "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(true),
       "maxconn": Json(30000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
     ]),
     row("9002", [
-      "project": Json("1002"), "name": Json("edge-ip"), "ips": Json("10.0.0.30"),
-      "domain": Json(""), "force_https": Json(false),
+      "project": Json("1002"), "name": Json("edge-ip"), "ips": Json("10.0.0.30,10.0.0.10"),
+      "domain": Json(""), "engine": Json("haproxy"), "force_https": Json(false),
       "certificate": Json(""), "private_key": Json(""),
       "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(false),
       "maxconn": Json(30000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),

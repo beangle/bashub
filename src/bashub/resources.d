@@ -82,6 +82,7 @@ Registry hubRegistry() {
         Column("ips", "ips", Kind.text),
         Column("domain", "domain", Kind.text),
         Column("force_https", "forceHttps", Kind.boolean),
+        Column("engine", "engine", Kind.text),
         Column("certificate", "certificate", Kind.text),
         Column("http_port", "httpPort", Kind.number),
         Column("https_port", "httpsPort", Kind.number),
@@ -350,7 +351,7 @@ private string[] requiredOf(string path) {
   case "projects":
     return ["name", "title", "basVersion"];
   case "endpoints":
-    return ["project", "name", "ips"];
+    return ["project", "name", "ips", "engine"];
   case "proxy-settings":
     return ["project", "proxyEngine", "ip"];
   case "engines":
