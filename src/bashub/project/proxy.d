@@ -364,10 +364,11 @@ string renderNginx(ProxyModel model) {
   if (hostname.length > 0)
     line(out_, "        server_name  " ~ hostname ~ ";");
   if (enableHttps) {
-    auto cert = model.endpointName.length
-        ? certificateDir ~ "/" ~ model.endpointName ~ ".pem" : certificateDir ~ "/cert.pem";
-    auto key = model.endpointName.length
-        ? certificateDir ~ "/" ~ model.endpointName ~ ".key.pem" : certificateDir ~ "/key.pem";
+    auto legacy = model.endpointName.length == 0 || model.endpointName == "default";
+    auto cert = legacy ? certificateDir ~ "/cert.pem"
+        : certificateDir ~ "/" ~ model.endpointName ~ ".pem";
+    auto key = legacy ? certificateDir ~ "/key.pem"
+        : certificateDir ~ "/" ~ model.endpointName ~ ".key.pem";
     line(out_, "        ssl_certificate " ~ cert ~ ";");
     line(out_, "        ssl_certificate_key " ~ key ~ ";");
     line(out_, "        ssl_protocols      " ~ sslProtocols ~ ";");
@@ -462,8 +463,9 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "frontend main");
   line(out_, "    bind *:" ~ httpPort.to!string);
   if (enableHttps) {
-    auto bundle = model.endpointName.length
-        ? certificateDir ~ "/" ~ model.endpointName ~ ".bundle.pem" : certificateDir ~ "/bundle.pem";
+    auto bundle = (model.endpointName.length == 0 || model.endpointName == "default")
+        ? certificateDir ~ "/bundle.pem"
+        : certificateDir ~ "/" ~ model.endpointName ~ ".bundle.pem";
     auto bind = "    bind *:" ~ httpsPort.to!string ~ " ssl crt " ~ bundle;
     if (sslCiphers.length > 0)
       bind ~= "ciphers " ~ sslCiphers ~ " ";
