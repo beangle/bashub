@@ -1192,8 +1192,25 @@ class HubService {
   void agentStatus(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
+    Json agentsJson;
+    try
+      agentsJson = agents.status;
+    catch (Exception e) {
+      logError("Collect agent status failed: %s", e.msg);
+      writeJsonApi(res, errorDocument(500, "在线节点查询失败", e.msg), HTTPStatus.internalServerError);
+      return;
+    }
+    // 标题/机构/应用名只是展示增强，数据库装饰失败不能让整个监控页 500。
+    try
+      agentsJson = withProjectInfo(agentsJson);
+    catch (Exception e)
+      logWarn("Decorate agent projects failed: %s", e.msg);
+    try
+      agentsJson = withWebappTitles(agentsJson);
+    catch (Exception e)
+      logWarn("Decorate agent webapps failed: %s", e.msg);
     auto doc = Json.emptyObject;
-    doc["agents"] = withWebappTitles(withProjectInfo(agents.status));
+    doc["agents"] = agentsJson;
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
