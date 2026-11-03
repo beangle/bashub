@@ -155,6 +155,11 @@ final class AgentSession {
     case "report:bas":
       basReport = message.body;
       basAt = message.at;
+      // basReport 是服务动作后的即时快照；在下一份 health 到达前以它为准，
+      // 否则刚启动的实例会继续按旧 health 被记成 stopped。
+      healthKnown = false;
+      health = null;
+      healthAt = "";
       break;
     case "report:health":
       health = parseHealth(message.body, healthKnown);

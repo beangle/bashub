@@ -124,7 +124,8 @@ void runAgentLoop(AgentRegistry registry, string project, string projectId, stri
       Envelope message;
       if (parse(socket.receiveText(), message)) {
         session.accept(message);
-        if (message.typ == "report:health" && session.healthKnown)
+        if ((message.typ == "report:health" && session.healthKnown)
+            || message.typ == "report:bas")
           registry.recordProjectHealth(session.project, session.projectId);
       } else
         logWarn("%s: unreadable message dropped", project);
@@ -265,7 +266,8 @@ void runRelayLoop(AgentRegistry registry, string project, string projectId, stri
         continue;
       }
       target.accept(message);
-      if (message.typ == "report:health" && target.healthKnown)
+      if ((message.typ == "report:health" && target.healthKnown)
+          || message.typ == "report:bas")
         registry.recordProjectHealth(project, projectId);
     }
   } catch (Exception e) {
