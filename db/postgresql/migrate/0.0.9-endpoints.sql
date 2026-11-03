@@ -51,7 +51,7 @@ insert into bas.cfg_endpoints
   (id, project_id, name, ips, domain, force_https, http_port, https_port,
    enable_https, maxconn, ssl_ciphers, ssl_protocols)
 select p.id, p.project_id, 'default', replace(p.ip, ' ', ','),
-       case when p.proxy_by_hostname then nullif(trim(pr.hostname), '') else null end,
+       nullif(trim(pr.hostname), ''),
        p.force_https, p.http_port, p.https_port, p.enable_https, p.maxconn,
        p.ssl_ciphers, p.ssl_protocols
 from bas.cfg_proxy_settings p
