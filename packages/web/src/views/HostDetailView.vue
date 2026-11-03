@@ -148,9 +148,14 @@ const scriptUrl = computed(() =>
 )
 
 /** 系统特性：详情页跟原 host/info.ftl 一样展示全部（列表页才按平台过滤）。 */
+const featureCatalog = ref<ResourceRow[]>([])
+const featureIds = computed<string[]>(() => {
+  const value = host.value?.attributes.featureIds
+  return Array.isArray(value) ? value.map((item) => String(item)) : []
+})
 const features = computed(() =>
-  relationshipIds(host.value, 'features')
-    .map((id) => included.value.get(`platformFeatures:${id}`))
+  featureIds.value
+    .map((id) => featureCatalog.value.find((row) => row.id === id))
     .filter((row): row is ResourceRow => Boolean(row))
     .map((row) => ({
       id: row.id,
@@ -202,16 +207,18 @@ function webappLabel(webapp: ResourceRow): string {
 onMounted(async () => {
   loading.value = true
   try {
-    const [hostDetail, serverPage, webappDoc] = await Promise.all([
-      getResourceDetail(HOSTS_PATH, hostId, ['project', 'project.org', 'platform', 'features']),
+    const [hostDetail, serverPage, webappDoc, featurePage] = await Promise.all([
+      getResourceDetail(HOSTS_PATH, hostId, ['project', 'project.org', 'platform']),
       listResource(SERVERS_PATH, {
         filters: { 'server.host.id': hostId },
         include: ['farm'],
         pageSize: 200,
       }),
       fetchDocument(`${HOSTS_PATH}/${hostId}/webapps`, { include: 'artifact' }),
+      listResource('/platform-features', { pageSize: 300, sort: 'name' }),
     ])
     host.value = hostDetail.row
+    featureCatalog.value = featurePage.rows
     included.value = indexIncluded([...hostDetail.included, ...serverPage.included, ...webappDoc.included])
     servers.value = serverPage.rows
     webapps.value = webappDoc.rows

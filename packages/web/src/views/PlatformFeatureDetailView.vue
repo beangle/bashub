@@ -160,8 +160,13 @@ function featureLabel(row: ResourceRow): string {
   return version ? `${name} ${version}` : name
 }
 
+function dependencyIds(): string[] {
+  const value = feature.value?.attributes.dependencies
+  return Array.isArray(value) ? value.map((item) => String(item)) : []
+}
+
 const dependencyNames = computed(() =>
-  relationshipIds(feature.value, 'dependencies')
+  dependencyIds()
     .map((id) => features.value.find((row) => row.id === id))
     .filter((row): row is ResourceRow => Boolean(row))
     .map(featureLabel)
@@ -240,7 +245,7 @@ function startFeatureEdit() {
   featureDraft.version = attributeText(attributes.version)
   featureDraft.logo = attributeText(attributes.logo)
   featureDraft.description = attributeText(attributes.description)
-  featureDraft.dependencies = relationshipIds(feature.value, 'dependencies')
+  featureDraft.dependencies = dependencyIds()
   editingFeature.value = true
 }
 
@@ -263,8 +268,9 @@ async function submitFeature() {
         version: featureDraft.version.trim(),
         logo: featureDraft.logo.trim(),
         description: featureDraft.description,
+        dependencies: featureDraft.dependencies,
       },
-      { dependencies: { data: featureDraft.dependencies.map((id) => ({ type: 'platformFeatures', id })) } },
+      {},
       featureId,
     )
     editingFeature.value = false

@@ -30,7 +30,6 @@
           <th>组件</th>
           <th>规格</th>
           <th>挂载名</th>
-          <th v-if="showSort" class="binding-table__sort">顺序</th>
           <th class="binding-table__action">操作</th>
         </tr>
       </thead>
@@ -41,14 +40,6 @@
           </td>
           <td><code class="binding-table__spec">{{ specSummary(row.spec) }}</code></td>
           <td><code class="binding-table__mount">{{ row.mountName }}</code></td>
-          <td v-if="showSort" class="binding-table__sort">
-            <t-input-number
-              :model-value="row.sortno"
-              theme="normal"
-              :min="0"
-              @change="updateRow(index, { sortno: Number($event || 0) })"
-            />
-          </td>
           <td class="binding-table__action">
             <t-button size="small" variant="text" theme="danger" @click="removeBinding(index)">移除</t-button>
           </td>
@@ -81,10 +72,8 @@ const addId = ref('')
 
 const rows = computed(() => {
   const items = props.modelValue.filter((binding) => binding.kind === props.kind)
-  if (props.kind !== 'static_bundle') return items
   return [...items].sort((left, right) => left.mountName.localeCompare(right.mountName))
 })
-const showSort = computed(() => props.kind !== 'static_bundle')
 const candidates = computed(() => {
   const bound = new Set(rows.value.map((row) => row.componentId))
   return props.components.filter((component) => component.kind === props.kind && !bound.has(component.id))
@@ -116,7 +105,7 @@ const description = computed(() => {
     case 'static_bundle':
       return '挂载名在组件目录维护，对应 /static/{mountName}/；bundle 按挂载名字母排序，来源按 provider 稳定排序。'
     case 'www_doc':
-      return '文档路径在组件目录维护，对应 /www/{mountName}/；此处只设置引用顺序。'
+      return '文档路径在组件目录维护，对应 /www/{mountName}/；绑定按挂载名排序。'
     default:
       return ''
   }
@@ -132,7 +121,6 @@ function emitRows(nextRows: MicdnBinding[]) {
 function addBinding() {
   const component = candidates.value.find((candidate) => candidate.id === addId.value)
   if (!component) return
-  const sortno = props.modelValue.reduce((max, binding) => Math.max(max, Number(binding.sortno) || 0), 0) + 10
   emitRows([
     ...rows.value,
     {
@@ -140,7 +128,6 @@ function addBinding() {
       kind: component.kind,
       name: component.name,
       mountName: component.mountName,
-      sortno,
       spec: component.spec,
     },
   ])

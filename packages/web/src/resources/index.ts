@@ -283,7 +283,7 @@ export const resourceSchemas: ResourceSchema[] = [
         min: 1, max: 65535, placeholder: '8082', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
         help: 'setline adminListen 端口；basctl 在本机连接 127.0.0.1:<端口> 推路由，不写入 server.xml',
       },
-      { key: 'features', label: '系统特性', type: 'refs', ref: featureRef, column: false },
+      { key: 'featureIds', label: '系统特性', type: 'lines', column: false, help: '一行一个平台功能 ID' },
     ],
   },
   {
@@ -375,7 +375,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'name', label: '名称', required: true },
       { key: 'version', label: '版本', required: true },
       { key: 'logo', label: 'Logo', required: true, width: 90, cell: { type: 'image', width: 60, height: 60 } },
-      { key: 'dependencies', label: '依赖', type: 'refs', ref: featureRef },
+      { key: 'dependencies', label: '依赖', form: false, column: false },
       { key: 'description', label: '描述', type: 'textarea', column: true },
     ],
     // 卡片点进详情页：功能自身与它的脚本就地维护（原 platformFeature/info.ftl，见 PlatformFeatureDetailView）。

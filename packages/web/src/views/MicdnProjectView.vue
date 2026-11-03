@@ -403,7 +403,6 @@ async function save() {
       outgoingConfig(),
       bindings.value.map((binding) => ({
         componentId: binding.componentId,
-        sortno: Number(binding.sortno) || 0,
       })),
     )
     applyDocument(payload)

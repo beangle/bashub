@@ -74,13 +74,11 @@ export interface MicdnBinding {
   kind: MicdnComponentKind
   name: string
   mountName: string
-  sortno: number
   spec: MicdnComponentSpec
 }
 
 export interface MicdnBindingInput {
   componentId: string
-  sortno: number
 }
 
 export interface MicdnProjectSummary {
