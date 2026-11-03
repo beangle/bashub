@@ -19,7 +19,6 @@ import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses,
 import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
   renderBashScript, renderHostScript;
 import bashub.project.server : renderServerXml;
-import bashub.project.peers : renderPeers;
 import bashub.resources : hubRegistry;
 import bashub.store : createHubStore;
 
@@ -182,83 +181,6 @@ unittest {
   assert(findProject(reg, store, "openurp.prod", project));
   xml = renderServerXml(store, reg, project);
   assert(xml.canFind(`setline-hostname="prod.openurp.net"`));
-}
-
-@("peers contains web and micdn nodes")
-unittest {
-  Registry reg;
-  auto store = newStore(reg);
-  ProjectContext project;
-
-  assert(findProject(reg, store, "beangle.demo", project));
-  auto text = renderPeers(store, reg, project);
-  auto config = parseJsonString(text);
-  assert(config["peers"].length == 0);
-
-  assert(findProject(reg, store, "openurp.prod", project));
-  text = renderPeers(store, reg, project);
-  config = parseJsonString(text);
-  assert(config["peers"].length == 2);
-
-  assert(findProject(reg, store, "openurp.prod", project));
-  text = renderPeers(store, reg, project);
-  config = parseJsonString(text);
-  assert(config["peers"].length == 2);
-  assert(config["peers"][0]["name"].get!string == "host01");
-  assert(config["peers"][0]["url"].get!string == "http://10.0.0.11:8080");
-  assert(config["peers"][1]["name"].get!string == "host02");
-  assert(config["peers"][1]["url"].get!string == "http://10.0.0.12:8082");
-  assert(config["agent"].type == Json.Type.undefined);
-  assert(!text.canFind("adminListen"));
-  assert(!text.canFind(`"listen"`));
-
-  Json configDoc;
-  assert(store.fetch(reg.find("project-micdn"), "1002", Query.init, configDoc));
-  auto micdnConfig = jsonGet(jsonGet(configDoc["data"], "attributes"), "config");
-  micdnConfig["servers"] = Json([
-    Json(["name": Json("cdn02"), "adminListen": Json("10.0.0.32:8081")]),
-    Json(["name": Json("cdn01"), "adminListen": Json("10.0.0.31:8081")]),
-  ]);
-  assert(store.updateColumns(reg.find("project-micdn"), "1002", ["config": micdnConfig]));
-
-  text = renderPeers(store, reg, project);
-  config = parseJsonString(text);
-  assert(config["peers"].length == 4);
-  assert(config["peers"][0]["name"].get!string == "cdn01");
-  assert(config["peers"][0]["url"].get!string == "http://10.0.0.31:8081");
-  assert(config["peers"][1]["name"].get!string == "cdn02");
-  assert(config["peers"][1]["url"].get!string == "http://10.0.0.32:8081");
-}
-
-@("peers reject invalid host setline listen ports") unittest {
-  Registry reg;
-  auto store = newStore(reg);
-  ProjectContext project;
-
-  foreach (value; [0L, 65536L]) {
-    assert(store.updateColumns(reg.find("hosts"), "2001", ["setline_listen_port": Json(value)]));
-    assert(findProject(reg, store, "openurp.prod", project));
-    assertThrown!Exception(renderPeers(store, reg, project));
-  }
-}
-
-@("peers skip hosts without setline listen ports") unittest {
-  Registry reg;
-  auto store = newStore(reg);
-  ProjectContext project;
-  Json updated;
-
-  assert(store.update(reg.find("webapps"), "7001",
-      parseJsonString(`{"data":{"type":"webapps","relationships":{"targets":{"data":[
-        {"type":"servers","id":"5001"}]}}}}`), updated));
-  assert(store.update(reg.find("hosts"), "2002",
-      parseJsonString(`{"data":{"type":"hosts","attributes":{
-        "setlineListenPort":null,"setlineAdminPort":null}}}`), updated));
-  assert(findProject(reg, store, "openurp.prod", project));
-
-  auto config = parseJsonString(renderPeers(store, reg, project));
-  assert(config["peers"].length == 1);
-  assert(config["peers"][0]["name"].get!string == "host01");
 }
 
 @("micdn server registrations normalize adminListen and stay out of micdn.xml")

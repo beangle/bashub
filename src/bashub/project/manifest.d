@@ -19,7 +19,7 @@ string sha256Hex(string text) {
 }
 
 /// 输出稳定、无时间戳的清单，避免内容未变时 agent 反复更新状态。
-string renderSetlineManifest(string peers, string proxy, string certificate, string certificateKey) {
+string renderSetlineManifest(string proxy, string certificate, string certificateKey) {
   auto out_ = appender!string;
   out_.put("{\n");
   out_.put("  \"version\": 1,\n");
@@ -29,9 +29,6 @@ string renderSetlineManifest(string peers, string proxy, string certificate, str
   out_.put("\",\n");
   out_.put(`    "certificate-key": "`);
   out_.put(sha256Hex(certificateKey));
-  out_.put("\",\n");
-  out_.put(`    "peers": "`);
-  out_.put(sha256Hex(peers));
   out_.put("\",\n");
   out_.put(`    "proxy": "`);
   out_.put(sha256Hex(proxy));

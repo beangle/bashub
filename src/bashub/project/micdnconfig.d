@@ -671,7 +671,7 @@ private void normalizeBlob(Json source, ref Json result) {
 }
 
 /// Micdn 部署节点只服务配置分发，不写进 micdn.xml。每个节点登记自己的
-/// setline adminListen，setline sidecar 再把它们作为 peers 读取路由表。
+/// setline adminListen。
 private void normalizeServers(Json source, ref Json result) {
   auto raw = jsonGet(source, "servers");
   if (raw.type == Json.Type.undefined || raw.type == Json.Type.null_) {

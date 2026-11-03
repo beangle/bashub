@@ -40,7 +40,6 @@ import bashub.project.resolver : ProjectContext, dataOf, findProject, findProjec
   loadAll, matchHostIp, resolveHostProject, resolveSetlineProject;
 import bashub.project.script : renderHostScript;
 import bashub.project.server : renderServerXml;
-import bashub.project.peers : renderPeers;
 import bashub.security : HubSecurity;
 import bashub.store : projectKey;
 
@@ -261,6 +260,103 @@ class HubService {
     doc["ip"] = Json(ip);
     doc["endpoints"] = Json(result);
     writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// `GET /api/bashub/config/{project}/routes?ip=...`：当前 agent 的运行路由。
+  void projectRoutes(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+
+    auto requested = ipHeaderAddresses(req.query.get("ip", ""));
+    if (requested.length == 0)
+      requested = ipHeaderAddresses(req.headers.get("ip", ""));
+    auto sessions = agents.sessionsOf(projectName);
+    AgentSession chosen;
+    if (requested.length > 0) {
+      foreach (session; sessions)
+        if (requested.canFind(session.ip)) {
+          chosen = session;
+          break;
+        }
+    } else if (sessions.length == 1) {
+      chosen = sessions[0];
+    }
+    if (chosen is null) {
+      writeJsonApi(res, errorDocument(404, "节点不在线", "no matching agent for " ~ projectName),
+          HTTPStatus.notFound);
+      return;
+    }
+    if (chosen.basReport.type != Json.Type.object) {
+      writeJsonApi(res, errorDocument(404, "节点未上报", "agent has not reported instances"),
+          HTTPStatus.notFound);
+      return;
+    }
+
+    auto host = attributeText(project.data, "hostname").strip;
+    if (host.length == 0)
+      host = chosen.host.length ? chosen.host : chosen.ip;
+    auto report = chosen.basReport;
+    auto instances = jsonGet(report, "instances");
+    long[string] ports;
+    if (instances.type == Json.Type.array) {
+      foreach (ref instance; instances) {
+        auto portValue = jsonGet(instance, "httpPort");
+        if (portValue.type != Json.Type.int_)
+          continue;
+        auto port = portValue.get!long;
+        if (port <= 0 || port > 65535)
+          continue;
+        auto webapps = jsonGet(instance, "webapps");
+        if (webapps.type != Json.Type.array)
+          continue;
+        foreach (ref webapp; webapps) {
+          auto context = jsonText(jsonGet(webapp, "context")).strip;
+          if (context.length > 0)
+            addRoute(ports, context, port);
+          auto urls = jsonGet(webapp, "urls");
+          if (urls.type == Json.Type.array)
+            foreach (ref url; urls)
+              addRoute(ports, jsonText(url), port);
+        }
+      }
+    }
+
+    string[] prefixes = ports.keys;
+    prefixes.sort!((a, b) => a.length == b.length ? a < b : a.length > b.length);
+    Json[] routes;
+    foreach (prefix; prefixes) {
+      auto item = Json.emptyObject;
+      item["prefix"] = Json(prefix);
+      item["port"] = Json(ports[prefix]);
+      routes ~= item;
+    }
+    auto doc = Json.emptyObject;
+    doc["host"] = Json(host);
+    doc["ip"] = Json(chosen.ip);
+    doc["routes"] = Json(routes);
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  private static void addRoute(ref long[string] ports, string rawPrefix, long port) {
+    auto prefix = rawPrefix.strip;
+    if (prefix.length == 0)
+      return;
+    if (prefix[0] != '/')
+      prefix = "/" ~ prefix;
+    while (prefix.length > 1 && prefix[$ - 1] == '/')
+      prefix = prefix[0 .. $ - 1];
+    if (prefix.startsWith("/_setline"))
+      return;
+    if (prefix !in ports)
+      ports[prefix] = port;
   }
 
   /// `GET /api/bashub/config/{project}/endpoints/{name}/certificate`：endpoint 公钥证书。
@@ -507,21 +603,6 @@ class HubService {
     return text.length > 0 && !text.endsWith("\n") ? text ~ "\n" : text;
   }
 
-  /// `GET /api/bashub/config/{project}/setline-peers`：setline 的 peer 列表机器下载端点。
-  void projectPeers(HTTPServerRequest req, HTTPServerResponse res) {
-    auto projectName = req.params.get("project", "");
-    ProjectContext project;
-    if (!findProject(reg, store, projectName, project)) {
-      res.writeBody("", HTTPStatus.notFound);
-      return;
-    }
-    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
-      writeConfigUnauthorized(res);
-      return;
-    }
-    writePeers(res, project, "attachment");
-  }
-
   /// `GET /api/bashub/config/{project}/setline-manifest`：一次请求返回 setline 所需全部资源的 SHA-256。
   /// agent 先比清单，只下载变化项；值与对应下载端点的响应 Body 完全一致。
   void projectManifest(HTTPServerRequest req, HTTPServerResponse res) {
@@ -560,11 +641,10 @@ class HubService {
       certificateKey = jsonText(rowGet(row, "private_key"));
     }
     try {
-      auto peers = renderPeers(store, reg, project);
       auto proxy = endpoint.type == Json.Type.object
           ? renderProxyForEndpoint(store, reg, project, endpointName)
           : renderProxy(store, reg, project);
-      auto text = renderSetlineManifest(peers, proxy, certificate, certificateKey);
+      auto text = renderSetlineManifest(proxy, certificate, certificateKey);
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "application/json");
     } catch (Exception e) {
@@ -604,18 +684,6 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/projects/{id}/setline-peers`：管理台查看 setline peers。
-  void projectPeersView(HTTPServerRequest req, HTTPServerResponse res) {
-    if (!requireAuth(req, res, opts))
-      return;
-    ProjectContext project;
-    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ req.params.get("id", "")),
-          HTTPStatus.notFound);
-      return;
-    }
-    writePeers(res, project, "inline");
-  }
 
   /// `GET /api/bashub/ems/{project}/menus/{appName}`：当前 Project 部署应用的资源与菜单 XML。
   void projectEmsMenus(HTTPServerRequest req, HTTPServerResponse res) {
@@ -848,17 +916,7 @@ class HubService {
     return origin ~ api.micdn ~ "/" ~ qualifiedName ~ "/micdn.xml";
   }
 
-  private void writePeers(HTTPServerResponse res, const ProjectContext project, string disposition) {
-    try {
-      auto text = renderPeers(store, reg, project);
-      res.headers["Cache-Control"] = "no-store";
-      res.headers["Content-Disposition"] = disposition ~ `; filename="setline-peers.json"`;
-      res.writeBody(text, HTTPStatus.ok, "application/json");
-    } catch (Exception e) {
-      logError("Render setline peers failed: %s", e.msg);
-      res.writeBody("", HTTPStatus.internalServerError);
-    }
-  }
+
 
   /// 机器配置下载接受 `Bearer <project>:<Project.key>` 或 Basic（用户名 project、口令 key），
   /// 也兼容旧客户端只发 `<Project.key>`。带 Project 名时同时校验 URL 与凭证绑定关系。
@@ -2281,8 +2339,8 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/:project/proxy", &hub.projectProxy);
   router.get(api.config ~ "/projects/:id/endpoints/:name/certificate", &hub.projectEndpointCertificateInfo);
   router.patch(api.config ~ "/projects/:id/endpoints/:name/certificate", &hub.updateProjectEndpointCertificate);
-  router.get(api.config ~ "/:project/setline-peers", &hub.projectPeers);
   router.get(api.config ~ "/:project/proxy/:endpoint", &hub.projectEndpointProxy);
+  router.get(api.config ~ "/:project/routes", &hub.projectRoutes);
   router.get(api.config ~ "/:project/endpoints", &hub.projectEndpoints);
   router.get(api.config ~ "/:project/endpoints/:name/certificate", &hub.projectEndpointCertificate);
   router.get(api.config ~ "/:project/endpoints/:name/certificate-key", &hub.projectEndpointCertificateKey);
@@ -2290,7 +2348,6 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/:project/script/:host", &hub.projectHostScript);
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);
   router.get(api.config ~ "/projects/:id/proxy", &hub.projectProxyView);
-  router.get(api.config ~ "/projects/:id/setline-peers", &hub.projectPeersView);
 
   // micdn：下载配置、管理台聚合视图与组件目录
   router.get(api.micdn ~ "/:project/micdn.xml", &hub.projectMicdnXml);

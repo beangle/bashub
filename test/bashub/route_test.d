@@ -593,10 +593,6 @@ unittest {
   assert(ex.contentType == "text/plain");
   assert(ex.body.canFind("upstream prod-farm{"));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/setline-peers");
-  assert(ex.status == 200, ex.body);
-  assert(ex.contentType == "application/json", ex.contentType);
-  assert(parseJson(ex.body)["peers"].length == 2);
 
 }
 
@@ -630,39 +626,24 @@ unittest {
   assert(ex.status == 401);
 }
 
-@("project config/setline-peers requires the project key and follows the project")
-unittest {
+@("project routes are derived from the live agent bas report") unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, testDao(reg));
-  auto router = newRouterWith(reg, store);
+  auto agents = new AgentRegistry();
+  auto session = agents.attach("openurp.prod", "1002", "10.0.0.11");
+  session.basReport = parseJsonString(`{"instances":[{"id":"prod-farm.app1","httpPort":9080,
+    "webapps":[{"context":"/bas","urls":["/bas","/context1"]}]}]}`);
+  auto router = newRouterWith(reg, store, false, agents);
+  auto auth = "Bearer openurp.prod:fedcba9876543210fedcba9876543210";
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/setline-peers",
-      ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
+      "http://localhost/api/bashub/config/openurp.prod/routes?ip=10.0.0.11",
+      ["Authorization": auth]);
   assert(ex.status == 200, ex.body);
-  assert(ex.contentType == "application/json");
-  auto config = parseJson(ex.body);
-  assert(config["peers"].length == 2);
-  assert(config["agent"].type == Json.Type.undefined);
-  assert(config["peers"][0]["name"].get!string == "host01");
-  assert(config["peers"][0]["url"].get!string == "http://10.0.0.11:8080");
-  assert(config["peers"][1]["url"].get!string == "http://10.0.0.12:8082");
-  assert(!ex.body.canFind("adminListen"));
-
-  auto basic = cast(string) Base64.encode(cast(const(ubyte)[])
-      "openurp.prod:fedcba9876543210fedcba9876543210");
-  ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/setline-peers", ["Authorization": "Basic " ~ basic]);
-  assert(ex.status == 200, ex.body);
-
-  ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/setline-peers", ["Authorization": "Bearer wrong"]);
-  assert(ex.status == 401);
-
-  ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/beangle.demo/setline-peers",
-      ["Authorization": "Bearer 0123456789abcdef0123456789abcdef"]);
-  assert(ex.status == 200, ex.body);
-  assert(parseJson(ex.body)["peers"].length == 0);
+  auto doc = parseJson(ex.body);
+  assert(doc["host"].get!string == "prod.openurp.net");
+  assert(doc["routes"].get!(Json[]).length == 2);
+  assert(doc["routes"][0]["prefix"].get!string == "/context1");
+  assert(doc["routes"][0]["port"].get!long == 9080);
 }
 
 @("project config/setline-manifest requires the key and hashes every downloaded body")
@@ -678,15 +659,12 @@ unittest {
   string sha256Lower(string text) {
     return toHexString!(LetterCase.lower)(sha256Of(text)).idup;
   }
-  auto peers = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/setline-peers", auth);
   auto proxy = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/proxy/edge-web", auth);
   auto cert = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-web/certificate", auth);
   auto key = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-web/certificate-key", auth);
-  assert(resources["peers"].get!string == sha256Lower(peers.body));
   assert(resources["proxy"].get!string == sha256Lower(proxy.body));
   assert(resources["certificate"].get!string == sha256Lower(cert.body));
   assert(resources["certificate-key"].get!string == sha256Lower(key.body));

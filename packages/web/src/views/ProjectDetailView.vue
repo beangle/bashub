@@ -190,27 +190,7 @@
               </div>
             </article>
 
-            <article class="detail-card">
-              <header class="detail-card__head">
-                <div>
-                  <h4>Setline Peers</h4>
-                  <p>setline 从这里读取 web 节点与 micdn 节点的路由表。</p>
-                </div>
-              </header>
-              <p v-if="warnings.peers" class="load-error">{{ warnings.peers }}</p>
-              <table v-else-if="setlinePeers.length > 0" class="detail-table">
-                <thead>
-                  <tr><th>名称</th><th>地址</th></tr>
-                </thead>
-                <tbody>
-                  <tr v-for="peer in setlinePeers" :key="`${peer.name}|${peer.url}`">
-                    <td>{{ peer.name }}</td>
-                    <td><code>{{ peer.url }}</code></td>
-                  </tr>
-                </tbody>
-              </table>
-              <p v-else class="empty-text">当前没有 peer。请为 Project 添加主机或 Micdn 服务器。</p>
-            </article>
+
           </div>
 
           <div v-else-if="activeSection === 'certificate'" class="detail-stack">
@@ -459,7 +439,7 @@
               <header class="detail-card__head">
                 <div>
                   <h4>Micdn 节点</h4>
-                  <p>这些 adminListen 同时会进入 setline peers。</p>
+                  <p>这些 adminListen 由本机 setline 管理。</p>
                 </div>
               </header>
               <table v-if="micdnServers.length > 0" class="detail-table">
@@ -525,9 +505,7 @@ import { getMicdnProject, type MicdnBinding, type MicdnProjectDocument } from '@
 import {
   readEndpointCertificate,
   readProjectConfig,
-  readSetlinePeers,
   saveEndpointCertificate,
-  type SetlinePeer,
 } from '@/api/project-detail'
 import {
   attributeText,
@@ -603,7 +581,6 @@ const webapps = ref<ResourceRow[]>([])
 const agents = ref<AgentStatus[]>([])
 const proxyConfig = ref('')
 const serverConfig = ref('')
-const setlinePeers = ref<SetlinePeer[]>([])
 const micdn = ref<MicdnProjectDocument>()
 const loading = ref(false)
 const loadError = ref('')
@@ -957,7 +934,7 @@ async function load() {
   const includedRows = [...detail.included]
 
   const [
-    farmsResult, hostsResult, webappsResult, agentsResult, proxyResult, serverResult, peersResult,
+    farmsResult, hostsResult, webappsResult, agentsResult, proxyResult, serverResult,
     micdnResult, endpointResult,
   ] =
     await Promise.allSettled([
@@ -978,7 +955,6 @@ async function load() {
       listAgents(),
       readProjectConfig(projectId, 'proxy'),
       readProjectConfig(projectId, 'server'),
-      readSetlinePeers(projectId),
       getMicdnProject(projectId),
       listResource('/endpoints', {
         filters: { 'endpoint.project.id': projectId },
@@ -1023,9 +999,6 @@ async function load() {
 
   if (serverResult.status === 'fulfilled') serverConfig.value = serverResult.value
   else warning('server', 'server.xml', serverResult.reason)
-
-  if (peersResult.status === 'fulfilled') setlinePeers.value = peersResult.value
-  else warning('peers', 'Setline peers', peersResult.reason)
 
   if (micdnResult.status === 'fulfilled') micdn.value = micdnResult.value
   else warning('micdn', 'Micdn 配置', micdnResult.reason)

@@ -54,14 +54,14 @@
                 <h3>Micdn 服务器</h3>
                 <p>
                   登记运行 micdn 的节点。每台服务器的 setline <code>adminListen</code> 会写入
-                  bashub 的 peers 配置，侧车从 <code>http://&lt;adminListen&gt;/_setline/routes</code>
+                  本机 setline 从 <code>http://&lt;adminListen&gt;/_setline/routes</code>
                   读取路由表。
                 </p>
               </div>
               <t-button variant="outline" @click="addServer">添加服务器</t-button>
             </header>
             <div v-if="config.servers.length === 0" class="server-empty">
-              尚未登记 micdn 服务器。setline peers 只包含现有 web 节点。
+              尚未登记 micdn 服务器。
             </div>
             <table v-else class="server-table">
               <thead>

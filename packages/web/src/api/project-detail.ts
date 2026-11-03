@@ -3,11 +3,6 @@ import { getPlainJson } from './resource'
 import { sessionService } from '@/auth'
 import { apiPath } from './prefix'
 
-export interface SetlinePeer {
-  name: string
-  url: string
-}
-
 export type ProjectConfigKind = 'proxy' | 'server'
 
 const contentTypes: Record<ProjectConfigKind, string> = {
@@ -29,13 +24,6 @@ export async function readProjectConfig(projectId: string, kind: ProjectConfigKi
     throw new Error(`${kind === 'proxy' ? '代理配置' : 'server.xml'}加载失败（HTTP ${response.status}）`)
   }
   return response.text()
-}
-
-export async function readSetlinePeers(projectId: string): Promise<SetlinePeer[]> {
-  const document = await getPlainJson<{ peers?: SetlinePeer[] }>(
-    apiPath('config', `/projects/${encodeURIComponent(projectId)}/setline-peers`),
-  )
-  return document.peers ?? []
 }
 
 export interface EndpointCertificateInfo {
