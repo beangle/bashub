@@ -31,7 +31,7 @@ import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.project.menus : renderEmsMenus;
-import bashub.project.manifest : renderSetlineManifest;
+import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
@@ -262,44 +262,27 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `GET /api/bashub/config/{project}/routes?ip=...`：当前 agent 的运行路由。
-  void projectRoutes(HTTPServerRequest req, HTTPServerResponse res) {
-    auto projectName = req.params.get("project", "");
-    ProjectContext project;
-    if (!findProject(reg, store, projectName, project)) {
-      res.writeBody("", HTTPStatus.notFound);
-      return;
-    }
-    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
-      writeConfigUnauthorized(res);
-      return;
-    }
-
+  /// 选取请求对应的 agent；query `ip` 优先，其次 `ip` 请求头，最后只接受唯一会话。
+  private AgentSession chooseAgent(HTTPServerRequest req, string projectName) {
+    if (agents is null)
+      return null;
     auto requested = ipHeaderAddresses(req.query.get("ip", ""));
     if (requested.length == 0)
       requested = ipHeaderAddresses(req.headers.get("ip", ""));
     auto sessions = agents.sessionsOf(projectName);
-    AgentSession chosen;
     if (requested.length > 0) {
       foreach (session; sessions)
-        if (requested.canFind(session.ip)) {
-          chosen = session;
-          break;
-        }
-    } else if (sessions.length == 1) {
-      chosen = sessions[0];
+        if (requested.canFind(session.ip))
+          return session;
+      return null;
     }
-    if (chosen is null) {
-      writeJsonApi(res, errorDocument(404, "节点不在线", "no matching agent for " ~ projectName),
-          HTTPStatus.notFound);
-      return;
-    }
-    if (chosen.basReport.type != Json.Type.object) {
-      writeJsonApi(res, errorDocument(404, "节点未上报", "agent has not reported instances"),
-          HTTPStatus.notFound);
-      return;
-    }
+    return sessions.length == 1 ? sessions[0] : null;
+  }
 
+  /// 由 basagent 上报的实例生成 routes 文档；没有上报时返回 null。
+  private Json routeDocument(ProjectContext project, AgentSession chosen) {
+    if (chosen is null || chosen.basReport.type != Json.Type.object)
+      return Json(null);
     auto host = attributeText(project.data, "hostname").strip;
     if (host.length == 0)
       host = chosen.host.length ? chosen.host : chosen.ip;
@@ -342,6 +325,34 @@ class HubService {
     doc["host"] = Json(host);
     doc["ip"] = Json(chosen.ip);
     doc["routes"] = Json(routes);
+    return doc;
+  }
+
+  /// `GET /api/bashub/config/{project}/routes?ip=...`：当前 agent 的运行路由。
+  void projectRoutes(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+
+    auto chosen = chooseAgent(req, projectName);
+    if (chosen is null) {
+      writeJsonApi(res, errorDocument(404, "节点不在线", "no matching agent for " ~ projectName),
+          HTTPStatus.notFound);
+      return;
+    }
+    auto doc = routeDocument(project, chosen);
+    if (doc.type != Json.Type.object) {
+      writeJsonApi(res, errorDocument(404, "节点未上报", "agent has not reported instances"),
+          HTTPStatus.notFound);
+      return;
+    }
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -644,7 +655,17 @@ class HubService {
       auto proxy = endpoint.type == Json.Type.object
           ? renderProxyForEndpoint(store, reg, project, endpointName)
           : renderProxy(store, reg, project);
-      auto text = renderSetlineManifest(proxy, certificate, certificateKey);
+      auto routes = routeDocument(project, chooseAgent(req, projectName));
+    auto routesText = routes.type == Json.Type.object ? routes.toString : "{}";
+    auto text = renderSetlineManifest(routesText, proxy, certificate, certificateKey);
+    auto etag = "\"" ~ sha256Hex(text) ~ "\"";
+    res.headers["ETag"] = etag;
+    auto inm = req.headers.get("if-none-match", req.headers.get("If-None-Match", "")).strip;
+    if (inm.length > 0 && inm == etag) {
+      res.headers["Cache-Control"] = "no-store";
+      res.writeBody("", HTTPStatus.notModified);
+      return;
+    }
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "application/json");
     } catch (Exception e) {
