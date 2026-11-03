@@ -61,7 +61,7 @@ private void decorateWebapp(Registry reg, Dao dao, const Resource res, Row row, 
 private void decorateHost(Registry reg, Dao dao, Row row, ref Json attributes) {
   auto features = reg.find("platform-features");
   auto scripts = reg.find("platform-feature-scripts");
-  auto ids = rowGet(row, "features");
+  auto ids = rowGet(row, "feature_ids");
   auto platformId = jsonText(rowGet(row, "platform"));
   if (features.path.length == 0 || scripts.path.length == 0 || ids.type != Json.Type.array ||
       platformId.length == 0) {

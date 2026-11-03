@@ -17,7 +17,7 @@ import bashub.project.resolver : dataOf, loadAll;
 import beangle.commons.xml : escapeXml;
 import beangle.data.query : Query;
 import beangle.data.resource : Registry, Resource;
-import beangle.data.value : Row, jsonGet, jsonText;
+import beangle.data.value : Row, jsonGet, jsonText, rowGet;
 import beangle.jsonapi.document : attributeText, relationshipId;
 import beangle.jsonapi.store : Store;
 
@@ -45,7 +45,6 @@ struct BoundComponent {
   string kind;
   string name;
   string mountName;
-  long sortno;
   Json spec;
 }
 
@@ -54,7 +53,6 @@ struct MicdnState {
   Json config;
   BoundComponent[] components;
   Json[] catalog;
-  string[] bindingIds;
 }
 
 /// 一个 Project 的完整配置视图。
@@ -249,8 +247,8 @@ bool loadMicdnProject(Store store, Registry reg, string projectId, out MicdnProj
   project["name"] = Json(attributeText(projectDoc["data"], "name"));
   project["qualifiedName"] = Json(attributeText(projectDoc["data"], "qualifiedName"));
   project["title"] = Json(attributeText(projectDoc["data"], "title"));
-  auto proxies = loadAll(store, reg.find("proxy-settings"), ["project": projectId]);
-  project["ip"] = Json(proxies.length > 0 ? attributeText(proxies[0], "ip") : "");
+  auto endpoints = loadAll(store, reg.find("endpoints"), ["project": projectId]);
+  project["ip"] = Json(endpoints.length > 0 ? attributeText(endpoints[0], "ips") : "");
   project["keyMasked"] = Json(maskSecret(cleanKey));
   project["keySet"] = Json(cleanKey.length > 0);
 
@@ -271,18 +269,20 @@ bool loadMicdnState(Store store, Registry reg, string projectId, out MicdnState 
       byId[id] = component;
   }
 
-  Query bindingQuery;
-  bindingQuery.pageSize = 100000;
-  bindingQuery.addFilter("project", projectId);
-  auto bindings = dataOf(store.search(reg.find("project-micdn-components"), bindingQuery));
+  Json[] bindings;
+  Row projectMicdn;
+  if (store.fetchRaw(reg.find("project-micdn"), projectId, projectMicdn)) {
+    auto stored = rowGet(projectMicdn, "components");
+    if (stored.type == Json.Type.array)
+      bindings = stored.get!(Json[]);
+  }
 
   BoundComponent[] components;
-  string[] bindingIds;
   foreach (ref binding; bindings) {
-    auto bindingId = jsonText(jsonGet(binding, "id"));
-    auto componentId = relationshipId(binding, "component");
+    auto componentId = binding.type == Json.Type.string
+        ? binding.get!string : firstText(binding, "componentId", "component");
     if (componentId.length == 0)
-      throw new MicdnConfigException("component", "绑定 " ~ bindingId ~ " 没有组件");
+      throw new MicdnConfigException("bindings.componentId", "组件登记缺少 componentId");
     if (auto found = componentId in byId) {
       auto kind = attributeText(*found, "kind");
       auto mountName = attributeText(*found, "mountName");
@@ -290,16 +290,15 @@ bool loadMicdnState(Store store, Registry reg, string projectId, out MicdnState 
         throw new MicdnConfigException("mountName", "组件 " ~ componentId ~ " 缺少挂载名");
       validateMountName(kind, mountName);
       auto spec = normalizeComponentSpec(kind, jsonGet(jsonGet(*found, "attributes"), "spec"));
-      components ~= BoundComponent(bindingId, componentId, kind, attributeText(*found, "name"),
-          mountName, attributeText(binding, "sortno").to!long, spec);
-      bindingIds ~= bindingId;
+      components ~= BoundComponent("", componentId, kind, attributeText(*found, "name"),
+          mountName, spec);
     } else {
       throw new MicdnConfigException("component", "绑定的组件不存在: " ~ componentId);
     }
   }
 
-  sortBindings(components);
-  state = MicdnState(config, components, catalog, bindingIds);
+  components.sort!((a, b) => a.mountName < b.mountName);
+  state = MicdnState(config, components, catalog);
   return true;
 }
 
@@ -346,7 +345,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     }
   }
   staticBundles.sort!((a, b) => nameBefore(a.mountName, b.mountName));
-  sortBindings(wwwDocs);
+  wwwDocs.sort!((a, b) => nameBefore(a.mountName, b.mountName));
 
   auto xml = appender!string;
   xml.put(`<?xml version="1.0" encoding="UTF-8"?>`);
@@ -519,7 +518,6 @@ Json micdnProjectDocument(const MicdnProjectView view, string remoteUrl = "") {
     item["kind"] = Json(component.kind);
     item["name"] = Json(component.name);
     item["mountName"] = Json(component.mountName);
-    item["sortno"] = Json(component.sortno);
     item["spec"] = component.spec;
     bindings ~= item;
   }
@@ -584,26 +582,19 @@ void saveMicdnProject(Store store, Registry reg, string projectId, Json body) {
       validateMountName(kind, mountName);
       auto spec = normalizeComponentSpec(kind, jsonGet(jsonGet(*found, "attributes"), "spec"));
       desired ~= BoundComponent("", componentId, kind, attributeText(*found, "name"),
-          mountName, numberField(item, "sortno", 0), spec);
+          mountName, spec);
     }
   }
-  sortBindings(desired);
+  desired.sort!((a, b) => a.mountName < b.mountName);
 
   store.transaction({
     Row configValues;
     configValues["config"] = config;
+    Json[] registered;
+    foreach (ref component; desired)
+      registered ~= Json(component.componentId);
+    configValues["components"] = Json(registered);
     store.upsertColumns(reg.find("project-micdn"), projectId, configValues);
-
-    auto bindingRes = reg.find("project-micdn-components");
-    foreach (bindingId; oldState.bindingIds)
-      store.removeColumns(bindingRes, bindingId);
-    foreach (ref component; desired) {
-      Row values;
-      values["project"] = Json(projectId);
-      values["component"] = Json(component.componentId);
-      values["sortno"] = Json(component.sortno);
-      store.insertColumns(bindingRes, values);
-    }
   });
 }
 
@@ -891,11 +882,7 @@ private string[] textList(Json value) {
   return result;
 }
 
-private void sortBindings(ref BoundComponent[] components) {
-  components.sort!((a, b) => a.sortno == b.sortno
-      ? a.mountName < b.mountName
-      : a.sortno < b.sortno);
-}
+
 
 /// Static bundle 与来源都使用固定排序，避免绑定表顺序或 JSON 数组顺序影响最终 XML。
 private bool nameBefore(string left, string right) {

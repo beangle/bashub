@@ -18,6 +18,7 @@ import beangle.data.value : Row, jsonText;
 import beangle.jsonapi.store : Store, StoreException;
 
 import test.bashub.fixture : testDao;
+import test.beangle.fixture : fixtureRegistry;
 import bashub.resources : hubRegistry;
 import bashub.store : createHubStore;
 
@@ -52,7 +53,6 @@ unittest {
   assert(store.search(reg.find("menus"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("cdn-components"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.search(reg.find("project-micdn"), Query.init)["meta"]["page"]["total"].get!long == 1);
-  assert(store.search(reg.find("project-micdn-components"), Query.init)["meta"]["page"]["total"].get!long == 2);
   assert(store.backend == "memory");
 }
 
@@ -65,20 +65,15 @@ unittest {
   assert(engines["data"][0]["attributes"]["listeners"].get!(Json[]).length == 1);
   assert(engines["data"][0]["attributes"]["jars"].get!(Json[]).length == 1);
 
-  auto farms = store.search(reg.find("farms"), parseQuery(["include": "hosts,servers,servers.host"]));
+  auto farms = store.search(reg.find("farms"), parseQuery(["include": "servers,servers.host"]));
   auto farm = farms["data"][0];
-  assert(farm["relationships"]["hosts"]["data"].get!(Json[]).length == 2);
   assert(farm["relationships"]["servers"]["data"].get!(Json[]).length == 2);
   bool hasServer;
-  bool hasHostRelation;
   foreach (item; farms["included"].get!(Json[])) {
     if (item["type"].get!string == "servers")
       hasServer = true;
-    if (item["type"].get!string == "hosts" && jsonText(item["relationships"]["project"]["data"]["id"]) == "1002")
-      hasHostRelation = true;
   }
   assert(hasServer);
-  assert(hasHostRelation);
 
   auto resources = store.search(reg.find("resources"), parseQuery(["filter[scope]": "Private"]));
   assert(resources["meta"]["page"]["total"].get!long == 1);
@@ -206,26 +201,16 @@ unittest {
   assert(updated["data"]["attributes"]["setlineAdminPort"].get!long == 18081);
 }
 
-@("enabling setline requires the project hostname only for hostname groups")
-unittest {
+@("setline host ports no longer require proxy settings") unittest {
   Registry reg;
   auto store = newStore(reg);
   Json updated;
 
   assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("")]));
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
-      ["proxy_by_hostname": Json(false)]));
   assert(store.update(reg.find("hosts"), "2001",
       parseJsonString(`{"data":{"type":"hosts","attributes":{
         "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
-
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
-      ["proxy_by_hostname": Json(true)]));
-  assertThrown!StoreException(store.update(reg.find("hosts"), "2001",
-      parseJsonString(`{"data":{"type":"hosts","attributes":{
-        "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));
-  store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]);
-  store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(true)]);
+  assert(updated["data"]["attributes"]["setlineListenPort"].get!long == 18080);
 }
 
 @("webapp targets and host setline ports keep run-at valid")
@@ -287,10 +272,6 @@ unittest {
   auto artifact = artifacts["data"][0]["attributes"];
   assert(artifact["gav"].get!string == "org.beangle.bashub:bas-web:war:0.0.8");
 
-  auto proxies = store.search(reg.find("proxy-settings"),
-      parseQuery(["filter[proxySetting.project.id]": "1002"]));
-  assert(proxies["meta"]["page"]["total"].get!long == 1);
-  assert(proxies["data"][0]["attributes"]["ip"].get!string == "10.0.0.10");
   auto hosts = store.search(reg.find("hosts"), parseQuery(["filter[name]": "host01"]));
   auto logos = hosts["data"][0]["attributes"]["featureLogos"].get!(Json[]);
   assert(logos.length == 2);
@@ -328,19 +309,18 @@ unittest {
 
 @("a failed collection write rolls back the main row")
 unittest {
-  auto reg = hubRegistry();
+  auto reg = fixtureRegistry();
   auto dao = new FailingDao(reg);
   auto store = new Store(reg, dao);
   bool failed;
   try {
-    store.create(reg.find("engines"),
-        parseJsonString(`{"data":{"type":"engines","attributes":{"name":"broken","typ":"tomcat",
-        "version":"10","listeners":["a"]}}}`));
+    store.create(reg.find("profiles"),
+        parseJsonString(`{"data":{"type":"profiles","attributes":{"name":"broken","tags":["a"]}}}`));
   } catch (DaoException e) {
     failed = true;
   }
   assert(failed);
-  assert(dao.allRows(reg.find("engines")).length == 0);
+  assert(dao.allRows(reg.find("profiles")).length == 0);
 }
 
 /// 强制集合写入失败，验证主行不会留在库里。

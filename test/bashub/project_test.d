@@ -158,11 +158,6 @@ unittest {
   auto store = newStore(reg);
   auto hosts = reg.find("hosts");
   ProjectContext project;
-  // 本用例只验证端口校验，避免受 hostname/按域名分组状态影响。
-  store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(false)]);
-  scope (exit)
-    store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(true)]);
-
   foreach (value; ["0", "70000", "not-a-port"]) {
     assert(store.updateColumns(hosts, "2001", ["setline_admin_port": Json(value)]));
     assert(findProject(reg, store, "openurp.prod", project));
@@ -170,27 +165,23 @@ unittest {
   }
 }
 
-@("server.xml requires the project hostname only when proxyByHostname is enabled") unittest {
+@("server.xml uses the project hostname for setline when present") unittest {
   Registry reg;
   auto store = newStore(reg);
   ProjectContext project;
-  scope (exit) {
+  scope (exit)
     store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]);
-    store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_by_hostname": Json(true)]);
-  }
 
   assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("")]));
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
-      ["proxy_by_hostname": Json(false)]));
   assert(findProject(reg, store, "openurp.prod", project));
   auto xml = renderServerXml(store, reg, project);
   assert(!xml.canFind("setline-hostname"));
   assert(xml.canFind(`setline-listen-port="8080"`));
 
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002",
-      ["proxy_by_hostname": Json(true)]));
+  assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]));
   assert(findProject(reg, store, "openurp.prod", project));
-  assertThrown!Exception(renderServerXml(store, reg, project));
+  xml = renderServerXml(store, reg, project);
+  assert(xml.canFind(`setline-hostname="prod.openurp.net"`));
 }
 
 @("peers contains web and micdn nodes")
@@ -209,7 +200,6 @@ unittest {
   config = parseJsonString(text);
   assert(config["peers"].length == 2);
 
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
   assert(findProject(reg, store, "openurp.prod", project));
   text = renderPeers(store, reg, project);
   config = parseJsonString(text);
@@ -302,32 +292,25 @@ unittest {
   ProjectContext project;
   assert(findProject(reg, store, "openurp.prod", project));
 
-  auto nginx = renderProxy(store, reg, project);
+  auto nginx = renderProxyForEndpoint(store, reg, project, "edge-web");
   assert(nginx.canFind("worker_connections 60000;"));
   assert(nginx.canFind("upstream prod-farm{"));
   assert(nginx.canFind("server 10.0.0.11:9080 check inter 5s;"));
   assert(nginx.canFind("server 10.0.0.12:9081;"));
   assert(nginx.canFind("location /bas {"));
   assert(nginx.canFind("proxy_pass http://prod-farm;"));
-  assert(nginx.canFind("ssl_certificate /etc/setline/certs/cert.pem;"));
-  assert(nginx.canFind("ssl_certificate_key /etc/setline/certs/key.pem;"));
-  assert(!nginx.canFind("/etc/nginx/prod.openurp.net"));
-
-  auto endpointNginx = renderProxyForEndpoint(store, reg, project, "edge-web");
-  assert(endpointNginx.canFind("server_name  www.openurp.net;"));
-  assert(endpointNginx.canFind("ssl_certificate /etc/setline/certs/edge-web.pem;"));
-  assert(endpointNginx.canFind("location /bas {"));
+  assert(nginx.canFind("ssl_certificate /etc/setline/certs/edge-web.pem;"));
+  assert(nginx.canFind("ssl_certificate_key /etc/setline/certs/edge-web.key.pem;"));
+  assert(nginx.canFind("server_name  www.openurp.net;"));
   assertThrown!Exception(renderProxyForEndpoint(store, reg, project, "missing"));
 
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
-  assert(findProject(reg, store, "openurp.prod", project));
-  auto haproxy = renderProxy(store, reg, project);
+  auto haproxy = renderProxyForEndpoint(store, reg, project, "edge-ip");
   assert(haproxy.canFind("# HAProxy main configuration."));
   assert(!haproxy.canFind("setline.json"));
   assert(!haproxy.canFind(`"agent"`));
   assert(haproxy.canFind("frontend main"));
   assert(haproxy.canFind("bind *:80"));
-  assert(haproxy.canFind("ssl crt /etc/setline/certs/bundle.pem"));
+  assert(haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
   assert(haproxy.canFind("map_beg(/var/lib/setline/haproxy/setline.map)"));
   assert(haproxy.canFind("use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)]"));
   assert(haproxy.canFind("# setline path routes: backends and map are written by the setline agent " ~
@@ -375,12 +358,15 @@ unittest {
   dao.seedMany(webapps, "targets", "7002", ["5001"]);
   dao.seedMany(webapps, "targets", "7003", ["5002"]);
   dao.seedMany(webapps, "targets", "7004", ["5003"]);
+  dao.seedMany(webapps, "endpoints", "7002", ["9001"]);
+  dao.seedMany(webapps, "endpoints", "7003", ["9001"]);
+  dao.seedMany(webapps, "endpoints", "7004", ["9001"]);
 
   auto store = createHubStore(reg, dao);
   ProjectContext project;
   assert(findProject(reg, store, "openurp.prod", project));
 
-  auto nginx = renderProxy(store, reg, project);
+  auto nginx = renderProxyForEndpoint(store, reg, project, "edge-web");
   assert(nginx.canFind("upstream prod-farm2{"));
   assert(nginx.canFind("upstream prod-farm_app1{"));
   assert(nginx.canFind("upstream prod-farm_app2{"));
@@ -388,9 +374,8 @@ unittest {
   assert(nginx.canFind("location /context1 {"));
   assert(nginx.canFind("proxy_pass http://prod-farm_app3;"));
 
-  assert(store.updateColumns(reg.find("proxy-settings"), "9002", ["proxy_engine": Json("haproxy")]));
   assert(findProject(reg, store, "openurp.prod", project));
-  auto haproxy = renderProxy(store, reg, project);
+  auto haproxy = renderProxyForEndpoint(store, reg, project, "edge-ip");
   assert(haproxy.canFind("map_beg(/var/lib/setline/haproxy/setline.map)"));
   assert(haproxy.canFind("use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)]"));
   assert(!haproxy.canFind("setline_route"));
@@ -469,8 +454,8 @@ unittest {
   auto alphaSpec = parseJsonString(`{"sources":[
     {"kind":"npm","ref":"alpha@1","inner":""}]}`);
   BoundComponent[] components = [
-    BoundComponent("", "2", "static_bundle", "zeta", "zeta", 10, zetaSpec),
-    BoundComponent("", "1", "static_bundle", "alpha", "Alpha", 20, alphaSpec),
+    BoundComponent("", "2", "static_bundle", "zeta", "zeta", zetaSpec),
+    BoundComponent("", "1", "static_bundle", "alpha", "Alpha", alphaSpec),
   ];
 
   auto xml = renderMicdnXml(config, components, "prod", "secret-key");

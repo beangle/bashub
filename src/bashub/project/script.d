@@ -16,7 +16,7 @@ import bashub.project.resolver : ProjectContext, loadAll;
 import beangle.data.query : Query;
 import beangle.data.resource : Registry;
 import beangle.data.value : jsonText;
-import beangle.jsonapi.document : attributeText, relationshipId, relationshipIds;
+import beangle.jsonapi.document : attributeStrings, attributeText, relationshipId, relationshipIds;
 import beangle.jsonapi.store : Store;
 
 import vibe.data.json : Json;
@@ -83,7 +83,7 @@ bool loadHostScriptModel(Store store, Registry reg, const ProjectContext context
     ScriptFeature feature;
     feature.id = jsonText(item["id"]);
     feature.name = attributeText(item, "name");
-    feature.dependencies = relationshipIds(item, "dependencies");
+    feature.dependencies = attributeStrings(item, "dependencies");
     featureById[feature.id] = feature;
   }
 
@@ -98,7 +98,7 @@ bool loadHostScriptModel(Store store, Registry reg, const ProjectContext context
     scripts ~= script;
   }
 
-  auto roots = relationshipIds(host, "features");
+  auto roots = attributeStrings(host, "featureIds");
   model.scripts = orderScripts(roots, featureById, scripts);
   return true;
 }

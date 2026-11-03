@@ -57,23 +57,6 @@ Registry hubRegistry() {
       "name",
       []),
     /// 代理/SETLINE 配置与 project 1:1；IP 是 setline 下载用的内部地址。
-    Resource(
-      "proxy-settings", "proxySettings", "bas.cfg_proxy_settings", "id",
-      [
-        Column("proxy_by_hostname", "proxyByHostname", Kind.boolean),
-        Column("proxy_engine", "proxyEngine", Kind.text),
-        Column("maxconn", "maxconn", Kind.number),
-        Column("http_port", "httpPort", Kind.number),
-        Column("https_port", "httpsPort", Kind.number),
-        Column("enable_https", "enableHttps", Kind.boolean),
-        Column("force_https", "forceHttps", Kind.boolean),
-        Column("ssl_ciphers", "sslCiphers", Kind.text),
-        Column("ssl_protocols", "sslProtocols", Kind.text),
-        Column("ip", "ip", Kind.text),
-      ],
-      [Relation("project", "project_id", "projects")],
-      [],
-      "id"),
     /// 代理 endpoint：同一 project 下 name/domain 唯一；ips 是代理机内网地址列表。
     Resource(
       "endpoints", "endpoints", "bas.cfg_endpoints", "id",
@@ -103,14 +86,12 @@ Registry hubRegistry() {
         Column("remark", "remark", Kind.text),
         Column("jsp_support", "jspSupport", Kind.boolean),
         Column("websocket_support", "websocketSupport", Kind.boolean),
+        Column("listeners", "listeners", Kind.jsonDocument),
+        Column("jars", "jars", Kind.jsonDocument),
       ],
       [Relation("project", "project_id", "projects")],
       [],
-      "name",
-      [
-        ValueList("listeners", "bas.cfg_engines_listeners", "engine_id", "value_"),
-        ValueList("jars", "bas.cfg_engines_jars", "engine_id", "value_"),
-      ]),
+      "name"),
     Resource(
       "farms", "farms", "bas.cfg_farms", "id",
       [
@@ -127,7 +108,6 @@ Registry hubRegistry() {
       "name",
       [],
       [
-        ManyRelation("hosts", "hosts", "bas.cfg_farms_hosts", "farm_id", "host_id"),
         ManyRelation("servers", "servers", "bas.cfg_servers", "farm_id", "id", false),
       ]),
     Resource(
@@ -160,6 +140,7 @@ Registry hubRegistry() {
         Column("platform_version", "platformVersion", Kind.text),
         Column("arch", "arch", Kind.number),
         Column("agent_group", "agentGroup", Kind.text),
+        Column("feature_ids", "featureIds", Kind.jsonDocument),
         Column("setline_listen_port", "setlineListenPort", Kind.number),
         Column("setline_admin_port", "setlineAdminPort", Kind.number),
       ],
@@ -168,9 +149,7 @@ Registry hubRegistry() {
         Relation("platform", "platform_id", "platforms"),
       ],
       [],
-      "name",
-      [],
-      [ManyRelation("features", "platform-features", "bas.cfg_hosts_features", "host_id", "platform_feature_id")]),
+      "name"),
     Resource(
       "artifacts", "artifacts", "bas.cfg_artifacts", "id",
       [
@@ -216,15 +195,11 @@ Registry hubRegistry() {
         Column("version", "version", Kind.text),
         Column("logo", "logo", Kind.text),
         Column("description", "description", Kind.text),
+        Column("dependencies", "dependencies", Kind.jsonDocument),
       ],
       [],
       [],
-      "name",
-      [],
-      [
-        ManyRelation("dependencies", "platform-features", "bas.cfg_platform_features_dependencies",
-            "from_feature_id", "platform_feature_id"),
-      ]),
+      "name"),
     Resource(
       "platform-feature-scripts", "platformFeatureScripts", "bas.cfg_platform_feature_scripts", "id",
       [Column("scripts", "scripts", Kind.text)],
@@ -311,19 +286,11 @@ Registry hubRegistry() {
       "name"),
     Resource(
       "project-micdn", "projectMicdn", "bas.cfg_project_micdn", "project_id",
-      [Column("config", "config", Kind.jsonDocument)],
+      [Column("config", "config", Kind.jsonDocument),
+       Column("components", "components", Kind.jsonDocument)],
       [],
       [],
       "project_id"),
-    Resource(
-      "project-micdn-components", "projectMicdnComponents", "bas.cfg_project_micdn_components", "id",
-      [Column("sortno", "sortno", Kind.number)],
-      [
-        Relation("project", "project_id", "projects"),
-        Relation("component", "component_id", "cdn-components"),
-      ],
-      [],
-      "sortno"),
   ];
   foreach (ref item; items) {
     item.entityAlias = aliasOf(item.path);
@@ -343,8 +310,6 @@ private string[] requiredOf(string path) {
     return ["name", "title", "basVersion"];
   case "endpoints":
     return ["project", "name", "ips", "engine"];
-  case "proxy-settings":
-    return ["project", "proxyEngine", "ip"];
   case "engines":
     return ["name", "typ", "version"];
   case "farms":
@@ -372,9 +337,7 @@ private string[] requiredOf(string path) {
   case "cdn-components":
     return ["kind", "name", "mountName", "spec"];
   case "project-micdn":
-    return ["config"];
-  case "project-micdn-components":
-    return ["project", "component", "sortno"];
+    return ["config", "components"];
   default:
     return null;
   }
@@ -391,12 +354,8 @@ private string aliasOf(string path) {
     return "appGroup";
   case "cdn-components":
     return "cdnComponents";
-  case "proxy-settings":
-    return "proxySetting";
   case "project-micdn":
     return "projectMicdn";
-  case "project-micdn-components":
-    return "projectMicdnComponents";
   default:
     return path.endsWith("s") ? path[0 .. $ - 1] : path;
   }

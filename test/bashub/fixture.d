@@ -24,8 +24,6 @@ MemoryDao testDao(Registry reg) {
     dao.seed(reg.find("platforms"), row);
   foreach (row; projectRows())
     dao.seed(reg.find("projects"), row);
-  foreach (row; proxyRows())
-    dao.seed(reg.find("proxy-settings"), row);
   foreach (row; hostRows())
     dao.seed(reg.find("hosts"), row);
   foreach (row; engineRows())
@@ -58,27 +56,13 @@ MemoryDao testDao(Registry reg) {
     dao.seed(reg.find("cdn-components"), row);
   foreach (row; projectMicdnRows())
     dao.seed(reg.find("project-micdn"), row);
-  foreach (row; projectMicdnComponentRows())
-    dao.seed(reg.find("project-micdn-components"), row);
-
-  auto engines = reg.find("engines");
-  dao.seedValues(engines, "listeners", "3001", ["org.beangle.bas.listener.StartupListener"]);
-  dao.seedValues(engines, "jars", "3001", ["org.beangle:beangle-webmvc:4.6.0"]);
-  dao.seedValues(engines, "listeners", "3002", []);
 
   auto farms = reg.find("farms");
-  dao.seedMany(farms, "hosts", "4001", ["2001", "2002"]);
   dao.seedMany(farms, "servers", "4001", ["5001", "5002"]);
 
   auto webapps = reg.find("webapps");
   dao.seedMany(webapps, "targets", "7001", ["5001", "5002"]);
   dao.seedMany(webapps, "endpoints", "7001", ["9001", "9002"]);
-
-  auto features = reg.find("platform-features");
-  dao.seedMany(features, "dependencies", "8002", ["8001"]);
-
-  auto hosts = reg.find("hosts");
-  dao.seedMany(hosts, "features", "2001", ["8001", "8002"]);
 
   auto menus = reg.find("menus");
   dao.seedMany(menus, "resources", "14002", ["13001", "13002"]);
@@ -119,26 +103,6 @@ private Row[] projectRows() {
   ];
 }
 
-private Row[] proxyRows() {
-  return [
-    row("9001", [
-      "project": Json("1001"), "ip": Json("127.0.0.1"),
-      "proxy_by_hostname": Json(false),
-      "http_port": Json(80L), "https_port": Json(443L),
-      "enable_https": Json(true), "force_https": Json(false), "maxconn": Json(30000L),
-      "proxy_engine": Json("haproxy"),
-      "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
-    ]),
-    row("9002", [
-      "project": Json("1002"), "ip": Json("10.0.0.10"),
-      "proxy_by_hostname": Json(true),
-      "http_port": Json(80L), "https_port": Json(443L),
-      "enable_https": Json(true), "force_https": Json(true), "maxconn": Json(60000L),
-      "proxy_engine": Json("nginx"),
-      "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
-    ]),
-  ];
-}
 
 private Row[] hostRows() {
   return [
@@ -147,12 +111,14 @@ private Row[] hostRows() {
       "cpu": Json("Xeon Gold 6248"), "platform_version": Json("9.2"), "arch": Json(2L),
       "setline_listen_port": Json(8080L), "setline_admin_port": Json(10080L),
       "agent_group": Json("default_group"), "project": Json("1002"), "platform": Json("1"),
+      "feature_ids": Json([Json("8001"), Json("8002")]),
     ]),
     row("2002", [
       "name": Json("host02"), "ip": Json("10.0.0.12"), "memory": Json(16L), "cores": Json(4L),
       "cpu": Json("Xeon E5-2680"), "platform_version": Json("2022"), "arch": Json(2L),
       "setline_listen_port": Json(8082L), "setline_admin_port": Json(10081L),
       "agent_group": Json("default_group"), "project": Json("1002"), "platform": Json("2"),
+      "feature_ids": Json(cast(Json[]) null),
     ]),
   ];
 }
@@ -162,11 +128,14 @@ private Row[] engineRows() {
     row("3001", [
       "name": Json("tomcat"), "typ": Json("tomcat-server"), "version": Json("10.1.42"),
       "remark": Json("全量发行包"), "jsp_support": Json(true), "websocket_support": Json(true),
+      "listeners": Json([Json("org.beangle.bas.listener.StartupListener")]),
+      "jars": Json([Json("org.beangle:beangle-webmvc:4.6.0")]),
       "project": Json("1002"),
     ]),
     row("3002", [
       "name": Json("undertow"), "typ": Json("undertow"), "version": Json("2.3.18"),
       "remark": Json("嵌入式单应用"), "jsp_support": Json(false), "websocket_support": Json(true),
+      "listeners": Json(cast(Json[]) null), "jars": Json(cast(Json[]) null),
       "project": Json("1002"),
     ]),
   ];
@@ -233,13 +202,13 @@ private Row[] endpointRows() {
       "domain": Json("www.openurp.net"), "engine": Json("nginx"), "force_https": Json(true),
       "certificate": Json(""), "private_key": Json(""),
       "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(true),
-      "maxconn": Json(30000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
+      "maxconn": Json(60000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
     ]),
     row("9002", [
       "project": Json("1002"), "name": Json("edge-ip"), "ips": Json("10.0.0.30,10.0.0.10"),
       "domain": Json(""), "engine": Json("haproxy"), "force_https": Json(false),
       "certificate": Json(""), "private_key": Json(""),
-      "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(false),
+      "http_port": Json(80L), "https_port": Json(443L), "enable_https": Json(true),
       "maxconn": Json(30000L), "ssl_ciphers": Json(""), "ssl_protocols": Json(""),
     ]),
   ];
@@ -253,7 +222,7 @@ private Row[] featureRows() {
     ]),
     row("8002", [
       "name": Json("Node.js"), "version": Json("20"), "logo": Json("/images/node.svg"),
-      "description": Json("前端构建运行时"),
+      "description": Json("前端构建运行时"), "dependencies": Json([Json("8001")]),
     ]),
   ];
 }
@@ -396,16 +365,12 @@ private Row[] projectMicdnRows() {
     "base": Json("/var/lib/micdn/blob"), "maxSize": Json("50M"),
     "publicImages": Json(true),
   ]);
-  auto item = row("1002", ["config": config]);
+  auto item = row("1002", [
+    "config": config,
+    "components": Json([Json("17001"), Json("17002")]),
+  ]);
   item["project_id"] = Json("1002");
   return [item];
-}
-
-private Row[] projectMicdnComponentRows() {
-  return [
-    row("18001", ["project": Json("1002"), "component": Json("17001"), "sortno": Json(10L)]),
-    row("18002", ["project": Json("1002"), "component": Json("17002"), "sortno": Json(20L)]),
-  ];
 }
 
 /// 行里的外键用**关系名**当键（对应 SQL 的 `t.org_id as org`）。
