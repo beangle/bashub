@@ -38,26 +38,27 @@ export async function readSetlinePeers(projectId: string): Promise<SetlinePeer[]
   return document.peers ?? []
 }
 
-export interface ProjectCertificateInfo {
+export interface EndpointCertificateInfo {
   /** PEM 公钥证书（可含完整链）。 */
   certificate: string
   /** 私钥是否已设置；私钥原文永远不下发。 */
   keySet: boolean
 }
 
-export function readProjectCertificate(projectId: string): Promise<ProjectCertificateInfo> {
-  return getPlainJson<ProjectCertificateInfo>(
-    apiPath('config', `/projects/${encodeURIComponent(projectId)}/certificate`),
+export function readEndpointCertificate(projectId: string, endpointName: string): Promise<EndpointCertificateInfo> {
+  return getPlainJson<EndpointCertificateInfo>(
+    apiPath('config', `/projects/${encodeURIComponent(projectId)}/endpoints/${encodeURIComponent(endpointName)}/certificate`),
   )
 }
 
-export async function saveProjectCertificate(
+export async function saveEndpointCertificate(
   projectId: string,
+  endpointName: string,
   input: { certificate: string; privateKey: string },
-): Promise<ProjectCertificateInfo> {
+): Promise<EndpointCertificateInfo> {
   const document = await apiClient.patch<unknown>(
-    apiPath('config', `/projects/${encodeURIComponent(projectId)}/certificate`),
+    apiPath('config', `/projects/${encodeURIComponent(projectId)}/endpoints/${encodeURIComponent(endpointName)}/certificate`),
     input,
   )
-  return document as unknown as ProjectCertificateInfo
+  return document as unknown as EndpointCertificateInfo
 }

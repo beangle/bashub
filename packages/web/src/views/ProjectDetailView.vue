@@ -523,10 +523,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { listAgents, type AgentInstance, type AgentStatus } from '@/api/agents'
 import { getMicdnProject, type MicdnBinding, type MicdnProjectDocument } from '@/api/micdn'
 import {
-  readProjectCertificate,
+  readEndpointCertificate,
   readProjectConfig,
   readSetlinePeers,
-  saveProjectCertificate,
+  saveEndpointCertificate,
   type SetlinePeer,
 } from '@/api/project-detail'
 import {
@@ -619,7 +619,6 @@ const projectTitle = computed(() => attrOf(project.value, 'title'))
 const basVersion = computed(() => attrOf(project.value, 'basVersion'))
 const ip = computed(() => attrOf(proxy.value, 'ip'))
 const hostname = computed(() => attrOf(project.value, 'hostname'))
-const proxyByHostname = computed(() => boolOf(proxy.value?.attributes.proxyByHostname))
 const httpPort = computed(() => attrOf(proxy.value, 'httpPort'))
 const httpsPort = computed(() => attrOf(proxy.value, 'httpsPort'))
 const enableHttps = computed(() => boolOf(proxy.value?.attributes.enableHttps))
@@ -652,9 +651,7 @@ const setlineHosts = computed(() =>
     .sort((a, b) => a.name.localeCompare(b.name)),
 )
 const setlineEnabled = computed(() => setlineHosts.value.length > 0)
-const setlineGroup = computed(() =>
-  proxyByHostname.value ? hostname.value || '（域名未填写）' : '*',
-)
+const setlineGroup = computed(() => hostname.value || '*')
 const setlineHostsText = computed(() =>
   setlineHosts.value.map((host) => `${host.name}:${host.listen}/${host.admin}`).join('；') || '—',
 )
@@ -881,6 +878,24 @@ async function copyText(value: string, label: string) {
 }
 
 /** 打开证书编辑框：公钥回填，私钥不回显（留空保持原值）。 */
+const certificateEndpointName = computed(() => attrOf(proxy.value, 'name'))
+
+async function loadEndpointCertificate() {
+  const endpointName = certificateEndpointName.value
+  if (!endpointName) {
+    certificateText.value = ''
+    privateKeySet.value = false
+    return
+  }
+  try {
+    const info = await readEndpointCertificate(projectId, endpointName)
+    certificateText.value = info.certificate
+    privateKeySet.value = info.keySet
+  } catch (reason) {
+    warning('certificate', '证书', reason)
+  }
+}
+
 function openCertificateEditor() {
   certificateDraft.value = certificateText.value
   privateKeyDraft.value = ''
@@ -897,7 +912,7 @@ async function saveCertificate() {
   }
   savingCertificate.value = true
   try {
-    const info = await saveProjectCertificate(projectId, {
+    const info = await saveEndpointCertificate(projectId, certificateEndpointName.value, {
       certificate: certificateDraft.value,
       privateKey: privateKeyDraft.value,
     })
@@ -909,6 +924,18 @@ async function saveCertificate() {
     certificateError.value = errorText(reason)
   } finally {
     savingCertificate.value = false
+  }
+}
+
+function endpointAsProxy(endpoint: ResourceRow): ResourceRow {
+  const attributes = endpoint.attributes
+  return {
+    ...endpoint,
+    attributes: {
+      ...attributes,
+      ip: attributes.ips,
+      proxyEngine: attributes.engine,
+    },
   }
 }
 
@@ -931,7 +958,7 @@ async function load() {
 
   const [
     farmsResult, hostsResult, webappsResult, agentsResult, proxyResult, serverResult, peersResult,
-    micdnResult, certificateResult, proxySettingResult,
+    micdnResult, endpointResult,
   ] =
     await Promise.allSettled([
       listResource('/farms', {
@@ -953,10 +980,9 @@ async function load() {
       readProjectConfig(projectId, 'server'),
       readSetlinePeers(projectId),
       getMicdnProject(projectId),
-      readProjectCertificate(projectId),
-      listResource('/proxy-settings', {
-        filters: { 'proxySetting.project.id': projectId },
-        pageSize: 1,
+      listResource('/endpoints', {
+        filters: { 'endpoint.project.id': projectId },
+        pageSize: 100,
       }),
     ])
 
@@ -986,8 +1012,14 @@ async function load() {
 
   if (proxyResult.status === 'fulfilled') proxyConfig.value = proxyResult.value
   else warning('proxy', '代理配置', proxyResult.reason)
-  if (proxySettingResult.status === 'fulfilled') proxy.value = proxySettingResult.value.rows[0]
-  else warning('proxySetting', '代理设置', proxySettingResult.reason)
+  if (endpointResult.status === 'fulfilled') {
+    const rows = endpointResult.value.rows
+    const endpoint = rows.find((row) => attributeText(row.attributes.name) === 'default') ?? rows[0]
+    proxy.value = endpoint ? endpointAsProxy(endpoint) : undefined
+    await loadEndpointCertificate()
+  } else {
+    warning('endpoint', '代理点', endpointResult.reason)
+  }
 
   if (serverResult.status === 'fulfilled') serverConfig.value = serverResult.value
   else warning('server', 'server.xml', serverResult.reason)
@@ -997,13 +1029,6 @@ async function load() {
 
   if (micdnResult.status === 'fulfilled') micdn.value = micdnResult.value
   else warning('micdn', 'Micdn 配置', micdnResult.reason)
-
-  if (certificateResult.status === 'fulfilled') {
-    certificateText.value = certificateResult.value.certificate
-    privateKeySet.value = certificateResult.value.keySet
-  } else {
-    warning('certificate', '证书', certificateResult.reason)
-  }
 
   const farmIds = farms.value.map((farm) => farm.id)
   if (farmIds.length > 0) {
