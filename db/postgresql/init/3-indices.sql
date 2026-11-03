@@ -1,10 +1,4 @@
-create index idx_29fg6n1sclcq6coy09lhjttqw on bas.cfg_engines_jars (engine_id);
-create index idx_in6ec9d0g28776rkhib4s06f6 on bas.cfg_engines_listeners (engine_id);
-create index idx_1ushahopqhn0hay3xm8bff2nx on bas.cfg_farms_hosts (farm_id);
-create index idx_tpaxgb7ixvpsjsvhqdc8e6ave on bas.cfg_hosts_features (host_id);
 create index idx_s6d9t6afcb79jfbamk81hj90m on bas.cfg_platform_feature_scripts (feature_id);
-create index idx_m7sd32ln741hkgmm2b276pyee on bas.cfg_platform_features_dependencies (from_feature_id);
-create index idx_cfg_project_micdn_components_component on bas.cfg_project_micdn_components (component_id);
 create index idx_j2s4cn47mq1a9qjtl9h44lo93 on bas.cfg_servers (farm_id);
 create index idx_cfg_webapps_endpoints_webapp on bas.cfg_webapps_endpoints (webapp_id);
 create index idx_cfg_webapps_endpoints_endpoint on bas.cfg_webapps_endpoints (endpoint_id);
