@@ -335,7 +335,7 @@ class HubService {
     return item;
   }
 
-  /// `GET /api/bashub/config/{project}/proxy`：按 Project 的 `proxyEngine` 输出 haproxy / nginx。
+  /// `GET /api/bashub/config/{project}/proxy`：按 endpoint 的 engine 输出 haproxy / nginx。
   /// 机器下载与 `config/server` 使用同一个 Project key；未知引擎与不存在的 Project 一样返回 404。
   /// 未指定 endpoint 时选 default，否则第一个；兼容旧的项目级代理预览。
   private string defaultEndpointName(ProjectContext project) {
@@ -2333,8 +2333,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   string[] configResources;
   string[] emsResources;
   foreach (item; reg.all) {
-    if (item.path != "cdn-components" && item.path != "project-micdn"
-        && item.path != "project-micdn-components" && item.path != "proxy-settings") {
+    if (item.path != "cdn-components" && item.path != "project-micdn") {
       auto group = resourceApiGroup(item);
       if (group == "ems")
         emsResources ~= item.path;

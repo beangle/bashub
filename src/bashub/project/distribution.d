@@ -24,8 +24,6 @@ import vibe.data.json : Json;
 /// 一次配置分发请求的只读数据。
 struct ProjectData {
   ProjectContext project;
-  /// 代理/SETLINE 配置；缺失时为空对象（使用默认值，不回退到 project 字段）。
-  Json proxy;
   Json[] farms;
   Json[] hosts;
   Json[] endpoints;
@@ -46,10 +44,6 @@ struct ProjectData {
 ProjectData loadProjectData(Store store, Registry reg, const ProjectContext context) {
   ProjectData data;
   data.project = context;
-  data.proxy = Json(["" : Json("")]);
-  auto proxyRows = loadAll(store, reg.find("proxy-settings"), ["project": context.id]);
-  if (proxyRows.length > 0)
-    data.proxy = proxyRows[0];
   data.farms = loadAll(store, reg.find("farms"), ["project": context.id]);
   data.hosts = loadAll(store, reg.find("hosts"), ["project": context.id]);
   data.endpoints = loadAll(store, reg.find("endpoints"), ["project": context.id]);

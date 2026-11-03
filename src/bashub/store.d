@@ -77,16 +77,6 @@ void fillHubDefaults(const Resource res, ref Row values) {
     values["resolve_support"] = Json(true);
     return;
   }
-  if (res.path == "proxy-settings") {
-    setDefault(values, "proxy_engine", "haproxy");
-    setDefault(values, "maxconn", 30000);
-    setDefault(values, "http_port", 80);
-    setDefault(values, "https_port", 443);
-    setDefault(values, "enable_https", false);
-    setDefault(values, "force_https", false);
-    setDefault(values, "proxy_by_hostname", false);
-    return;
-  }
   if (res.path != "projects")
     return;
   if (isBlank(rowGet(values, "key")))
@@ -176,18 +166,6 @@ private void normalizeHostSetlinePorts(Store store, Registry reg, string id, ref
     if (projectId.length == 0 ||
         !store.fetch(reg.find("projects"), projectId, Query.init, projectDoc))
       throw new StoreException("project", "启用 Setline 的主机必须属于一个存在的项目");
-    Query proxyQuery;
-    proxyQuery.pageSize = 1;
-    proxyQuery.addFilter("project", projectId);
-    auto proxies = dataOf(store.search(reg.find("proxy-settings"), proxyQuery));
-    if (proxies.length == 0)
-      throw new StoreException("project", "启用 Setline 的主机所属项目必须先配置代理设置");
-    if (attributeBool(proxies[0], "proxyByHostname")) {
-      auto hostname = attributeText(jsonGet(projectDoc, "data"), "hostname").strip;
-      if (hostname.length == 0)
-        throw new StoreException("setlineListenPort",
-            "按域名分组时必须在所属项目中填写域名");
-    }
   }
 
   if (listen.length == 0 && id.length > 0 && hostHasTargetedServer(store, reg, id))

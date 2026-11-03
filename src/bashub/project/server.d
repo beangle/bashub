@@ -59,11 +59,10 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
   xml.put(escapeXml(attributeText(context.data, "basVersion")));
   xml.put("\"");
   putAttr(xml, "agent-listen-port", attributeText(context.data, "agentListenPort"));
-  if (setlineEnabled && attributeBool(data.proxy, "proxyByHostname")) {
+  if (setlineEnabled) {
     auto hostname = attributeText(context.data, "hostname").strip;
-    if (hostname.length == 0)
-      throw new Exception("Project.hostname is required when proxyByHostname is enabled");
-    putAttr(xml, "setline-hostname", hostname);
+    if (hostname.length > 0)
+      putAttr(xml, "setline-hostname", hostname);
   }
   xml.put(">\n");
   xml.put("  <repository remote=\"");

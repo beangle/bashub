@@ -7,7 +7,7 @@
  */
 
 module bashub.project.proxy;
-/// `GET /api/bashub/config/{project}/proxy`：按 `proxyEngine` 输出 haproxy / nginx 配置。
+/// `GET /api/bashub/config/{project}/proxy`：按 endpoint engine 输出 haproxy / nginx 配置。
 /// 分组口径与 Scala `ConfigWS.prepareProxyData` 一致：只有带 targets 的 webapp 参与，
 /// 同一个 farm 内按 server 集合拆后端；多个 server 的集合命名为 `farm2`、`farm3`…。
 
@@ -89,16 +89,29 @@ private struct FarmGroup {
 /// setline pull 的证书落点。公钥/私钥分开给 nginx；haproxy 读拼接后的 bundle。
 private enum certificateDir = "/etc/setline/certs";
 
-/// 按 `project.proxyEngine` 渲染项目级单代理（旧接口）；未知引擎返回空串。
+/// 渲染项目代理；未指定 endpoint 时使用 default，否则第一个 endpoint。
 string renderProxy(Store store, Registry reg, const ProjectContext context) {
   return renderProxyForEndpoint(store, reg, context, "");
 }
 
-/// 按 endpoint 渲染；endpointName 为空时使用旧的项目级单代理。
 string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext context,
     string endpointName) {
   auto data = loadProjectData(store, reg, context);
-  auto model = buildProxyModel(data, endpointName);
+  string wanted = endpointName;
+  if (wanted.length == 0 && data.endpoints.length > 0) {
+    wanted = "default";
+    bool hasDefault;
+    foreach (endpoint; data.endpoints)
+      if (attributeText(endpoint, "name") == "default") {
+        hasDefault = true;
+        break;
+      }
+    if (!hasDefault)
+      wanted = attributeText(data.endpoints[0], "name");
+  }
+  if (wanted.length == 0)
+    return "";
+  auto model = buildProxyModel(data, wanted);
   if (model.engine == "nginx")
     return renderNginx(model);
   if (model.engine == "haproxy")
@@ -110,36 +123,34 @@ string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext co
 ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   ProxyModel model;
   model.project = data.project.data;
-  model.proxy = data.proxy.type == Json.Type.object ? data.proxy : Json(["" : Json("")]);
-  model.engine = attributeText(model.proxy, "proxyEngine").strip;
+
+  string wanted = endpointName;
+  if (wanted.length == 0 && data.endpoints.length > 0)
+    wanted = attributeText(data.endpoints[0], "name");
 
   string endpointId;
-  if (endpointName.length) {
-    foreach (endpoint; data.endpoints) {
-      if (attributeText(endpoint, "name") == endpointName) {
-        endpointId = jsonText(endpoint["id"]);
-        model.endpointName = endpointName;
-        model.hostname = attributeText(endpoint, "domain").strip;
-        auto endpointEngine = attributeText(endpoint, "engine").strip;
-        if (endpointEngine.length)
-          model.engine = endpointEngine;
-        auto proxy = data.proxy;
-        proxy["maxconn"] = Json(attributeLong(endpoint, "maxconn", 30000));
-        proxy["httpPort"] = Json(attributeLong(endpoint, "httpPort", 80));
-        proxy["httpsPort"] = Json(attributeLong(endpoint, "httpsPort", 443));
-        proxy["enableHttps"] = Json(attributeBool(endpoint, "enableHttps"));
-        proxy["forceHttps"] = Json(attributeBool(endpoint, "forceHttps"));
-        proxy["sslCiphers"] = Json(attributeText(endpoint, "sslCiphers"));
-        proxy["sslProtocols"] = Json(attributeText(endpoint, "sslProtocols"));
-        model.proxy = proxy;
-        break;
-      }
+  foreach (endpoint; data.endpoints) {
+    if (attributeText(endpoint, "name") == wanted) {
+      endpointId = jsonText(endpoint["id"]);
+      model.endpointName = wanted;
+      model.hostname = attributeText(endpoint, "domain").strip;
+      model.engine = attributeText(endpoint, "engine").strip;
+      model.proxy = Json([
+        "attributes": Json([
+          "maxconn": Json(attributeLong(endpoint, "maxconn", 30000)),
+          "httpPort": Json(attributeLong(endpoint, "httpPort", 80)),
+          "httpsPort": Json(attributeLong(endpoint, "httpsPort", 443)),
+          "enableHttps": Json(attributeBool(endpoint, "enableHttps")),
+          "forceHttps": Json(attributeBool(endpoint, "forceHttps")),
+          "sslCiphers": Json(attributeText(endpoint, "sslCiphers")),
+          "sslProtocols": Json(attributeText(endpoint, "sslProtocols")),
+        ]),
+      ]);
+      break;
     }
-    if (endpointId.length == 0)
-      throw new Exception("unknown endpoint " ~ endpointName);
-  } else {
-    model.hostname = attributeText(data.project.data, "hostname").strip;
   }
+  if (wanted.length && endpointId.length == 0)
+    throw new Exception("unknown endpoint " ~ wanted);
 
   auto apps = data.webapps.dup;
   sort!((a, b) => attributeText(a, "contextPath") < attributeText(b, "contextPath"))(apps);
