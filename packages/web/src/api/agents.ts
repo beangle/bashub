@@ -150,6 +150,8 @@ export interface AgentHistory {
   projectId?: string
   /** project 的说明（title），监控卡片的大标题。 */
   projectTitle?: string
+  /** 当前在线 agent 数；0 表示最后采样后节点已离线。 */
+  onlineAgents?: number
   from: string
   to: string
   days: number

@@ -45,9 +45,10 @@
           <div class="history-title">
             <span class="history-index">{{ index + 1 }}</span>
             <strong>{{ row.id }}</strong>
-            <t-tag size="small" variant="light" :theme="stateTheme(row.lastState)">
-              {{ stateLabel(row.lastState) }}
+            <t-tag size="small" variant="light" :theme="agentOffline ? 'warning' : stateTheme(displayState(row))">
+              {{ agentOffline ? '节点离线' : stateLabel(displayState(row)) }}
             </t-tag>
+            <t-tag v-if="liveState(row.id)" size="small" variant="outline">实时</t-tag>
           </div>
           <div class="history-summary">
             <span>可用率 {{ row.availability.toFixed(1) }}%</span>
@@ -83,7 +84,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { readAgentHistory, type AgentHealth, type AgentHistory } from '@/api/agents'
+import { listAgents, readAgentHistory, type AgentHealth, type AgentHistory, type AgentStatus } from '@/api/agents'
 
 interface HistoryCell {
   date: string
@@ -110,6 +111,7 @@ const days = 180
 const project = computed(() => String(route.params.project ?? ''))
 const projectId = computed(() => history.value?.projectId ?? '')
 const history = ref<AgentHistory | null>(null)
+const liveAgents = ref<AgentStatus[]>([])
 const loading = ref(false)
 const error = ref('')
 const serverFilter = ref('')
@@ -124,12 +126,33 @@ const serverIds = computed<string[]>(() => {
   return [...ids].sort(compareServerIds)
 })
 
+const onlineAgents = computed(() =>
+  history.value?.onlineAgents ?? liveAgents.value.filter((agent) => agent.project === history.value?.project).length,
+)
+const agentOffline = computed(() => onlineAgents.value === 0)
+
+/** 当前在线 agent 的实时状态；历史采样落后时优先用它解释最新状态。 */
+function liveState(id: string): AgentHealth['state'] | '' {
+  for (const agent of liveAgents.value) {
+    if (agent.project !== history.value?.project) continue
+    if (agent.basReport?.instances?.some((instance) => instance.id === id)) return 'running'
+    if (agent.basReport?.declared?.some((instance) => instance.id === id)) return 'stopped'
+    const health = agent.health?.find((item) => item.id === id)
+    if (health) return health.state
+  }
+  return ''
+}
+
+function displayState(row: HistoryRow): AgentHealth['state'] | '' {
+  return liveState(row.id) || row.lastState
+}
+
 const rows = computed<HistoryRow[]>(() => {
   const data = history.value
   if (!data) return []
   const dates = recentDateKeys(data.days, historyAnchor(data))
   const samplesByServer = new Map<string, { at: string; state: AgentHealth['state'] }[]>()
-  for (const sample of data.samples) {
+  for (const sample of [...data.samples].sort((a, b) => a.at.localeCompare(b.at))) {
     const date = sampleDateKey(sample.at)
     if (!date) continue
     for (const [id, state] of Object.entries(sample.servers ?? {})) {
@@ -148,7 +171,7 @@ const rows = computed<HistoryRow[]>(() => {
 
   return ids.map((id) => {
     const samples = samplesByServer.get(id) ?? []
-    const byDate = new Map<string, { running: number; stopped: number; error: number }>()
+    const byDate = new Map<string, { running: number; stopped: number; error: number; lastState: AgentHealth['state'] }>()
     let lastAt = ''
     let lastState: AgentHealth['state'] | '' = ''
     const changes: { at: string; state: AgentHealth['state'] }[] = []
@@ -156,9 +179,10 @@ const rows = computed<HistoryRow[]>(() => {
       const date = sampleDateKey(sample.at)
       let day = byDate.get(date)
       if (!day) {
-        day = { running: 0, stopped: 0, error: 0 }
+        day = { running: 0, stopped: 0, error: 0, lastState: sample.state }
         byDate.set(date, day)
       }
+      day.lastState = sample.state
       if (sample.state === 'running') day.running++
       else if (sample.state === 'stopped') day.stopped++
       else day.error++
@@ -180,10 +204,9 @@ const rows = computed<HistoryRow[]>(() => {
       stopped += day.stopped
       failed += day.error
       sampledDays++
-      const state = day.error > 0 ? 'error' : day.stopped > 0 ? 'stopped' : 'running'
       return {
         date,
-        state,
+        state: day.lastState,
         title: `${day.running} 运行 / ${day.stopped} 停止 / ${day.error} 异常`,
       }
     })
@@ -231,7 +254,7 @@ function historyAnchor(data: AgentHistory): string {
   const today = sampleDateKey(data.to)
   if (today) return today
   let latest = ''
-  for (const sample of data.samples) {
+  for (const sample of [...data.samples].sort((a, b) => a.at.localeCompare(b.at))) {
     const date = sampleDateKey(sample.at)
     if (date > latest) latest = date
   }
@@ -277,7 +300,13 @@ async function reload() {
   loading.value = true
   error.value = ''
   try {
-    history.value = await readAgentHistory(project.value, { days })
+    const [historyResult, agentsResult] = await Promise.allSettled([
+      readAgentHistory(project.value, { days }),
+      listAgents(),
+    ])
+    if (historyResult.status === 'rejected') throw historyResult.reason
+    history.value = historyResult.value
+    liveAgents.value = agentsResult.status === 'fulfilled' ? agentsResult.value : []
   } catch (reason) {
     error.value = errorText(reason)
   } finally {
