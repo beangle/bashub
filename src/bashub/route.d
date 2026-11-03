@@ -14,7 +14,7 @@ module bashub.route;
 
 import beangle.data.dao : DaoException;
 import beangle.data.query : Query, QueryException, parseQuery;
-import beangle.jsonapi.document : attributeBool, attributeLong, attributeText, errorDocument, okDocument, unauthorizedDocument;
+import beangle.jsonapi.document : attributeBool, attributeLong, attributeText, errorDocument, okDocument, relationshipIds, unauthorizedDocument;
 import beangle.data.resource : Registry, Resource;
 import beangle.jsonapi.router : JsonApiService, RouteOptions, collectParams, requireAuth, withFormatSuffix,
   writeJsonApi;
@@ -337,6 +337,28 @@ class HubService {
 
   /// `GET /api/bashub/config/{project}/proxy`：按 Project 的 `proxyEngine` 输出 haproxy / nginx。
   /// 机器下载与 `config/server` 使用同一个 Project key；未知引擎与不存在的 Project 一样返回 404。
+  /// 未指定 endpoint 时选 default，否则第一个；兼容旧的项目级代理预览。
+  private string defaultEndpointName(ProjectContext project) {
+    auto endpoints = dataOf(store.search(reg.find("endpoints"), projectEndpointQuery(project.id)));
+    string fallback;
+    foreach (endpoint; endpoints) {
+      auto current = attributeText(endpoint, "name");
+      if (fallback.length == 0)
+        fallback = current;
+      if (current == "default")
+        return current;
+    }
+    // 没有 default 时优先选实际被 webapp 引用的 endpoint，避免预览到空代理。
+    bool[string] used;
+    foreach (webapp; dataOf(store.search(reg.find("webapps"), projectEndpointQuery(project.id))))
+      foreach (id; relationshipIds(webapp, "endpoints"))
+        used[id] = true;
+    foreach (endpoint; endpoints)
+      if (jsonText(endpoint["id"]) in used)
+        return attributeText(endpoint, "name");
+    return fallback;
+  }
+
   void projectEndpointProxy(HTTPServerRequest req, HTTPServerResponse res) {
     auto projectName = req.params.get("project", "");
     ProjectContext project;
@@ -349,7 +371,14 @@ class HubService {
       return;
     }
     try {
-      auto text = renderProxyForEndpoint(store, reg, project, req.params.get("endpoint", ""));
+      auto endpointName = req.params.get("endpoint", "");
+      if (endpointName.length == 0)
+        endpointName = defaultEndpointName(project);
+      if (endpointName.length == 0) {
+        res.writeBody("", HTTPStatus.notFound);
+        return;
+      }
+      auto text = renderProxyForEndpoint(store, reg, project, endpointName);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
         return;
@@ -374,6 +403,12 @@ class HubService {
     }
     try {
       auto endpoint = req.query.get("endpoint", "");
+      if (endpoint.length == 0)
+        endpoint = defaultEndpointName(project);
+      if (endpoint.length == 0) {
+        res.writeBody("", HTTPStatus.notFound);
+        return;
+      }
       auto text = renderProxyForEndpoint(store, reg, project, endpoint);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
@@ -381,56 +416,30 @@ class HubService {
       }
       res.writeBody(text, HTTPStatus.ok, "text/plain");
     } catch (Exception e) {
-      logError("Render proxy config failed: %s", e.msg);
+      logError("Render proxy config failed: %s", e.toString);
       res.writeBody("", HTTPStatus.internalServerError);
     }
   }
 
-  /// `GET /api/bashub/config/{project}/certificate`：setline 拉取的 PEM 公钥证书。
-  void projectCertificate(HTTPServerRequest req, HTTPServerResponse res) {
-    writeProjectCertificate(req, res, false);
-  }
-
-  /// `GET /api/bashub/config/{project}/certificate-key`：setline 拉取的 PEM 私钥。
-  void projectCertificateKey(HTTPServerRequest req, HTTPServerResponse res) {
-    writeProjectCertificate(req, res, true);
-  }
-
-  private void writeProjectCertificate(HTTPServerRequest req, HTTPServerResponse res, bool privateKey) {
-    ProjectContext project;
-    auto projectName = req.params.get("project", "");
-    if (!findProject(reg, store, projectName, project)) {
-      res.writeBody("", HTTPStatus.notFound);
-      return;
-    }
-    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
-      writeConfigUnauthorized(res);
-      return;
-    }
-
-    Row row;
-    auto text = "";
-    if (store.fetchRaw(reg.find("project-certificates"), project.id, row))
-      text = jsonText(rowGet(row, privateKey ? "private_key" : "certificate"));
-    res.headers["Cache-Control"] = "no-store";
-    res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
-  }
-
-  /// `GET /api/bashub/config/projects/{id}/certificate`：管理台读取公钥与私钥是否已设置。
-  void projectCertificateInfo(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `GET /api/bashub/config/projects/{id}/endpoints/{name}/certificate`：管理台读取 endpoint 证书。
+  void projectEndpointCertificateInfo(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
-    auto id = req.params.get("id", "");
     ProjectContext project;
-    if (!findProjectById(reg, store, id, project)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found"), HTTPStatus.notFound);
       return;
     }
+    Json endpoint;
+    if (!findEndpointJson(project, req.params.get("name", ""), endpoint)) {
+      writeJsonApi(res, errorDocument(404, "代理点不存在", "endpoint not found"), HTTPStatus.notFound);
+      return;
+    }
+    Row row;
     auto doc = Json.emptyObject;
     doc["certificate"] = Json("");
     doc["keySet"] = Json(false);
-    Row row;
-    if (store.fetchRaw(reg.find("project-certificates"), project.id, row)) {
+    if (store.fetchRaw(reg.find("endpoints"), jsonText(endpoint["id"]), row)) {
       doc["certificate"] = Json(jsonText(rowGet(row, "certificate")));
       doc["keySet"] = Json(jsonText(rowGet(row, "private_key")).length > 0);
     }
@@ -438,14 +447,18 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
-  /// `PATCH /api/bashub/config/projects/{id}/certificate`：保存 PEM 公钥证书；私钥留空表示保持原值。
-  void updateProjectCertificate(HTTPServerRequest req, HTTPServerResponse res) {
+  /// `PATCH /api/bashub/config/projects/{id}/endpoints/{name}/certificate`：保存 endpoint 证书；私钥留空保持原值。
+  void updateProjectEndpointCertificate(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
-    auto id = req.params.get("id", "");
     ProjectContext project;
-    if (!findProjectById(reg, store, id, project)) {
-      writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found"), HTTPStatus.notFound);
+      return;
+    }
+    Json endpoint;
+    if (!findEndpointJson(project, req.params.get("name", ""), endpoint)) {
+      writeJsonApi(res, errorDocument(404, "代理点不存在", "endpoint not found"), HTTPStatus.notFound);
       return;
     }
     auto body = requestJson(req, res);
@@ -467,14 +480,25 @@ class HubService {
     values["certificate"] = Json(certificate);
     if (privateKey.length > 0)
       values["private_key"] = Json(privateKey);
-    auto certificates = reg.find("project-certificates");
-    store.upsertColumns(certificates, project.id, values);
+    auto endpoints = reg.find("endpoints");
+    auto endpointId = jsonText(endpoint["id"]);
+    store.updateColumns(endpoints, endpointId, values);
     Row stored;
     auto doc = Json.emptyObject;
     doc["certificate"] = Json(certificate);
-    doc["keySet"] = Json(store.fetchRaw(certificates, project.id, stored)
+    doc["keySet"] = Json(store.fetchRaw(endpoints, endpointId, stored)
         && jsonText(rowGet(stored, "private_key")).length > 0);
     writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  private bool findEndpointJson(ProjectContext project, string name, out Json endpoint) {
+    foreach (item; dataOf(store.search(reg.find("endpoints"), projectEndpointQuery(project.id)))) {
+      if (attributeText(item, "name") == name) {
+        endpoint = item;
+        return true;
+      }
+    }
+    return false;
   }
 
   /// PEM 只保留一份稳定的换行。
@@ -512,16 +536,34 @@ class HubService {
       return;
     }
 
+    auto endpointName = req.query.get("endpoint", "");
+    Json endpoint;
+    if (endpointName.length == 0) {
+      auto items = dataOf(store.search(reg.find("endpoints"), projectEndpointQuery(project.id)));
+      if (items.length > 0) {
+        endpointName = attributeText(items[0], "name");
+        foreach (item; items)
+          if (attributeText(item, "name") == "default")
+            endpointName = "default";
+      }
+    }
+    if (endpointName.length > 0 && !findEndpointJson(project, endpointName, endpoint)) {
+      res.writeBody("", HTTPStatus.notFound);
+      return;
+    }
     Row row;
     auto certificate = "";
     auto certificateKey = "";
-    if (store.fetchRaw(reg.find("project-certificates"), project.id, row)) {
+    if (endpoint.type == Json.Type.object
+        && store.fetchRaw(reg.find("endpoints"), jsonText(endpoint["id"]), row)) {
       certificate = jsonText(rowGet(row, "certificate"));
       certificateKey = jsonText(rowGet(row, "private_key"));
     }
     try {
       auto peers = renderPeers(store, reg, project);
-      auto proxy = renderProxy(store, reg, project);
+      auto proxy = endpoint.type == Json.Type.object
+          ? renderProxyForEndpoint(store, reg, project, endpointName)
+          : renderProxy(store, reg, project);
       auto text = renderSetlineManifest(peers, proxy, certificate, certificateKey);
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "application/json");
@@ -543,6 +585,12 @@ class HubService {
     }
     try {
       auto endpoint = req.query.get("endpoint", "");
+      if (endpoint.length == 0)
+        endpoint = defaultEndpointName(project);
+      if (endpoint.length == 0) {
+        res.writeBody("", HTTPStatus.notFound);
+        return;
+      }
       auto text = renderProxyForEndpoint(store, reg, project, endpoint);
       if (text.length == 0) {
         res.writeBody("", HTTPStatus.notFound);
@@ -551,7 +599,7 @@ class HubService {
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "text/plain");
     } catch (Exception e) {
-      logError("Render proxy config failed: %s", e.msg);
+      logError("Render proxy config failed: %s", e.toString);
       res.writeBody("", HTTPStatus.internalServerError);
     }
   }
@@ -1257,7 +1305,9 @@ class HubService {
       return;
     }
     try {
-      writeJsonApi(res, agents.history(project.id, projectName, cast(int) daysCount), HTTPStatus.ok);
+      auto doc = agents.history(project.id, projectName, cast(int) daysCount);
+      doc["onlineAgents"] = Json(cast(long) agents.sessionsOf(projectName).length);
+      writeJsonApi(res, doc, HTTPStatus.ok);
     } catch (Exception e) {
       logError("Query agent history failed: %s", e.msg);
       writeJsonApi(res, errorDocument(500, "运行历史查询失败", e.msg), HTTPStatus.internalServerError);
@@ -2229,10 +2279,8 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   // config：机器配置分发与配置详情
   router.get(api.config ~ "/:project/server", &hub.projectServer);
   router.get(api.config ~ "/:project/proxy", &hub.projectProxy);
-  router.get(api.config ~ "/projects/:id/certificate", &hub.projectCertificateInfo);
-  router.patch(api.config ~ "/projects/:id/certificate", &hub.updateProjectCertificate);
-  router.get(api.config ~ "/:project/certificate", &hub.projectCertificate);
-  router.get(api.config ~ "/:project/certificate-key", &hub.projectCertificateKey);
+  router.get(api.config ~ "/projects/:id/endpoints/:name/certificate", &hub.projectEndpointCertificateInfo);
+  router.patch(api.config ~ "/projects/:id/endpoints/:name/certificate", &hub.updateProjectEndpointCertificate);
   router.get(api.config ~ "/:project/setline-peers", &hub.projectPeers);
   router.get(api.config ~ "/:project/proxy/:endpoint", &hub.projectEndpointProxy);
   router.get(api.config ~ "/:project/endpoints", &hub.projectEndpoints);
@@ -2286,7 +2334,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   string[] emsResources;
   foreach (item; reg.all) {
     if (item.path != "cdn-components" && item.path != "project-micdn"
-        && item.path != "project-micdn-components" && item.path != "project-certificates") {
+        && item.path != "project-micdn-components" && item.path != "proxy-settings") {
       auto group = resourceApiGroup(item);
       if (group == "ems")
         emsResources ~= item.path;

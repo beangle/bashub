@@ -588,7 +588,7 @@ unittest {
   assert(!ex.body.canFind("download-secret"));
   assert(ex.body.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="********"/>`));
 
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/proxy");
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/proxy?endpoint=edge-web");
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/plain");
   assert(ex.body.canFind("upstream prod-farm{"));
@@ -604,7 +604,7 @@ unittest {
 unittest {
   auto router = newRouter();
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/proxy",
+      "http://localhost/api/bashub/config/openurp.prod/proxy?endpoint=edge-web",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "text/plain");
@@ -670,7 +670,7 @@ unittest {
   auto router = newRouter();
   auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/setline-manifest", auth);
+      "http://localhost/api/bashub/config/openurp.prod/setline-manifest?endpoint=edge-web", auth);
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/json");
   auto resources = parseJson(ex.body)["resources"];
@@ -681,11 +681,11 @@ unittest {
   auto peers = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/setline-peers", auth);
   auto proxy = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/proxy", auth);
+      "http://localhost/api/bashub/config/openurp.prod/proxy/edge-web", auth);
   auto cert = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/certificate", auth);
+      "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-web/certificate", auth);
   auto key = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/certificate-key", auth);
+      "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-web/certificate-key", auth);
   assert(resources["peers"].get!string == sha256Lower(peers.body));
   assert(resources["proxy"].get!string == sha256Lower(proxy.body));
   assert(resources["certificate"].get!string == sha256Lower(cert.body));
@@ -876,27 +876,20 @@ unittest {
   assert(rows[0]["attributes"]["displayName"].get!string == "prod-farm.app1 (10.0.0.11)");
 }
 
-@("project certificates live outside project and are downloadable by token")
-unittest {
+@("endpoint certificates are managed by session and downloadable by token") unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, testDao(reg));
   auto cert = "-----BEGIN CERTIFICATE-----\nCERT\n-----END CERTIFICATE-----";
   auto cert2 = "-----BEGIN CERTIFICATE-----\nCERT2\n-----END CERTIFICATE-----";
   auto key = "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----";
-  assert(store.upsertColumns(reg.find("project-certificates"), "1002", [
+  assert(store.updateColumns(reg.find("endpoints"), "9002", [
     "certificate": Json(cert), "private_key": Json(key),
   ]));
   auto router = newRouterWith(reg, store);
 
-  // project 资源不再携带证书大字段
-  auto ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002");
-  assert(ex.status == 200, ex.body);
-  auto attributes = parseJson(ex.body)["data"]["attributes"];
-  assert(attributes["sslCertificate"].type == Json.Type.undefined);
-  assert(attributes["sslCertificateKey"].type == Json.Type.undefined);
-
   // 管理台专用端点：回公钥与「私钥是否已设置」，绝不回私钥原文
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/certificate");
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate");
   assert(ex.status == 200, ex.body);
   auto info = parseJson(ex.body);
   assert(info["certificate"].get!string == cert);
@@ -906,8 +899,8 @@ unittest {
   // PATCH 只换公钥：私钥留空保持原值
   auto body = Json.emptyObject;
   body["certificate"] = Json(cert2);
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/projects/1002/certificate",
-      body.toString);
+  ex = call(router, HTTPMethod.PATCH,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate", body.toString);
   assert(ex.status == 200, ex.body);
   auto cert2Pem = cert2 ~ "\n";
   auto updated = parseJson(ex.body);
@@ -916,22 +909,22 @@ unittest {
 
   // 非法 PEM 拒绝
   body["certificate"] = Json("not a certificate");
-  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/config/projects/1002/certificate",
-      body.toString);
+  ex = call(router, HTTPMethod.PATCH,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate", body.toString);
   assert(ex.status == 400, ex.body);
 
-  // setline 的机器端点仍按 Project key 下载
-  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate");
+  // setline 的机器端点按 Project key + endpoint 下载
+  auto url = "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-ip/certificate";
+  ex = call(router, HTTPMethod.GET, url);
   assert(ex.status == 401, ex.body);
-  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate",
-      ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
+  auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];
+  ex = callWithHeaders(router, HTTPMethod.GET, url, auth);
   assert(ex.status == 200, ex.body);
   assert(ex.body == cert2Pem);
-  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate-key",
-      ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"]);
+  ex = callWithHeaders(router, HTTPMethod.GET, url ~ "-key", auth);
   assert(ex.status == 200, ex.body);
   assert(ex.body == key);
-  ex = callWithHeaders(router, HTTPMethod.GET, "http://localhost/api/bashub/config/openurp.prod/certificate-key",
+  ex = callWithHeaders(router, HTTPMethod.GET, url ~ "-key",
       ["Authorization": "Bearer openurp.prod:wrong"]);
   assert(ex.status == 401, ex.body);
 }

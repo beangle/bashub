@@ -110,8 +110,8 @@ string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext co
 ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   ProxyModel model;
   model.project = data.project.data;
-  model.proxy = data.proxy;
-  model.engine = attributeText(data.proxy, "proxyEngine").strip;
+  model.proxy = data.proxy.type == Json.Type.object ? data.proxy : Json(["" : Json("")]);
+  model.engine = attributeText(model.proxy, "proxyEngine").strip;
 
   string endpointId;
   if (endpointName.length) {

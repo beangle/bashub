@@ -94,15 +94,6 @@ Registry hubRegistry() {
       [Relation("project", "project_id", "projects")],
       [],
       "name"),
-    /// 证书单独成表：project 的列表/详情不再携带大字段；只给专用端点内部使用。
-    Resource(
-      "project-certificates", "projectCertificates", "bas.cfg_project_certificates", "project_id",
-      [
-        Column("certificate", "certificate", Kind.text),
-        Column("private_key", "privateKey", Kind.text),
-      ],
-      [], [],
-      "project_id"),
     Resource(
       "engines", "engines", "bas.cfg_engines", "id",
       [

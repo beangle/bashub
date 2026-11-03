@@ -46,7 +46,7 @@ struct ProjectData {
 ProjectData loadProjectData(Store store, Registry reg, const ProjectContext context) {
   ProjectData data;
   data.project = context;
-  data.proxy = Json.emptyObject;
+  data.proxy = Json(["" : Json("")]);
   auto proxyRows = loadAll(store, reg.find("proxy-settings"), ["project": context.id]);
   if (proxyRows.length > 0)
     data.proxy = proxyRows[0];
