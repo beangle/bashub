@@ -135,13 +135,17 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
       model.endpointName = wanted;
       model.hostname = attributeText(endpoint, "domain").strip;
       model.engine = attributeText(endpoint, "engine").strip;
+      // 没有证书时不能生成引用证书文件的 TLS 配置；即使 enableHttps 打开也退回 HTTP。
+      auto hasCertificate = attributeText(endpoint, "certificate").strip.length > 0;
+      auto enableHttps = hasCertificate && attributeBool(endpoint, "enableHttps");
+      auto forceHttps = enableHttps && attributeBool(endpoint, "forceHttps");
       model.proxy = Json([
         "attributes": Json([
           "maxconn": Json(attributeLong(endpoint, "maxconn", 30000)),
           "httpPort": Json(attributeLong(endpoint, "httpPort", 80)),
           "httpsPort": Json(attributeLong(endpoint, "httpsPort", 443)),
-          "enableHttps": Json(attributeBool(endpoint, "enableHttps")),
-          "forceHttps": Json(attributeBool(endpoint, "forceHttps")),
+          "enableHttps": Json(enableHttps),
+          "forceHttps": Json(forceHttps),
           "sslCiphers": Json(attributeText(endpoint, "sslCiphers")),
           "sslProtocols": Json(attributeText(endpoint, "sslProtocols")),
         ]),

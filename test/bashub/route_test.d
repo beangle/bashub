@@ -658,7 +658,6 @@ unittest {
   string sha256Lower(string text) {
     return toHexString!(LetterCase.lower)(sha256Of(text)).idup;
   }
-  auto etag = "\"" ~ sha256Lower(manifestBody) ~ "\"";
   auto resources = parseJson(manifestBody)["resources"];
   auto proxy = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/proxy/edge-web", auth);
@@ -666,19 +665,9 @@ unittest {
       "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-web/certificate", auth);
   auto key = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/endpoints/edge-web/certificate-key", auth);
-  assert(resources["routes"].get!string.length == 64);
   assert(resources["proxy"].get!string == sha256Lower(proxy.body));
   assert(resources["certificate"].get!string == sha256Lower(cert.body));
   assert(resources["certificate-key"].get!string == sha256Lower(key.body));
-
-  auto manifestHeaders = [
-    "Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210",
-    "If-None-Match": etag,
-  ];
-  ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/setline-manifest?endpoint=edge-web",
-      manifestHeaders);
-  assert(ex.status == 304, ex.body);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/setline-manifest",

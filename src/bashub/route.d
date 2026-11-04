@@ -31,7 +31,7 @@ import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.project.menus : renderEmsMenus;
-import bashub.project.manifest : renderSetlineManifest, sha256Hex;
+import bashub.project.manifest : renderSetlineManifest;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
@@ -655,17 +655,7 @@ class HubService {
       auto proxy = endpoint.type == Json.Type.object
           ? renderProxyForEndpoint(store, reg, project, endpointName)
           : renderProxy(store, reg, project);
-      auto routes = routeDocument(project, chooseAgent(req, projectName));
-    auto routesText = routes.type == Json.Type.object ? routes.toString : "{}";
-    auto text = renderSetlineManifest(routesText, proxy, certificate, certificateKey);
-    auto etag = "\"" ~ sha256Hex(text) ~ "\"";
-    res.headers["ETag"] = etag;
-    auto inm = req.headers.get("if-none-match", req.headers.get("If-None-Match", "")).strip;
-    if (inm.length > 0 && inm == etag) {
-      res.headers["Cache-Control"] = "no-store";
-      res.writeBody("", HTTPStatus.notModified);
-      return;
-    }
+      auto text = renderSetlineManifest(proxy, certificate, certificateKey);
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(text, HTTPStatus.ok, "application/json");
     } catch (Exception e) {

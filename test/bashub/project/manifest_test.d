@@ -13,13 +13,13 @@ import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import vibe.data.json : parseJson;
 
 @("setline manifest hashes every downloadable response deterministically") unittest {
-  auto text = renderSetlineManifest("routes\n", "proxy\n", "certificate\n", "key\n");
-  assert(text == renderSetlineManifest("routes\n", "proxy\n", "certificate\n", "key\n"));
+  auto text = renderSetlineManifest("proxy\n", "certificate\n", "key\n");
+  assert(text == renderSetlineManifest("proxy\n", "certificate\n", "key\n"));
   auto root = parseJson(text);
   assert(root["version"].get!int == 1);
   assert(root["resources"]["proxy"].get!string == sha256Hex("proxy\n"));
   assert(root["resources"]["proxy"].get!string == sha256Hex("proxy\n"));
   assert(root["resources"]["certificate"].get!string == sha256Hex("certificate\n"));
   assert(root["resources"]["certificate-key"].get!string == sha256Hex("key\n"));
-  assert(root["resources"]["routes"].get!string.length == 64);
+  assert(root["resources"]["proxy"].get!string.length == 64);
 }

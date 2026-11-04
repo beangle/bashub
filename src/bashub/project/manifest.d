@@ -19,14 +19,11 @@ string sha256Hex(string text) {
 }
 
 /// 输出稳定、无时间戳的清单，避免内容未变时 agent 反复更新状态。
-string renderSetlineManifest(string routes, string proxy, string certificate, string certificateKey) {
+string renderSetlineManifest(string proxy, string certificate, string certificateKey) {
   auto out_ = appender!string;
   out_.put("{\n");
   out_.put("  \"version\": 1,\n");
   out_.put("  \"resources\": {\n");
-  out_.put(`    "routes": "`);
-  out_.put(sha256Hex(routes));
-  out_.put("\",\n");
   out_.put(`    "certificate": "`);
   out_.put(sha256Hex(certificate));
   out_.put("\",\n");

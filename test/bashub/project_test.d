@@ -232,7 +232,7 @@ unittest {
   assert(!haproxy.canFind(`"agent"`));
   assert(haproxy.canFind("frontend main"));
   assert(haproxy.canFind("bind *:80"));
-  assert(haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
+  assert(!haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
   assert(haproxy.canFind("map_beg(/var/lib/setline/haproxy/setline.map)"));
   assert(haproxy.canFind("use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)]"));
   assert(haproxy.canFind("# setline path routes: backends and map are written by the setline agent " ~
