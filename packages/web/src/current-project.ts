@@ -62,5 +62,6 @@ export function isProjectRef(field: FieldSchema): boolean {
  * （原 UI 里只有 farm/host/webapp 这样做，artifact/engine 的「针对配置」是各自可空的选项。）
  */
 export function isProjectScoped(schema: ResourceSchema): boolean {
+  if (schema.followProject === false) return false
   return (schema.filters ?? []).some(isProjectRef) || schema.fields.some((field) => isProjectRef(field) && field.required)
 }

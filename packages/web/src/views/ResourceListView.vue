@@ -269,7 +269,7 @@ const isCards = schema.layout === 'cards'
 /** 以配置为工作域的资源（群集/主机/应用部署）：查询条件与新建表单都跟着「当前配置」走。 */
 const projectScoped = isProjectScoped(schema)
 /** 查询条件里的「配置」字段。 */
-const projectFilter = filterFields.find(isProjectRef)
+const projectFilter = schema.followProject === false ? undefined : filterFields.find(isProjectRef)
 /** 树形表格的 defaultExpandAll 只在挂载时生效，数据异步返回后需重挂一次才能整树展开。 */
 const treeRevision = ref(0)
 
@@ -480,21 +480,27 @@ function refItemTexts(row: ResourceRow, field: FieldSchema, cell: NonNullable<Fi
   return refItemParts(row, field, cell).map((part) => `${part.main}${part.muted}`)
 }
 
-/** 取展示值：优先属性路径（支持 `a.b` 嵌套），否则按「关联.属性」从 included 中取。 */
+/** 取展示值：优先属性路径，否则沿 relationships 逐级从 included 中取。 */
 function displayValue(row: ResourceRow, name: string): unknown {
   if (name === 'id') return row.id
-  const direct = valueAt(row.attributes, name.split('.'))
+  return resolveValue(row, name.split('.'))
+}
+
+/** 解析 `org.logoUrl` / `project.org.logoUrl` 这类可能跨多级关联的路径。 */
+function resolveValue(row: ResourceRow, parts: string[]): unknown {
+  if (parts.length === 0) return undefined
+  const direct = valueAt(row.attributes, parts)
   if (direct !== undefined) return direct
-  const [head, ...rest] = name.split('.')
+  if (parts.length < 2) return undefined
+  const [head, ...rest] = parts
   const targets = relationshipTargets(row, head)
-  if (targets.length === 0) return undefined
-  const texts = targets
-    // 必须按「类型:id」回取：不同实体类型的 id 会重复，只用 id 会串到别的类型上。
     .map((target) => includedIndex.value.get(`${target.type}:${target.id}`))
     .filter((item): item is ResourceRow => Boolean(item))
-    .map((item) => attributeText(valueAt(item.attributes, rest)))
-    .filter((text) => text.length > 0)
-  return texts.length > 0 ? texts.join(', ') : undefined
+  for (const target of targets) {
+    const value = resolveValue(target, rest)
+    if (value !== undefined && attributeText(value).length > 0) return value
+  }
+  return undefined
 }
 
 /** 把 `{attr}` 模板替换成行内取值。 */

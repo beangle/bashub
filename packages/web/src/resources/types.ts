@@ -182,6 +182,8 @@ export interface ResourceSchema {
   columns?: string[]
   /** 列表查询条件，如菜单页按应用过滤。 */
   filters?: FieldSchema[]
+  /** 是否跟随/记住「当前配置」；缺省 true。端点等跨配置列表设为 false。 */
+  followProject?: boolean
   /** 列表默认排序。 */
   sort?: string
   /** 批量动作。 */

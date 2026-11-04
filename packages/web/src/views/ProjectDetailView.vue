@@ -85,7 +85,7 @@
                 </div>
                 <div class="fact">
                   <span>入口地址</span>
-                  <strong>{{ hostname || ip || '—' }}</strong>
+                  <strong>{{ domain || ip || '—' }}</strong>
                 </div>
                 <div class="fact">
                   <span>HTTP / HTTPS</span>
@@ -595,7 +595,7 @@ const projectName = computed(() => qualifiedName.value || name.value)
 const projectTitle = computed(() => attrOf(project.value, 'title'))
 const basVersion = computed(() => attrOf(project.value, 'basVersion'))
 const ip = computed(() => attrOf(proxy.value, 'ip'))
-const hostname = computed(() => attrOf(project.value, 'hostname'))
+const domain = computed(() => attrOf(proxy.value, 'domain'))
 const httpPort = computed(() => attrOf(proxy.value, 'httpPort'))
 const httpsPort = computed(() => attrOf(proxy.value, 'httpsPort'))
 const enableHttps = computed(() => boolOf(proxy.value?.attributes.enableHttps))
@@ -628,7 +628,7 @@ const setlineHosts = computed(() =>
     .sort((a, b) => a.name.localeCompare(b.name)),
 )
 const setlineEnabled = computed(() => setlineHosts.value.length > 0)
-const setlineGroup = computed(() => hostname.value || '*')
+const setlineGroup = computed(() => domain.value || '*')
 const setlineHostsText = computed(() =>
   setlineHosts.value.map((host) => `${host.name}:${host.listen}/${host.admin}`).join('；') || '—',
 )
