@@ -73,12 +73,10 @@
         <div class="ip-cards">
           <article v-for="agent in group.agents" :key="agentKey(agent)" class="ip-card">
             <header class="ip-card__head">
-              <div class="ip-card__id">
-                <div class="ip-card__title">
-                  <strong class="ip-card__ip">{{ agent.ip || agent.host || '-' }}</strong>
-                  <span v-if="agent.host" class="ip-card__host">{{ agent.host }}</span>
-                  <t-tag size="small" theme="success" variant="light">在线</t-tag>
-                </div>
+              <div class="ip-card__title">
+                <strong class="ip-card__ip">{{ agent.ip || agent.host || '-' }}</strong>
+                <span v-if="agent.host" class="ip-card__host">{{ agent.host }}</span>
+                <t-tag size="small" theme="success" variant="light">在线</t-tag>
                 <span class="ip-card__os">{{ osText(agent) }}</span>
               </div>
               <span class="ip-card__count">{{ runningOf(agent) }} 运行 / {{ stoppedOf(agent) }} 停止</span>
@@ -1334,7 +1332,7 @@ onBeforeUnmount(() => {
 
 .ip-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
@@ -1342,12 +1340,9 @@ onBeforeUnmount(() => {
   background: var(--td-bg-color-container-hover);
 }
 
-.ip-card__id {
-  min-width: 0;
-}
-
 .ip-card__title {
   display: flex;
+  flex: 1;
   align-items: center;
   min-width: 0;
   gap: 8px;
@@ -1368,8 +1363,7 @@ onBeforeUnmount(() => {
 }
 
 .ip-card__os {
-  display: block;
-  margin-top: 2px;
+  min-width: 0;
   overflow: hidden;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
