@@ -15,8 +15,7 @@ dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
 ```
 
 控制台 API 与部署配置分发由 D 后端唯一实现，目标是**低功耗运行**。原 JVM 后端已于 2026-10
-退役；数据库仍是同一套 `bas.*` 表（含 `public.next_id()` 主键生成器）。完整的功能盘点、
-后续增强项见 [`docs/roadmap.md`](docs/roadmap.md)。
+退役；数据库仍是同一套 `bas.*` 表（含 `public.next_id()` 主键生成器）。
 
 后端 API 按能力域分组，根前缀缺省是 `/api/bashub`：
 
