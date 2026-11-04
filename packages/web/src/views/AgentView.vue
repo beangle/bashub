@@ -105,12 +105,11 @@
                         <td class="instance-index">{{ index + 1 }}</td>
                         <td class="instance-name" :title="instance.id || '-'">{{ instance.id || '-' }}</td>
                         <td>
-                          <div class="instance-status">
-                            <t-tag size="small" variant="light" :theme="instanceStateTheme(instance)">
-                              {{ instanceStateLabel(instance) }}
-                            </t-tag>
+                          <div class="instance-status" :class="`is-${instanceStatusKind(instance)}`">
+                            <span class="instance-state-dot"></span>
+                            <span class="instance-state-label">{{ instanceStateLabel(instance) }}</span>
                             <span v-if="isRunning(instance)" class="instance-pid">
-                              PID {{ instance.pid ?? '-' }}
+                              #{{ instance.pid ?? '-' }}
                             </span>
                           </div>
                         </td>
@@ -942,9 +941,9 @@ function instanceStateLabel(instance: AgentInstance): string {
   return isRunning(instance) ? '运行中' : '已停止'
 }
 
-function instanceStateTheme(instance: AgentInstance): 'success' | 'warning' | 'danger' {
-  if (instance.state === 'error') return 'danger'
-  return isRunning(instance) ? 'success' : 'warning'
+function instanceStatusKind(instance: AgentInstance): 'running' | 'stopped' | 'error' {
+  if (instance.state === 'error') return 'error'
+  return isRunning(instance) ? 'running' : 'stopped'
 }
 
 /** 卡片副标题：操作系统名称与内核版本；还没上报时给一句提示。 */
@@ -1520,15 +1519,43 @@ onBeforeUnmount(() => {
 }
 
 .instance-status {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   white-space: nowrap;
+  font-size: 12px;
+}
+
+.instance-state-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--td-text-color-placeholder);
+}
+
+.instance-status.is-running .instance-state-dot {
+  background: var(--td-success-color);
+}
+
+.instance-status.is-stopped .instance-state-dot {
+  background: var(--td-warning-color);
+}
+
+.instance-status.is-error .instance-state-dot {
+  background: var(--td-error-color);
+}
+
+.instance-state-label {
+  color: var(--td-text-color-primary);
+}
+
+.instance-status.is-stopped .instance-state-label,
+.instance-status.is-error .instance-state-label {
+  color: var(--td-text-color-secondary);
 }
 
 .instance-pid {
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
+  color: var(--td-text-color-placeholder);
   font-variant-numeric: tabular-nums;
 }
 
