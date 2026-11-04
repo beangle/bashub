@@ -90,13 +90,11 @@ private Row[] projectRows() {
   return [
     row("1001", [
       "name": Json("demo"), "title": Json("演示配置"), "bas_version": Json("6.0.0"),
-      "hostname": Json("demo.openurp.net"),
       "local_repo": Json("~/.m2/repository"), "remote_repo": Json("https://repo1.maven.org/maven2"),
       "key": Json("0123456789abcdef0123456789abcdef"), "org": Json("1"),
     ]),
     row("1002", [
       "name": Json("prod"), "title": Json("生产配置"), "bas_version": Json("6.0.0"),
-      "hostname": Json("prod.openurp.net"),
       "local_repo": Json("/srv/m2"), "remote_repo": Json("https://repo.openurp.net/maven2"),
       "key": Json("fedcba9876543210fedcba9876543210"), "org": Json("2"),
     ]),

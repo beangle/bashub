@@ -220,7 +220,6 @@
         <table name="cfg_projects" comment="Project?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
-            <column name="hostname" type="varchar(255)" comment="hostname?"/>
             <column name="&quot;key&quot;" type="varchar(255)" nullable="false" comment="key?"/>
             <column name="local_repo" type="varchar(255)" nullable="false" comment="localRepo?"/>
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>

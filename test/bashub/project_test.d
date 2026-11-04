@@ -118,7 +118,6 @@ unittest {
   assert(xml.canFind(`<proxy name="edge-ip" ip="10.0.0.30,10.0.0.10"/>`));
   assert(xml.canFind(`endpoints="edge-web,edge-ip"`));
   assert(!xml.canFind("<hub"));
-  assert(xml.canFind(`setline-hostname="prod.openurp.net"`));
 
   assert(xml.canFind(`<engine name="tomcat" type="tomcat-server" version="10.1.42"`));
   assert(!xml.canFind("undertow"));
@@ -162,25 +161,6 @@ unittest {
     assert(findProject(reg, store, "openurp.prod", project));
     assertThrown!Exception(renderServerXml(store, reg, project));
   }
-}
-
-@("server.xml uses the project hostname for setline when present") unittest {
-  Registry reg;
-  auto store = newStore(reg);
-  ProjectContext project;
-  scope (exit)
-    store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]);
-
-  assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("")]));
-  assert(findProject(reg, store, "openurp.prod", project));
-  auto xml = renderServerXml(store, reg, project);
-  assert(!xml.canFind("setline-hostname"));
-  assert(xml.canFind(`setline-listen-port="8080"`));
-
-  assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("prod.openurp.net")]));
-  assert(findProject(reg, store, "openurp.prod", project));
-  xml = renderServerXml(store, reg, project);
-  assert(xml.canFind(`setline-hostname="prod.openurp.net"`));
 }
 
 @("micdn server registrations normalize adminListen and stay out of micdn.xml")

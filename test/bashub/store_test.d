@@ -206,7 +206,6 @@ unittest {
   auto store = newStore(reg);
   Json updated;
 
-  assert(store.updateColumns(reg.find("projects"), "1002", ["hostname": Json("")]));
   assert(store.update(reg.find("hosts"), "2001",
       parseJsonString(`{"data":{"type":"hosts","attributes":{
         "setlineListenPort":18080,"setlineAdminPort":18081}}}`), updated));

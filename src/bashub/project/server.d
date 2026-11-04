@@ -47,23 +47,12 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
   auto engineIds = data.enginesById.keys;
   sort!((a, b) => attributeText(data.enginesById[a], "name") <
       attributeText(data.enginesById[b], "name"))(engineIds);
-  bool setlineEnabled;
-  foreach (host; hosts)
-    if (hostSetlinePortText(host, "setlineListenPort", "Host.setlineListenPort").length > 0
-        && hostSetlinePortText(host, "setlineAdminPort", "Host.setlineAdminPort").length > 0)
-      setlineEnabled = true;
-
   auto xml = appender!string;
   xml.put("<bas xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ");
   xml.put("xsi:noNamespaceSchemaLocation=\"http://beangle.github.io/schema/bas-1.0.0.xsd\" version=\"");
   xml.put(escapeXml(attributeText(context.data, "basVersion")));
   xml.put("\"");
   putAttr(xml, "agent-listen-port", attributeText(context.data, "agentListenPort"));
-  if (setlineEnabled) {
-    auto hostname = attributeText(context.data, "hostname").strip;
-    if (hostname.length > 0)
-      putAttr(xml, "setline-hostname", hostname);
-  }
   xml.put(">\n");
   xml.put("  <repository remote=\"");
   xml.put(escapeXml(attributeText(context.data, "remoteRepo")));

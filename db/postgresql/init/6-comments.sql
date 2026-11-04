@@ -71,7 +71,6 @@ comment on column bas.cfg_project_micdn.project_id is 'Project ID';
 comment on column bas.cfg_project_micdn.config is 'Micdn 配置(JSON)';
 comment on column bas.cfg_project_micdn.components is 'Micdn 组件 ID 数组，按挂载名排序：["18","19"]';
 comment on column bas.cfg_projects."key" is 'key?';
-comment on column bas.cfg_projects.hostname is 'hostname?';
 comment on column bas.cfg_projects.id is '非业务主键:datetime';
 comment on column bas.cfg_projects.local_repo is 'localRepo?';
 comment on column bas.cfg_projects.name is '名称';

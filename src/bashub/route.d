@@ -279,13 +279,24 @@ class HubService {
     return sessions.length == 1 ? sessions[0] : null;
   }
 
-  /// 由 basagent 上报的实例生成 routes 文档；没有上报时返回 null。
+  /// 找到包含该 agent IP 的 endpoint；找不到返回 undefined。
+  private Json endpointForIp(ProjectContext project, string ip) {
+    if (ip.length == 0)
+      return Json(null);
+    foreach (endpoint; dataOf(store.search(reg.find("endpoints"), projectEndpointQuery(project.id))))
+      if (endpointContainsIp(endpoint, ip))
+        return endpoint;
+    return Json(null);
+  }
+
+  /// 由 basagent 上报的实例生成 routes 文档；host 取 endpoint 域名，无域名用 *。
   private Json routeDocument(ProjectContext project, AgentSession chosen) {
     if (chosen is null || chosen.basReport.type != Json.Type.object)
       return Json(null);
-    auto host = attributeText(project.data, "hostname").strip;
+    auto endpoint = endpointForIp(project, chosen.ip);
+    auto host = endpoint.type == Json.Type.object ? attributeText(endpoint, "domain").strip : "";
     if (host.length == 0)
-      host = chosen.host.length ? chosen.host : chosen.ip;
+      host = "*";
     auto report = chosen.basReport;
     auto instances = jsonGet(report, "instances");
     long[string] ports;

@@ -44,7 +44,6 @@ Registry hubRegistry() {
         Column("title", "title", Kind.text),
         Column("bas_version", "basVersion", Kind.text),
         Column("agent_listen_port", "agentListenPort", Kind.number),
-        Column("hostname", "hostname", Kind.text),
         Column("local_repo", "localRepo", Kind.text),
         Column("remote_repo", "remoteRepo", Kind.text),
         Column("key", "key", Kind.text, true, "\"key\""),

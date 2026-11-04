@@ -481,7 +481,7 @@ unittest {
   auto router = newRouter(false, agents);
 
   auto a = agents.attach("openurp.prod", "1002", "10.0.0.10");
-  auto b = agents.attach("openurp.prod", "1002", "10.0.0.11");
+  auto b = agents.attach("openurp.prod", "1002", "10.0.0.20");
   Envelope hello;
   assert(parse(`{"type":"hello","at":"2026-10-16T10:00:00+08:00",
       "body":{"host":"app1","supports":["hello","report:now"]}}`, hello));
@@ -496,7 +496,7 @@ unittest {
   assert(parseJson(ex.body)["errors"][0]["detail"].get!string.canFind("?agent="));
 
   ex = call(router, HTTPMethod.POST,
-      "http://localhost/api/bashub/monitor/agents/openurp.prod/report?agent=10.0.0.11");
+      "http://localhost/api/bashub/monitor/agents/openurp.prod/report?agent=10.0.0.20");
   assert(ex.status == 202, ex.body);
   assert(a.takeOutbound().length == 0);
   assert(b.takeOutbound().length == 1);
@@ -630,17 +630,17 @@ unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, testDao(reg));
   auto agents = new AgentRegistry();
-  auto session = agents.attach("openurp.prod", "1002", "10.0.0.11");
+  auto session = agents.attach("openurp.prod", "1002", "10.0.0.20");
   session.basReport = parseJsonString(`{"instances":[{"id":"prod-farm.app1","httpPort":9080,
     "webapps":[{"context":"/bas","urls":["/bas","/context1"]}]}]}`);
   auto router = newRouterWith(reg, store, false, agents);
   auto auth = "Bearer openurp.prod:fedcba9876543210fedcba9876543210";
   auto ex = callWithHeaders(router, HTTPMethod.GET,
-      "http://localhost/api/bashub/config/openurp.prod/routes?ip=10.0.0.11",
+      "http://localhost/api/bashub/config/openurp.prod/routes?ip=10.0.0.20",
       ["Authorization": auth]);
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
-  assert(doc["host"].get!string == "prod.openurp.net");
+  assert(doc["host"].get!string == "www.openurp.net");
   assert(doc["routes"].get!(Json[]).length == 2);
   assert(doc["routes"][0]["prefix"].get!string == "/context1");
   assert(doc["routes"][0]["port"].get!long == 9080);
