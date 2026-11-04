@@ -176,6 +176,7 @@
             v-model="form[field.key]"
             :options="field.options || []"
             :placeholder="`请选择${field.label}`"
+            :disabled="field.locked"
             clearable
           />
           <t-select
@@ -183,17 +184,21 @@
             v-model="form[field.key]"
             :options="optionsOf(field)"
             :placeholder="`请选择${field.label}`"
+            :disabled="field.locked"
             filterable
             clearable
+            @change="onFieldChange(field, $event)"
           />
           <t-select
             v-else-if="inputType(field) === 'refs' || inputType(field) === 'ids'"
             v-model="form[field.key]"
             :options="optionsOf(field)"
             :placeholder="`请选择${field.label}`"
+            :disabled="field.locked"
             multiple
             filterable
             clearable
+            @change="onFieldChange(field, $event)"
           />
           <template v-if="field.help" #help>
             <span>{{ field.help }}</span>
@@ -322,6 +327,7 @@ const sort = ref(schema.sort || '')
 const pagination = reactive({ current: 1, pageSize: 30, total: 0 })
 const filterValues = reactive<Record<string, unknown>>({})
 const optionsCache = reactive<Record<string, SelectOption[]>>({})
+const optionRows = new Map<string, ResourceRow[]>()
 
 /** 查询条件是否已填值（空串、未选、空多选都算没填）。 */
 function filterValueFilled(value: unknown): boolean {
@@ -662,22 +668,34 @@ function refsOf(): FieldSchema[] {
   return [...formFields, ...filterFields].filter((field) => field.ref && (field.type === 'ref' || field.type === 'refs' || field.type === 'ids'))
 }
 
-async function loadOptions() {
-  const refs = refsOf()
+async function loadOptions(fields: FieldSchema[] = refsOf()) {
+  const project = projectId(form.project) || projectId(filterValues.project) || currentProjectId.value
   await Promise.all(
-    refs.map(async (field) => {
+    fields.map(async (field) => {
       const ref = field.ref!
-      const key = `${ref.path}#${field.key}`
-      if (optionsCache[key]) {
+      const key = `${ref.path}#${field.key}#${field.optionsFilter ? project : ''}`
+      if (!field.refreshOptions && optionsCache[key]) {
         optionsCache[field.key] = optionsCache[key]
         return
       }
-      const result = await listResource(ref.path, { pageSize: 300, sort: ref.sort || ref.labelFields[0] })
+      const result = await listResource(ref.path, {
+        pageSize: 300,
+        sort: ref.sort || ref.labelFields[0],
+        filters: field.optionsFilter && project ? { [field.optionsFilter]: project } : undefined,
+      })
       const options = result.rows.map((row) => ({ label: labelOf(row, ref.labelFields) || row.id, value: row.id }))
       optionsCache[key] = options
       optionsCache[field.key] = options
+      optionRows.set(field.key, result.rows)
     }),
   )
+}
+
+/** 表单里依赖当前 project 的选项：每次打开都重新拉，避免 endpoint/server 新增后仍是旧缓存。 */
+async function refreshFormOptions() {
+  const dynamic = formFields.filter((field) => field.refreshOptions || field.optionsFilter)
+  if (dynamic.length > 0)
+    await loadOptions(dynamic)
 }
 
 const gridActions = computed<DataGridAction[]>(() => {
@@ -928,20 +946,33 @@ function resetForm(row?: ResourceRow) {
 
 function onFieldChange(field: FieldSchema, value: unknown) {
   field.onChange?.(value, form)
+  if (!field.refDefaults || !field.ref) return
+  const selected = optionRows.get(field.key)?.find((row) => row.id === String(value))
+  if (!selected) return
+  for (const [target, path] of Object.entries(field.refDefaults)) {
+    const source = valueAt(selected.attributes, path.split('.'))
+    form[target] = source === null || source === undefined ? '' : String(source)
+  }
 }
 
 async function openForm() {
   showErrors.value = false
+  try {
+    await refreshFormOptions()
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '加载表单选项失败')
+    return
+  }
   formVisible.value = true
   await nextTick()
   formRef.value?.clearValidate()
 }
 
-function openCreate() {
+async function openCreate() {
   editingId.value = ''
   editingRow.value = undefined
   resetForm()
-  void openForm()
+  await openForm()
 }
 
 /** 卡片墙的落点：`cardLink` 模板（如平台功能 → 详情页）优先，否则打开编辑抽屉。 */
@@ -953,11 +984,11 @@ function openCard(row: ResourceRow) {
   openEdit(row)
 }
 
-function openEdit(row: ResourceRow) {
+async function openEdit(row: ResourceRow) {
   editingId.value = row.id
   editingRow.value = row
   resetForm(row)
-  void openForm()
+  await openForm()
 }
 
 /** 抽屉里的关联页入口：关掉抽屉再跳到目标页（如群集 → /config/servers?farm=<id>）。 */

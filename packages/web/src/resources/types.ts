@@ -109,6 +109,14 @@ export interface FieldSchema {
   nullable?: boolean
   placeholder?: string
   help?: string
+  /** 关联下拉的过滤条件，如 `server.farm.project.id` 只取当前配置下的选项。 */
+  optionsFilter?: string
+  /** 每次打开表单都重新获取选项，不使用页面级缓存（server/endpoint 会随配置变化）。 */
+  refreshOptions?: boolean
+  /** 选中关联后，从关联行属性填充表单字段：目标字段 → 源属性路径。 */
+  refDefaults?: Record<string, string>
+  /** 表单字段只读（如部署页的 project）。 */
+  locked?: boolean
   /** 敏感值：编辑时不由服务端回填，留空表示保持原值。 */
   secret?: boolean
   /** type=select 的静态选项。 */

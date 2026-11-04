@@ -174,7 +174,7 @@ export const resourceSchemas: ResourceSchema[] = [
     fields: [
       { key: 'name', label: '名称', required: true, width: '10%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
-      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       { key: 'engine', label: '引擎', type: 'ref', ref: { path: '/engines', type: 'engines', labelFields: ['name', 'version'] }, required: true, width: '12%' },
       { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', required: true, width: '8%' },
       // 进程参数只在表单里维护。
@@ -232,7 +232,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/hosts/{id}'), text: '{name}', target: '_self' } },
       { key: 'ip', label: 'IP', columnTitle: 'IP地址', required: true, width: '13%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
-      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       // 与原 host/list.ftl 一致：平台图标 + 名称(版本) 合成一列。
       {
         key: 'platform', label: '操作系统', type: 'ref', ref: platformRef, required: true, width: '12%',
@@ -311,16 +311,17 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true },
     ],
     fields: [
-      { key: 'artifact', label: '标题', type: 'ref', ref: artifactRef, required: true, form: true, cell: { type: 'join', fields: ['artifact.title'] } },
+      { key: 'artifact', label: '标题', type: 'ref', ref: artifactRef, required: true, form: true, cell: { type: 'join', fields: ['artifact.title'] },
+        refDefaults: { version: 'latestVersion', contextPath: 'contextPath' } },
       { key: 'artifactName', label: '名称', form: false, sortable: false, width: '21%', cell: { type: 'join', fields: ['artifact.artifactId'] } },
       // 配置是查询条件里的必填项，列表列不再重复展示。
-      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false },
+      { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       { key: 'version', label: '版本', required: true, width: '12%', cell: { type: 'updatable' } },
       { key: 'contextPath', label: '上下文', required: true },
       { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，反代与 setline 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
       { key: 'unpack', label: '解压执行', type: 'boolean', width: 70 },
-      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, help: '只能选择配置了 Setline 监听端口的主机上的服务' },
-      { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, help: '可多选；留空表示不做负载代理' },
+      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, width: '26%', optionsFilter: 'farm.project.id', refreshOptions: true, help: '只能选择当前配置下的服务' },
+      { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, width: '12%', optionsFilter: 'endpoint.project.id', refreshOptions: true, help: '只能选择当前配置下的代理点；留空表示不做负载代理' },
       { key: 'libs', label: '扩展库', type: 'textarea', rows: 6, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
     ],
   },
