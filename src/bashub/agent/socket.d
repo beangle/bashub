@@ -155,6 +155,7 @@ void runRelayLoop(AgentRegistry registry, string project, string projectId, stri
     master = registry.attachRelay(project, projectId, ip, groupName);
     logDebug("%s@%s: relay master connected", project, ip);
     auto lastPing = MonoTime.currTime;
+    auto lastHealth = MonoTime.currTime;
     while (socket.connected) {
       if (master.queue.superseded || !registry.isCurrent(master)) {
         socket.close(master.queue.closeCode, master.queue.closeReason);
@@ -171,6 +172,13 @@ void runRelayLoop(AgentRegistry registry, string project, string projectId, stri
       if (heartbeatInterval > Duration.zero && current - lastPing >= heartbeatInterval) {
         master.offer(ping());
         lastPing = current;
+      }
+      if (health.due(Clock.currTime, current - lastHealth)) {
+        foreach (session; registry.sessionsOfGroup(project, groupName)) {
+          if (session.supportsPrimitive("report:health"))
+            session.offer(reportHealth(session.agent));
+        }
+        lastHealth = current;
       }
       if (!socket.waitForData(PollInterval))
         continue;

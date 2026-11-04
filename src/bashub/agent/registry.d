@@ -15,6 +15,7 @@ module bashub.agent.registry;
 
 import channel = bashub.agent.channel;
 import bashub.agent.history : AgentHistoryStore, AgentSample;
+import beangle.data.value : jsonGet;
 
 import core.time : Duration, MonoTime, seconds;
 import std.uuid : randomUUID;
@@ -165,6 +166,18 @@ final class AgentSession {
       health = parseHealth(message.body, healthKnown);
       if (healthKnown)
         healthAt = channel.now();
+      // health 也带轻量 cpu/mem 动态指标；保留 os/disk 静态信息，只刷新这两项。
+      if (message.body.type == Json.Type.object) {
+        if (osReport.type != Json.Type.object)
+          osReport = Json.emptyObject;
+        auto cpu = jsonGet(message.body, "cpu");
+        if (cpu.type != Json.Type.undefined)
+          osReport["cpu"] = cpu;
+        auto mem = jsonGet(message.body, "mem");
+        if (mem.type != Json.Type.undefined)
+          osReport["mem"] = mem;
+        osAt = message.at;
+      }
       break;
     case "pong":
       break;

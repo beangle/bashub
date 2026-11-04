@@ -17,39 +17,14 @@
 
     <t-alert v-if="error" theme="error" :message="error" class="agent-alert" />
 
-    <section v-if="topology.length" class="topology-card">
-      <header class="topology-card__head">
-        <div>
-          <h3>本地组网拓扑</h3>
-          <p>同组 master 通过 LinkMutex 协商 target，follower 由 master 中继。</p>
-        </div>
-      </header>
-      <div class="topology-list">
-        <div v-for="item in topology" :key="item.group" class="topology-group">
-          <div class="topology-group__name">{{ item.group }}</div>
-          <div class="topology-group__flow">
-            <div class="topology-masters">
-              <span class="topology-role">Master / 中继</span>
-              <t-tag v-for="agent in item.masters" :key="agent.ip" variant="light">
-                {{ agentLabel(agent) }}
-              </t-tag>
-              <span v-if="!item.masters.length" class="topology-empty">暂无</span>
-            </div>
-            <span class="topology-arrow">→</span>
-            <div class="topology-followers">
-              <span class="topology-role">Follower</span>
-              <t-tag v-for="agent in item.followers" :key="agent.ip" variant="outline">
-                {{ agentLabel(agent) }}
-              </t-tag>
-              <span v-if="!item.followers.length" class="topology-empty">暂无</span>
-            </div>
-            <div v-if="item.linkMutex" class="topology-link-mutex">
-              <span class="topology-role">LinkMutex</span>
-              <span>{{ item.linkMutex.owner }} → {{ item.linkMutex.target }}</span>
-              <span class="topology-expire">{{ item.linkMutex.expiresIn }}s</span>
-            </div>
-          </div>
-        </div>
+    <section v-if="topology.length" class="topology-compact">
+      <span class="topology-compact__title">组网中继</span>
+      <div v-for="item in topology" :key="item.group" class="topology-compact__row">
+        <span class="topology-compact__group">{{ item.group }}</span>
+        <span class="topology-compact__link">
+          {{ item.linkMutex?.owner }} → {{ item.linkMutex?.target }}
+        </span>
+        <span class="topology-compact__ttl">{{ item.linkMutex?.expiresIn }}s</span>
       </div>
     </section>
 
@@ -474,9 +449,9 @@ const topology = computed(() => {
     else if (agent.role === 'follower') item.followers.push(agent)
     if (agent.linkMutex) item.linkMutex = agent.linkMutex
   }
-  // 单机组网没有中继信息；不展示只有一个 agent 的组。
+  // 只有正在使用 LinkMutex 的连接行为才展示拓扑；普通 master/follower 常驻不展示。
   return [...map.values()]
-    .filter((item) => item.total > 1)
+    .filter((item) => item.linkMutex !== undefined)
     .sort((a, b) => a.group.localeCompare(b.group))
 })
 
@@ -1150,6 +1125,39 @@ onBeforeUnmount(() => {
 .project-select {
   width: 420px;
   max-width: 100%;
+}
+
+.topology-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  background: var(--td-bg-color-container);
+}
+
+.topology-compact__title {
+  color: var(--td-text-color-placeholder);
+  font-weight: 600;
+}
+
+.topology-compact__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topology-compact__group {
+  font-weight: 600;
+}
+
+.topology-compact__ttl {
+  color: var(--td-text-color-placeholder);
 }
 
 .topology-card {
