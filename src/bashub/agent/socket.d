@@ -170,7 +170,10 @@ void runRelayLoop(AgentRegistry registry, string project, string projectId, stri
       if (master.role == "master")
         registry.refreshMaster(project, groupName, master.ip, 60.seconds);
       if (heartbeatInterval > Duration.zero && current - lastPing >= heartbeatInterval) {
-        master.offer(ping());
+        foreach (session; registry.sessionsOfGroup(project, groupName)) {
+          if (session.supportsPrimitive("ping"))
+            session.offer(ping(session.agent));
+        }
         lastPing = current;
       }
       if (health.due(Clock.currTime, current - lastHealth)) {

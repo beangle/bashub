@@ -172,12 +172,8 @@
               <aside class="ip-card__agent">
                 <dl class="agent-conn-facts">
                   <div class="agent-conn-row">
-                    <dt>连接</dt>
-                    <dd>{{ shortTime(agent.connectedAt) }}</dd>
-                  </div>
-                  <div class="agent-conn-row">
                     <dt>心跳</dt>
-                    <dd>{{ shortTime(agent.lastSeenAt) }}</dd>
+                    <dd :title="agent.lastSeenAt || ''">{{ heartbeatText(agent.lastSeenAt) }}</dd>
                   </div>
                   <div class="agent-conn-row">
                     <dt>BAS_HOME</dt>
@@ -956,6 +952,17 @@ function osText(agent: AgentStatus): string {
   const os = agent.os?.os
   if (!os) return '系统信息未上报'
   return [os.name, os.kernel].filter(Boolean).join(' · ') || '系统信息未上报'
+}
+
+/** 心跳时间：近期显示相对时间，较早时退回绝对时间。 */
+function heartbeatText(value?: string): string {
+  if (!value) return '-'
+  const at = new Date(value).getTime()
+  if (Number.isNaN(at)) return value
+  const seconds = Math.max(0, Math.floor((Date.now() - at) / 1000))
+  if (seconds < 60) return `${seconds} 秒前`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`
+  return shortTime(value)
 }
 
 /** 时间只留「月日T时分秒」；时区由服务器 locale 决定，卡面上不重复展示。 */
