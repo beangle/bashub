@@ -159,40 +159,6 @@
             </article>
           </div>
 
-          <div v-else-if="activeSection === 'setline'" class="detail-stack">
-            <article class="detail-card">
-              <header class="detail-card__head">
-                <div>
-                  <h4>路由推送</h4>
-                  <p>setline 端口属于主机；basctl 按本机 Host 读取管理口，实例启停后同步路由。</p>
-                </div>
-                <t-tag :theme="setlineEnabled ? 'success' : 'default'" variant="light">
-                  {{ setlineEnabled ? '已启用' : '未启用' }}
-                </t-tag>
-              </header>
-              <div class="fact-grid">
-                <div class="fact">
-                  <span>启用主机</span>
-                  <strong>{{ setlineEnabled ? `${setlineHosts.length} 台` : '—' }}</strong>
-                </div>
-                <div class="fact">
-                  <span>listen / admin</span>
-                  <strong>{{ setlineHostsText }}</strong>
-                </div>
-                <div class="fact">
-                  <span>路由组</span>
-                  <strong>{{ setlineGroup }}</strong>
-                </div>
-                <div class="fact">
-                  <span>server.xml</span>
-                  <strong>{{ setlineEnabled ? '已生成主机端口' : '未生成' }}</strong>
-                </div>
-              </div>
-            </article>
-
-
-          </div>
-
           <div v-else-if="activeSection === 'certificate'" class="detail-stack">
             <article class="detail-card">
               <header class="detail-card__head">
@@ -518,7 +484,7 @@ import {
 
 const PROJECTS_PATH = '/projects'
 
-type SectionKey = 'overview' | 'proxy' | 'setline' | 'certificate' | 'bas' | 'micdn'
+type SectionKey = 'overview' | 'proxy' | 'certificate' | 'bas' | 'micdn'
 
 interface SectionItem {
   key: SectionKey
@@ -561,7 +527,6 @@ interface IpGroup {
 const sectionItems: SectionItem[] = [
   { key: 'overview', label: '概览', hint: 'Project 的归属、版本与部署概况', icon: DashboardIcon },
   { key: 'proxy', label: 'Haproxy / Nginx', hint: '负载均衡监听与渲染后的代理配置', icon: InternetIcon },
-  { key: 'setline', label: 'Setline', hint: 'setline 的 peer 列表与路由来源', icon: LinkIcon },
   { key: 'certificate', label: '证书', hint: 'HTTPS、公钥证书与私钥保护', icon: CertificateIcon },
   { key: 'bas', label: 'BAS 服务', hint: '群集、服务、应用、在线实例与 server.xml', icon: ServerIcon },
   { key: 'micdn', label: 'Micdn', hint: '静态挂载、仓库、Blob 与 Micdn 节点', icon: CloudIcon },
@@ -617,21 +582,6 @@ const privateKeyDraft = ref('')
 const savingCertificate = ref(false)
 const certificateError = ref('')
 const keyConfigured = computed(() => Boolean(attrOf(project.value, 'key')) || micdn.value?.project.keySet === true)
-const setlineHosts = computed(() =>
-  hosts.value
-    .map((host) => ({
-      name: attributeText(host.attributes.name) || attributeText(host.attributes.ip),
-      listen: attributeText(host.attributes.setlineListenPort),
-      admin: attributeText(host.attributes.setlineAdminPort),
-    }))
-    .filter((host) => host.listen.length > 0 && host.admin.length > 0)
-    .sort((a, b) => a.name.localeCompare(b.name)),
-)
-const setlineEnabled = computed(() => setlineHosts.value.length > 0)
-const setlineGroup = computed(() => domain.value || '*')
-const setlineHostsText = computed(() =>
-  setlineHosts.value.map((host) => `${host.name}:${host.listen}/${host.admin}`).join('；') || '—',
-)
 const organizationText = computed(() => {
   const orgTitle = attrOf(organization.value, 'title')
   return [organizationName.value, orgTitle].filter(Boolean).join(' · ')

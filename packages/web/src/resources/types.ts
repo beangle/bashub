@@ -12,6 +12,8 @@ export type FieldType =
   | 'select'
   | 'ref'
   | 'refs'
+  /** 以关联 id 数组保存的属性（如 host.featureIds）：表单多选，提交为字符串数组。 */
+  | 'ids'
 
 export interface SelectOption {
   label: string

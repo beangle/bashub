@@ -46,8 +46,6 @@ comment on column bas.cfg_hosts.name is '名称';
 comment on column bas.cfg_hosts.platform_id is 'Platform?ID';
 comment on column bas.cfg_hosts.platform_version is 'platformVersion?';
 comment on column bas.cfg_hosts.project_id is 'Project?ID';
-comment on column bas.cfg_hosts.setline_listen_port is 'setlineListenPort?';
-comment on column bas.cfg_hosts.setline_admin_port is 'setlineAdminPort?';
 comment on column bas.cfg_organizations.id is '非业务主键:auto_increment';
 comment on column bas.cfg_organizations.logo_url is 'logoUrl?';
 comment on column bas.cfg_organizations.name is '名称';

@@ -48,15 +48,6 @@ const archOptions = [
   { label: 'AArch64', value: 3 },
 ]
 
-const setlineEnabledOptions = [
-  { label: '启用', value: 'yes' },
-  { label: '不启用', value: 'no' },
-]
-
-function hasPortValue(value: unknown): boolean {
-  return value !== null && value !== undefined && String(value).trim().length > 0
-}
-
 export const resourceSchemas: ResourceSchema[] = [
   {
     key: 'organizations',
@@ -256,33 +247,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'cores', label: 'CPU 核心数', columnTitle: 'CPU核心', type: 'number', required: true, width: '8%' },
       { key: 'cpu', label: 'CPU 规格', columnTitle: 'CPU规格', required: true, width: '20%', cell: { type: 'text', style: 'font-size:0.8em' } },
       { key: 'agentGroup', label: '组网分组', type: 'text', required: true, defaultValue: 'default_group', help: '同一分组内的 agent 自动选主；不同分组互不组网' },
-      {
-        key: 'setlineEnabled', label: '启用 Setline', type: 'radio', column: false,
-        options: setlineEnabledOptions, defaultValue: 'no', virtual: true,
-        deriveValue: (attributes) =>
-          hasPortValue(attributes.setlineListenPort) && hasPortValue(attributes.setlineAdminPort) ? 'yes' : 'no',
-        onChange: (value, form) => {
-          if (value === 'yes') {
-            form.setlineListenPort = 8080
-            form.setlineAdminPort = 8082
-          } else {
-            form.setlineListenPort = null
-            form.setlineAdminPort = null
-          }
-        },
-        help: '启用前须为所属配置填写域名，路由组直接使用该域名；关闭会清空两个端口。已有 Webapp 把该主机上的服务作为运行目标时不能关闭',
-      },
-      {
-        key: 'setlineListenPort', label: 'Setline 监听端口', type: 'number', column: false, nullable: true,
-        min: 1, max: 65535, placeholder: '8080', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
-        help: 'setline 数据面 listen 端口；agent 从 http://<IP>:<端口>/_setline/routes 拉取路由。它和 admin 端口必须同时配置',
-      },
-      {
-        key: 'setlineAdminPort', label: 'Setline 管理口端口', type: 'number', column: false, nullable: true,
-        min: 1, max: 65535, placeholder: '8082', requiredWhen: 'setlineEnabled', requiredWhenValue: 'yes',
-        help: 'setline adminListen 端口；basctl 在本机连接 127.0.0.1:<端口> 推路由，不写入 server.xml',
-      },
-      { key: 'featureIds', label: '系统特性', type: 'lines', column: false, help: '一行一个平台功能 ID' },
+      { key: 'featureIds', label: '系统特性', type: 'ids', ref: featureRef, column: false, help: '按平台功能名称多选' },
     ],
   },
   {

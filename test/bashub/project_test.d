@@ -125,8 +125,8 @@ unittest {
   assert(xml.canFind(`<listener class-name="org.beangle.bas.listener.StartupListener"/>`));
   assert(xml.canFind(`<jar uri="org.beangle:beangle-webmvc:4.6.0"/>`));
 
-  assert(xml.canFind(`<host name="host01" ip="10.0.0.11" agent-group="default_group" setline-listen-port="8080" setline-admin-port="10080"/>`));
-  assert(xml.canFind(`<host name="host02" ip="10.0.0.12" agent-group="default_group" setline-listen-port="8082" setline-admin-port="10081"/>`));
+  assert(xml.canFind(`<host name="host01" ip="10.0.0.11" agent-group="default_group"/>`));
+  assert(xml.canFind(`<host name="host02" ip="10.0.0.12" agent-group="default_group"/>`));
   assert(xml.canFind(`<farm name="prod-farm" engine="tomcat" max-heap-size="2048M">`));
   assert(xml.canFind(`<server name="app1" host="host01" http="8080" proxy-http-port="9080"`));
 
@@ -149,18 +149,6 @@ unittest {
   assert(xml.canFind(`token="hub-secret"`));
   // 预览遮掉令牌
   assert(renderServerXml(store, reg, demo, true, "hub-secret").canFind(`token="********"`));
-}
-
-@("server.xml rejects invalid host setline ports") unittest {
-  Registry reg;
-  auto store = newStore(reg);
-  auto hosts = reg.find("hosts");
-  ProjectContext project;
-  foreach (value; ["0", "70000", "not-a-port"]) {
-    assert(store.updateColumns(hosts, "2001", ["setline_admin_port": Json(value)]));
-    assert(findProject(reg, store, "openurp.prod", project));
-    assertThrown!Exception(renderServerXml(store, reg, project));
-  }
 }
 
 @("micdn server registrations normalize adminListen and stay out of micdn.xml")

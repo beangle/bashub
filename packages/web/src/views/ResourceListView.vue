@@ -187,7 +187,7 @@
             clearable
           />
           <t-select
-            v-else-if="inputType(field) === 'refs'"
+            v-else-if="inputType(field) === 'refs' || inputType(field) === 'ids'"
             v-model="form[field.key]"
             :options="optionsOf(field)"
             :placeholder="`请选择${field.label}`"
@@ -659,7 +659,7 @@ function filterOptions(field: FieldSchema): SelectOption[] {
 }
 
 function refsOf(): FieldSchema[] {
-  return [...formFields, ...filterFields].filter((field) => field.ref && (field.type === 'ref' || field.type === 'refs'))
+  return [...formFields, ...filterFields].filter((field) => field.ref && (field.type === 'ref' || field.type === 'refs' || field.type === 'ids'))
 }
 
 async function loadOptions() {
@@ -864,6 +864,7 @@ function defaultFormValue(field: FieldSchema): unknown {
   if (field.defaultValue !== undefined) return field.defaultValue
   switch (inputType(field)) {
     case 'refs':
+    case 'ids':
       return []
     case 'boolean':
       return field.key === 'enabled' || field.key === 'resolveSupport'
@@ -906,6 +907,9 @@ function resetForm(row?: ResourceRow) {
       form[field.key] = relationshipIds(row, field.key)[0] || ''
     } else if (field.type === 'refs') {
       form[field.key] = relationshipIds(row, field.key)
+    } else if (field.type === 'ids') {
+      const value = valueAt(row.attributes, field.path || [field.key])
+      form[field.key] = Array.isArray(value) ? value.map(String) : []
     } else if (field.deriveValue) {
       form[field.key] = field.deriveValue(row.attributes)
     } else if (field.type === 'boolean') {
@@ -1053,6 +1057,11 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
     if (field.type === 'refs') {
       const ids = Array.isArray(raw) ? (raw as string[]) : []
       relationships[field.key] = { data: ids.map((id) => ({ type: field.ref!.type, id: String(id) })) }
+      return
+    }
+    if (field.type === 'ids') {
+      const ids = Array.isArray(raw) ? (raw as string[]).map(String) : []
+      setAt(attributes, path, ids)
       return
     }
     if (field.type === 'boolean') {

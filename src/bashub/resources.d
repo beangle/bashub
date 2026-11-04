@@ -140,8 +140,6 @@ Registry hubRegistry() {
         Column("arch", "arch", Kind.number),
         Column("agent_group", "agentGroup", Kind.text),
         Column("feature_ids", "featureIds", Kind.jsonDocument),
-        Column("setline_listen_port", "setlineListenPort", Kind.number),
-        Column("setline_admin_port", "setlineAdminPort", Kind.number),
       ],
       [
         Relation("project", "project_id", "projects"),

@@ -133,9 +133,9 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 | `engines` | Engine | `type` 取 `tomcat-server`/`tomcat`/`undertow`/`jetty`/`any`（与 basctl 的 creator 同名）；`listeners`/`jars` 支持分隔符字符串；`jspSupport` 仅 `tomcat-server` 有效 |
 | `farms` | Farm | 群集 |
 | `servers` | Server | 群集实例；派生 `qualifiedName`（`群集.服务`）、`hostIp` 与 `displayName`（`群集.服务 (IP)`），供部署选择器显示 |
-| `hosts` | Host | `arch` 以 1 起的序号或枚举名提交；`setlineListenPort` / `setlineAdminPort` 是成对的主机级 setline 端口（1-65535），都为空表示该主机不部署 setline；listen 供 peer agent 读取 `/_setline/routes`，admin 供 basctl 在本机推路由；两个端口下发到 server.xml 的 `<host>`，不生成 `<setline>`；列表下发按 `platform` 过滤后的 `featureLogos`；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
+| `hosts` | Host | `arch` 以 1 起的序号或枚举名提交；setline 只运行在代理侧，主机不维护 setline 端口；列表下发按 `platform` 过滤后的 `featureLogos`；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
 | `artifacts` | Artifact | 下发计算属性 `gav`；`GET /api/bashub/config/artifacts/{id}/webapps?include=artifact` 返回使用该组件的部署；`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[..]}`）从 Maven Central 的 `maven-metadata.xml` 刷新 `latestVersion` |
-| `webapps` | Webapp | `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 只能选择位于同时配置了 `Host.setlineListenPort` 与 `Host.setlineAdminPort` 的主机上的 server，否则无法生成有效的 `run-at`；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
+| `webapps` | Webapp | `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 选择运行 server；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
 | `platform-features` | PlatformFeature | 菜单是 `平台与功能` 页签组里的「平台功能」页签 |
 | `platform-feature-scripts` | PlatformFeatureScript | 无独立列表页，在平台功能详情页维护；`scripts` 写入时去掉 `\r` |
 
@@ -161,12 +161,11 @@ Micdn 资源不挂在通用 CRUD 下，统一在 `/api/bashub/micdn` 暴露。Mi
 | `PATCH/DELETE /api/bashub/micdn/components/{id}` | 组件修改/删除 |
 
 `config.servers` 登记运行 micdn 的节点，每项为 `{name, adminListen}`，例如
-`{"name":"cdn01","adminListen":"10.0.0.31:8081"}`。该字段不写入 `micdn.xml`，只用于生成
-`/config/setline-peers` 的 peer 列表；`adminListen` 不能使用 `0.0.0.0`、`*` 或 `::` 这类不可拨号地址。
+`{"name":"cdn01","adminListen":"10.0.0.31:8081"}`。该字段不写入 `micdn.xml`。
 
 ## 机器端点（config / ems / micdn / monitor）
 
-`{project}` 为配置名。`server`、`proxy`、`setline-peers`、`certificate`、`certificate-key` 与
+`{project}` 为配置名。`server`、`proxy`、`routes`、`certificate`、`certificate-key` 与
 `/api/bashub/micdn/{project}/micdn.xml`、`/api/bashub/monitor/agents/{project}/channel` 使用 Project 令牌鉴权；
 推荐发 `Authorization: Bearer <project>:<Project.key>`，
 同时校验 URL 中的 Project 与凭证前缀。HTTP 配置下载也接受 Basic（用户名 `<project>`、
@@ -178,11 +177,10 @@ Freemarker 模板运行时，不属于 JSON:API。
 
 | URL | 说明 |
 |---|---|
-| `GET /api/bashub/config/{project}/server` | 服务器/集群配置；`Authorization: Bearer <project>:<project.key>` 鉴权。`<snapshot-repo>` 的 `token` 取 Project 的 micdn `<auth download-key>`，为空时回退 hub.xml 的 `<snapshot download-token>`（兼容 `maven-download-token` 属性）；都没有则不写 `token`。存在已启用 setline 的 Host 时，在对应 `<host>` 上输出 `setline-listen-port` / `setline-admin-port`。不再生成 `<setline>` 或 `setline-hostname`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
+| `GET /api/bashub/config/{project}/server` | 服务器/集群配置；`Authorization: Bearer <project>:<project.key>` 鉴权。`<snapshot-repo>` 的 `token` 取 Project 的 micdn `<auth download-key>`，为空时回退 hub.xml 的 `<snapshot download-token>`（兼容 `maven-download-token` 属性）；都没有则不写 `token`。不再生成 `<host>` 的 setline 端口、`<setline>` 或 `setline-hostname`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
 | `GET /api/bashub/config/{project}/proxy` | 反向代理配置（haproxy/nginx，按 `project.proxyEngine` 选择模板）；使用同样的 Project 令牌。只输出所选引擎自身的合法配置，不混入 setline agent 配置；HAProxy 按请求 `path` 做 `map_beg` 路由，不再生成 Host 分组查找、path ACL 或 inline backend |
 | `GET /api/bashub/config/{project}/certificate` | Project 的 PEM 公钥证书（可含完整证书链）；使用同样的 Project 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{project}/certificate-key` | Project 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
-| `GET /api/bashub/config/{project}/setline-peers` | haproxy/nginx sidecar 的 peer 列表（JSON）；使用同样的 Project 令牌。任何存在的 Project 都有响应：`peers` 由 Project 下带 server 且配置了 `setlineListenPort` 的 host（URL `http://<host.ip>:<host.setlineListenPort>`）与 Micdn 配置 `servers[]`（URL `http://<adminListen>`）合并生成，并按 URL 去重；没有 peer 时返回空数组。`setline pull` 把这组 peers 写回节点自己的 `setline.conf [agent] peers`。web 节点的端口来自 Host 的 setline `listen`；该 listen 地址必须能被 sidecar 访问，且 sidecar 来源 IP 要写进对应 setline 的 `peerReaders` |
 | `GET /api/bashub/config/{project}/setline-manifest` | setline 的资源配置摘要（SHA-256）；使用同样的 Project 令牌 |
 | `GET /api/bashub/ems/{project}/menus/{appName}` | 应用菜单 |
 | `GET /api/bashub/micdn/{project}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；`X-Micdn-Token` 或 `Authorization: Bearer <project.key>` 鉴权 |
@@ -190,7 +188,6 @@ Freemarker 模板运行时，不属于 JSON:API。
 | `WS /api/bashub/monitor/agents/{project}/channel` | 节点通道：basctl 主动连上来的 WebSocket（**不是** HTTP 接口，握手用 `Authorization: Bearer <project>:<Project.key>`，兼容只发 key），见下 |
 | `GET /api/bashub/config/projects/{id}/server` | 管理台查看最终 server.xml；登录会话鉴权 |
 | `GET /api/bashub/config/projects/{id}/proxy` | 管理台查看所选引擎的最终代理配置；登录会话鉴权 |
-| `GET /api/bashub/config/projects/{id}/setline-peers` | 管理台查看 setline peer 列表；登录会话鉴权 |
 | `GET /api/bashub/config/projects/{id}/certificate` | 管理台读取 PEM 公钥证书与 `keySet`（私钥原文永不回显）；登录会话鉴权 |
 | `PATCH /api/bashub/config/projects/{id}/certificate` | 保存公钥证书；`privateKey` 留空表示保持原私钥；登录会话鉴权 |
 

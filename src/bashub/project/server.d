@@ -140,14 +140,6 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
     putAttr(xml, "name", attributeText(host, "name"));
     putAttr(xml, "ip", attributeText(host, "ip"));
     putAttr(xml, "agent-group", attributeText(host, "agentGroup"));
-    auto listenPort = hostSetlinePortText(host, "setlineListenPort", "Host.setlineListenPort");
-    auto adminPort = hostSetlinePortText(host, "setlineAdminPort", "Host.setlineAdminPort");
-    if (listenPort.length > 0 && adminPort.length > 0) {
-      putAttr(xml, "setline-listen-port", listenPort);
-      putAttr(xml, "setline-admin-port", adminPort);
-    } else if (listenPort.length > 0 || adminPort.length > 0) {
-      throw new Exception("Host.setlineListenPort and Host.setlineAdminPort must be set together");
-    }
     xml.put("/>\n");
   }
   xml.put("  </hosts>\n\n");
@@ -258,22 +250,6 @@ private string numberText(Json resource, string attr) {
 
 private string boolText(bool value) {
   return value ? "true" : "false";
-}
-
-/// Host 的 setline 端口；留空返回空串，非空时校验为 1-65535 并输出规范数字。
-private string hostSetlinePortText(Json host, string attribute, string label) {
-  auto text = attributeText(host, attribute).strip;
-  if (text.length == 0)
-    return "";
-  uint port;
-  try {
-    port = text.to!uint;
-  } catch (Exception) {
-    throw new Exception(label ~ " must be a port number (1-65535): " ~ text);
-  }
-  if (port == 0 || port > 65535)
-    throw new Exception(label ~ " must be a port number (1-65535): " ~ text);
-  return port.to!string;
 }
 
 private void putAttr(A)(ref A xml, string name, string value) {

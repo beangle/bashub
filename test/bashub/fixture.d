@@ -107,14 +107,12 @@ private Row[] hostRows() {
     row("2001", [
       "name": Json("host01"), "ip": Json("10.0.0.11"), "memory": Json(32L), "cores": Json(8L),
       "cpu": Json("Xeon Gold 6248"), "platform_version": Json("9.2"), "arch": Json(2L),
-      "setline_listen_port": Json(8080L), "setline_admin_port": Json(10080L),
       "agent_group": Json("default_group"), "project": Json("1002"), "platform": Json("1"),
       "feature_ids": Json([Json("8001"), Json("8002")]),
     ]),
     row("2002", [
       "name": Json("host02"), "ip": Json("10.0.0.12"), "memory": Json(16L), "cores": Json(4L),
       "cpu": Json("Xeon E5-2680"), "platform_version": Json("2022"), "arch": Json(2L),
-      "setline_listen_port": Json(8082L), "setline_admin_port": Json(10081L),
       "agent_group": Json("default_group"), "project": Json("1002"), "platform": Json("2"),
       "feature_ids": Json(cast(Json[]) null),
     ]),

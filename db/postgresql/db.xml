@@ -104,9 +104,7 @@
             <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
             <column name="platform_version" type="varchar(255)" nullable="false" comment="platformVersion?"/>
             <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
-            <column name="setline_listen_port" type="integer" comment="setlineListenPort?"/>
             <column name="feature_ids" type="jsonb" nullable="false" defaultValue="[]" comment="系统特性 ID 数组"/>
-            <column name="setline_admin_port" type="integer" comment="setlineAdminPort?"/>
           </columns>
           <constraints>
             <primary-key name="pk_pxfg014nyayvye1gd3xih526i" columns="id"/>
