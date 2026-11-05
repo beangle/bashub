@@ -53,8 +53,14 @@
                 </span>
               </div>
               <div class="agent-actions">
-                <t-button size="small" variant="outline" :loading="refreshing" @click="refreshNow">
-                  刷新（{{ secondsLeft }}s）
+                <t-button
+                  size="small"
+                  variant="outline"
+                  :loading="refreshing"
+                  title="立即让当前 Project 的 agent 重新上报，并刷新状态"
+                  @click="refreshNow"
+                >
+                  刷新并上报
                 </t-button>
                 <t-button size="small" variant="outline" @click="goHistory(group.project)">运行历史</t-button>
                 <t-button
@@ -93,6 +99,7 @@
                         <th>Server</th>
                         <th>状态</th>
                         <th class="instance-col-port">端口</th>
+                        <th class="instance-col-memory">内存</th>
                         <th>应用</th>
                         <th class="instance-col-actions">操作</th>
                       </tr>
@@ -114,6 +121,7 @@
                           </div>
                         </td>
                         <td>{{ instance.httpPort ?? '-' }}</td>
+                        <td class="instance-memory">{{ instanceMemory(instance) }}</td>
                         <td class="instance-apps">
                           <template v-if="(instance.webapps ?? []).length">
                             <div
@@ -892,6 +900,7 @@ function resetLog() {
 function instancesOf(agent: AgentStatus): AgentInstance[] {
   const report = agent.basReport
   const running = report?.instances ?? []
+  const healthById = new Map((agent.health ?? []).map((item) => [item.id, item]))
   // 当前 server.xml 已经声明过（含空数组）时，只展示声明项；配置里删掉的
   // server 即使进程还在，也不再作为监控行展示。
   const declaredKnown = Array.isArray(report?.declared)
@@ -900,10 +909,15 @@ function instancesOf(agent: AgentStatus): AgentInstance[] {
       return (agent.health ?? []).map((item) => ({
         id: item.id,
         state: item.state,
+        rssBytes: item.rssBytes,
       }))
     }
     return running
-      .map((instance) => ({ ...instance, state: 'running' as const }))
+      .map((instance) => ({
+        ...instance,
+        state: 'running' as const,
+        rssBytes: instance.id ? healthById.get(instance.id)?.rssBytes : undefined,
+      }))
       .sort(compareInstances)
   }
   const declared = report?.declared ?? []
@@ -916,7 +930,7 @@ function instancesOf(agent: AgentStatus): AgentInstance[] {
   for (const instance of declared) {
     const live = instance.id ? runningById.get(instance.id) : undefined
     if (live) {
-      merged.push({ ...live, state: 'running' })
+      merged.push({ ...live, state: 'running', rssBytes: healthById.get(live.id || '')?.rssBytes })
       if (instance.id) runningById.delete(instance.id)
     } else {
       merged.push({ ...instance, state: 'stopped' })
@@ -934,6 +948,12 @@ function compareInstances(left: AgentInstance, right: AgentInstance): number {
 
 function isRunning(instance: AgentInstance): boolean {
   return instance.state !== 'stopped' && instance.state !== 'error'
+}
+
+/** 实例进程 RSS；只对运行中的实例展示。 */
+function instanceMemory(instance: AgentInstance): string {
+  if (!isRunning(instance) || typeof instance.rssBytes !== 'number') return '—'
+  return formatBytes(instance.rssBytes)
 }
 
 function instanceStateLabel(instance: AgentInstance): string {
@@ -1492,11 +1512,23 @@ onBeforeUnmount(() => {
 }
 
 .instance-col-index {
-  width: 44px;
+  width: 28px;
 }
 
 .instance-col-port {
-  width: 64px;
+  width: 52px;
+}
+
+.instance-col-memory {
+  width: 80px;
+  text-align: right !important;
+}
+
+.instance-memory {
+  color: var(--td-text-color-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right !important;
+  white-space: nowrap;
 }
 
 .instance-col-actions {

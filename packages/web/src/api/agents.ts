@@ -47,6 +47,8 @@ export interface AgentInstance {
   engine?: string
   httpPort?: number
   started?: string
+  /** 进程 RSS（字节）；由 health 巡检补充。 */
+  rssBytes?: number
   webapps?: AgentWebapp[]
   /** 前端合并 `instances` / `declared` 后得到的状态；接口本身只对运行实例给出 `running`。 */
   state?: 'running' | 'stopped' | 'error'
@@ -109,6 +111,7 @@ export interface AgentLinkMutex {
 export interface AgentHealth {
   id: string
   state: 'running' | 'stopped' | 'error'
+  rssBytes?: number
 }
 
 /** `GET /api/bashub/monitor/agents/summary`：在线列表轮询用的轻量摘要。 */

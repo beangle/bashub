@@ -27,6 +27,8 @@ import std.string : strip;
 struct AgentSample {
   string id;
   string state;
+  /** 进程 RSS（字节）；老 agent 或读不到时为 0。 */
+  long rssBytes;
 }
 
 /// 历史存储接口；测试与没有启用数据库的场景可以注入空实现或 null。

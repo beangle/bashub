@@ -447,7 +447,11 @@ final class AgentSession {
       if ((id in seen) !is null)
         continue;
       seen[id] = true;
-      result ~= AgentSample(id, state);
+      long rssBytes;
+      auto rss = jsonGet(item, "rssBytes");
+      if (rss.type == Json.Type.int_ || rss.type == Json.Type.bigInt)
+        rssBytes = rss.get!long;
+      result ~= AgentSample(id, state, rssBytes);
     }
     result.sort!((left, right) => left.id < right.id);
     return result;
@@ -455,8 +459,12 @@ final class AgentSession {
 
   private static Json healthJson(const(AgentSample)[] samples) {
     Json[] items;
-    foreach (sample; samples)
-      items ~= Json(["id": Json(sample.id), "state": Json(sample.state)]);
+    foreach (sample; samples) {
+      Json item = Json(["id": Json(sample.id), "state": Json(sample.state)]);
+      if (sample.rssBytes > 0)
+        item["rssBytes"] = Json(sample.rssBytes);
+      items ~= item;
+    }
     return Json(items);
   }
 
