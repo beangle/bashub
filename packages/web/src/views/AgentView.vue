@@ -916,7 +916,7 @@ function instancesOf(agent: AgentStatus): AgentInstance[] {
       .map((instance) => ({
         ...instance,
         state: 'running' as const,
-        rssBytes: instance.id ? healthById.get(instance.id)?.rssBytes : undefined,
+        rssBytes: instance.rssBytes ?? (instance.id ? healthById.get(instance.id)?.rssBytes : undefined),
       }))
       .sort(compareInstances)
   }
@@ -930,7 +930,11 @@ function instancesOf(agent: AgentStatus): AgentInstance[] {
   for (const instance of declared) {
     const live = instance.id ? runningById.get(instance.id) : undefined
     if (live) {
-      merged.push({ ...live, state: 'running', rssBytes: healthById.get(live.id || '')?.rssBytes })
+      merged.push({
+        ...live,
+        state: 'running',
+        rssBytes: live.rssBytes ?? healthById.get(live.id || '')?.rssBytes,
+      })
       if (instance.id) runningById.delete(instance.id)
     } else {
       merged.push({ ...instance, state: 'stopped' })
