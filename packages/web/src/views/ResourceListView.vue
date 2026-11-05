@@ -678,15 +678,33 @@ async function loadOptions(fields: FieldSchema[] = refsOf()) {
         optionsCache[field.key] = optionsCache[key]
         return
       }
-      const result = await listResource(ref.path, {
-        pageSize: 300,
-        sort: ref.sort || ref.labelFields[0],
-        filters: field.optionsFilter && project ? { [field.optionsFilter]: project } : undefined,
-      })
-      const options = result.rows.map((row) => ({ label: labelOf(row, ref.labelFields) || row.id, value: row.id }))
+      let result
+      let rows: ResourceRow[]
+      if (ref.path === '/servers' && field.optionsFilter === 'farm.project.id' && project) {
+        // server 只直接关联 farm；先取当前 project 的 farm，再在客户端按 farm 过滤 server。
+        const farms = await listResource('/farms', {
+          filters: { 'farm.project.id': project },
+          pageSize: 500,
+        })
+        const farmIds = new Set(farms.rows.map((row) => row.id))
+        result = await listResource('/servers', {
+          pageSize: 300,
+          sort: ref.sort || ref.labelFields[0],
+          include: ['farm', 'host'],
+        })
+        rows = result.rows.filter((row) => relationshipIds(row, 'farm').some((id) => farmIds.has(id)))
+      } else {
+        result = await listResource(ref.path, {
+          pageSize: 300,
+          sort: ref.sort || ref.labelFields[0],
+          filters: field.optionsFilter && project ? { [field.optionsFilter]: project } : undefined,
+        })
+        rows = result.rows
+      }
+      const options = rows.map((row) => ({ label: labelOf(row, ref.labelFields) || row.id, value: row.id }))
       optionsCache[key] = options
       optionsCache[field.key] = options
-      optionRows.set(field.key, result.rows)
+      optionRows.set(field.key, rows)
     }),
   )
 }
