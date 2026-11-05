@@ -110,7 +110,14 @@
                         :key="instance.id || instance.pid"
                       >
                         <td class="instance-index">{{ index + 1 }}</td>
-                        <td class="instance-name" :title="instance.id || '-'">{{ instance.id || '-' }}</td>
+                        <td class="instance-name" :title="instance.id || '-'">
+                          <router-link
+                            v-if="instance.id"
+                            class="instance-name-link"
+                            :to="serverDetailPath(agent, instance)"
+                          >{{ instance.id }}</router-link>
+                          <span v-else>—</span>
+                        </td>
                         <td>
                           <div class="instance-status" :class="`is-${instanceStatusKind(instance)}`">
                             <span class="instance-state-dot"></span>
@@ -137,6 +144,7 @@
                           <span v-else class="agent-muted">—</span>
                         </td>
                         <td class="instance-actions">
+                          <div class="instance-action-menu">
                           <template v-if="instance.id">
                             <t-button size="small" variant="text" @click="openLog(agent, instance)">查看日志</t-button>
                             <t-button
@@ -169,6 +177,7 @@
                             </t-button>
                           </template>
                           <span v-else class="agent-muted">—</span>
+                          </div>
                         </td>
                       </tr>
                     </tbody>
@@ -499,6 +508,11 @@ function goProject(projectId?: string) {
 /** 同一 project 下多台 agent 的键：后端用 `ip` 区分机器，没有 ip 时退回 host。 */
 function agentKey(agent: AgentStatus): string {
   return `${agent.project}@${agent.ip || agent.host || ''}`
+}
+
+/** 实例详情页：project + server + agent ip。 */
+function serverDetailPath(agent: AgentStatus, instance: AgentInstance): string {
+  return `/monitor/agents/${encodeURIComponent(agent.project)}/servers/${encodeURIComponent(instance.id || '')}?ip=${encodeURIComponent(agent.ip || '')}`
 }
 
 /** 运行/停止数以实例表为准：service:start 后 agent 先补发 report:bas，health 要等下一次采样。 */
@@ -1540,10 +1554,53 @@ onBeforeUnmount(() => {
   text-align: right !important;
 }
 
+.instance-table tbody tr {
+  position: relative;
+}
+
+.instance-action-menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+@media (hover: hover) {
+  .instance-action-menu {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    z-index: 2;
+    padding: 4px 6px;
+    border: 1px solid var(--td-component-stroke);
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--td-bg-color-container);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+    transform: translateY(-50%);
+    transition: opacity 0.15s ease;
+  }
+
+  .instance-table tbody tr:hover .instance-action-menu,
+  .instance-table tbody tr:focus-within .instance-action-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .instance-index {
   color: var(--td-text-color-placeholder);
   font-variant-numeric: tabular-nums;
   text-align: right !important;
+}
+
+.instance-name-link {
+  color: var(--td-brand-color);
+  text-decoration: none;
+}
+
+.instance-name-link:hover {
+  text-decoration: underline;
 }
 
 .instance-name {

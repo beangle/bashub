@@ -63,6 +63,11 @@ const router = createRouter({
       component: () => import('@/views/AgentHistoryView.vue'),
       meta: { title: '运行历史' },
     },
+    {
+      path: '/monitor/agents/:project/servers/:instance',
+      component: () => import('@/views/AgentServerView.vue'),
+      meta: { title: 'Server 详情' },
+    },
   ],
 })
 
