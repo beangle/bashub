@@ -63,7 +63,8 @@ SPA、数据库脚本和 deb/rpm 打包进入同一个仓库，后端以单个�
   `/usr/lib/systemd/system/bashub.service`、`/var/lib/bas/.ems` 与
   `/var/log/bas/bashub`；服务以 `bas:beangle` 运行，并与 basctl 共用账号。
 - AUR 包 `bashub` 使用同一安装布局，源码直接取自本标签；Arch 构建依赖 `ldc`、`dub`，
-  运行时依赖 `liblphobos`、`postgresql-libs`、`curl`、`zlib` 和 `gcc-libs`。
+  运行时依赖 `postgresql-libs`、`curl`、`zlib` 和 `gcc-libs`。Arch 的 LDC 默认静态
+  链接 D 运行时，因此安装包不依赖 `liblphobos`。
 - PostgreSQL 当前结构位于 `db/postgresql/db.xml` 与 `db/postgresql/init/*.sql`；全新库按
   文件名顺序执行初始化脚本，旧库先备份再按现有迁移脚本和 `--check-schema` 核对。
 
@@ -108,4 +109,3 @@ systemctl daemon-reload
 # 准备好 /var/lib/bas/.ems/bas 后启动
 systemctl enable --now bashub
 ```
-
