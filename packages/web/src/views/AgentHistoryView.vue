@@ -44,7 +44,7 @@
         <div class="history-card-head">
           <div class="history-title">
             <span class="history-index">{{ index + 1 }}</span>
-            <strong>{{ row.id }}</strong>
+            <router-link class="history-server-link" :to="serverDetailPath(row.id)">{{ row.id }}</router-link>
             <t-tag size="small" variant="light" :theme="agentOffline ? 'warning' : stateTheme(displayState(row))">
               {{ agentOffline ? '节点离线' : stateLabel(displayState(row)) }}
             </t-tag>
@@ -224,6 +224,16 @@ const rows = computed<HistoryRow[]>(() => {
     }
   })
 })
+
+/** 从历史行进入该 server 的实时详情页；节点离线时仍保留 link，详情页会给出提示。 */
+function serverDetailPath(id: string): string {
+  const agent = liveAgents.value.find((item) => item.project === history.value?.project
+    && (item.basReport?.instances?.some((instance) => instance.id === id)
+      || item.basReport?.declared?.some((instance) => instance.id === id)
+      || item.health?.some((sample) => sample.id === id)))
+  const ip = agent?.ip || ''
+  return `/monitor/agents/${encodeURIComponent(history.value?.project || project.value)}/servers/${encodeURIComponent(id)}?ip=${encodeURIComponent(ip)}`
+}
 
 function compareServerIds(left: string, right: string): number {
   return left.localeCompare(right, 'zh-CN', { numeric: true, sensitivity: 'base' })
@@ -426,6 +436,15 @@ onMounted(() => {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.history-server-link {
+  color: var(--td-brand-color);
+  text-decoration: none;
+}
+
+.history-server-link:hover {
+  text-decoration: underline;
 }
 
 .history-title {

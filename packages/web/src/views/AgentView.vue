@@ -122,9 +122,6 @@
                           <div class="instance-status" :class="`is-${instanceStatusKind(instance)}`">
                             <span class="instance-state-dot"></span>
                             <span class="instance-state-label">{{ instanceStateLabel(instance) }}</span>
-                            <span v-if="isRunning(instance)" class="instance-pid">
-                              #{{ instance.pid ?? '-' }}
-                            </span>
                           </div>
                         </td>
                         <td>{{ instance.httpPort ?? '-' }}</td>
@@ -1647,10 +1644,6 @@ onBeforeUnmount(() => {
   color: var(--td-text-color-secondary);
 }
 
-.instance-pid {
-  color: var(--td-text-color-placeholder);
-  font-variant-numeric: tabular-nums;
-}
 
 .instance-apps {
   min-width: 0;

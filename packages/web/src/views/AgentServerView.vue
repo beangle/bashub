@@ -24,6 +24,7 @@
     </div>
 
     <template v-else-if="instance && agent">
+      <div class="detail-grid">
       <article class="detail-card">
         <header class="detail-card__head">
           <div>
@@ -79,15 +80,54 @@
         </header>
         <div v-if="(instance.webapps ?? []).length === 0" class="detail-empty">暂无应用</div>
         <table v-else class="detail-table">
-          <thead><tr><th>上下文</th><th>构件</th><th>对外路径</th></tr></thead>
+          <thead><tr><th>上下文</th><th>标题</th><th>GAV</th></tr></thead>
           <tbody>
             <tr v-for="app in instance.webapps" :key="app.id || app.uri">
               <td>{{ app.context || '/' }}</td>
-              <td class="detail-uri" :title="app.uri || ''">{{ app.title || app.uri || '—' }}</td>
-              <td>{{ (app.urls ?? []).join(', ') || '—' }}</td>
+              <td>{{ app.title || '—' }}</td>
+              <td class="detail-gav" :title="app.uri || ''">{{ app.uri || '—' }}</td>
             </tr>
           </tbody>
         </table>
+      </article>
+      </div>
+
+      <div class="detail-stack">
+      <article class="detail-card">
+        <header class="detail-card__head">
+          <div>
+            <h3>运行历史</h3>
+            <p>最近 30 天采样；与完整历史页使用同一份 health 数据</p>
+          </div>
+          <div class="detail-actions">
+            <t-button size="small" variant="text" @click="goHistory">完整历史</t-button>
+          </div>
+        </header>
+        <div v-if="historyLoading" class="detail-empty">正在加载运行历史…</div>
+        <div v-else-if="!historySummary.total" class="detail-empty">暂无运行历史采样</div>
+        <template v-else>
+          <div class="history-summary">
+            <span>可用率 {{ historySummary.availability.toFixed(1) }}%</span>
+            <span>采样 {{ historySummary.sampledDays }} 天</span>
+            <span v-if="historySummary.lastAt">最近 {{ shortTime(historySummary.lastAt) }}</span>
+          </div>
+          <div class="history-strip" :aria-label="`最近 30 天运行状态`">
+            <span
+              v-for="cell in historySummary.cells"
+              :key="cell.date"
+              class="history-cell"
+              :class="`history-cell-${cell.state}`"
+              :title="`${cell.date} · ${cell.title}`"
+            />
+          </div>
+          <div class="history-axis"><span>{{ historySummary.firstDate }}</span><span>{{ historySummary.lastDate }}</span></div>
+          <div v-if="historySummary.changes.length" class="history-changes">
+            <span class="agent-muted">最近状态变化：</span>
+            <span v-for="change in historySummary.changes.slice(0, 6)" :key="`${change.at}-${change.state}`">
+              {{ shortTime(change.at) }} {{ stateLabel(change.state) }}
+            </span>
+          </div>
+        </template>
       </article>
 
       <article class="detail-card">
@@ -108,6 +148,7 @@
         </div>
         <pre ref="logRef" class="server-log">{{ logLines.join('\n') || '（暂无日志）' }}</pre>
       </article>
+      </div>
     </template>
   </section>
 </template>
@@ -119,9 +160,12 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   followAgentLog,
   listAgents,
+  readAgentHistory,
   readAgentLog,
   serviceAgentInstance,
   type AgentInstance,
+  type AgentHistory,
+  type AgentHealth,
   type AgentLogEvent,
   type AgentServiceAction,
   type AgentStatus,
@@ -137,6 +181,8 @@ const agents = ref<AgentStatus[]>([])
 const loading = ref(false)
 const error = ref('')
 const serviceLoading = ref(false)
+const history = ref<AgentHistory | null>(null)
+const historyLoading = ref(false)
 
 const agent = computed(() => agents.value.find((item) => item.project === project && (!agentIp || item.ip === agentIp)))
 const instance = computed(() => (agent.value ? agentInstances(agent.value).find((item) => item.id === instanceId) : undefined))
@@ -166,6 +212,70 @@ function agentInstances(value: AgentStatus): AgentInstance[] {
       ? { ...live, state: 'running' as const, rssBytes: live.rssBytes ?? healthById.get(live.id || '')?.rssBytes }
       : { ...declared, state: 'stopped' as const }
   })
+}
+
+const historySummary = computed(() => {
+  const data = history.value
+  const states = new Map<string, { state: AgentHealth['state']; at: string; total: number; running: number }>()
+  for (const sample of data?.samples ?? []) {
+    const state = sample.servers?.[instanceId]
+    if (!state) continue
+    const date = sample.at.slice(0, 10)
+    let day = states.get(date)
+    if (!day) {
+      day = { state, at: sample.at, total: 0, running: 0 }
+      states.set(date, day)
+    }
+    day.state = state
+    day.at = sample.at
+    day.total++
+    if (state === 'running') day.running++
+  }
+  const dates = lastDates(data?.to?.slice(0, 10) || new Date().toISOString().slice(0, 10), 30)
+  let total = 0
+  let running = 0
+  let sampledDays = 0
+  let lastAt = ''
+  let previous: AgentHealth['state'] | '' = ''
+  const changes: { at: string; state: AgentHealth['state'] }[] = []
+  const cells = dates.map((date) => {
+    const day = states.get(date)
+    if (!day) return { date, state: 'unknown' as const, title: '无采样' }
+    total += day.total
+    running += day.running
+    sampledDays++
+    lastAt = day.at
+    if (previous && previous !== day.state) changes.push({ at: day.at, state: day.state })
+    previous = day.state
+    return { date, state: day.state, title: `${day.running} 运行 / ${day.total - day.running} 停止` }
+  })
+  return {
+    cells,
+    total,
+    availability: total > 0 ? (running / total) * 100 : 0,
+    sampledDays,
+    lastAt,
+    firstDate: dates[0] ?? '',
+    lastDate: dates[dates.length - 1] ?? '',
+    changes,
+  }
+})
+
+function lastDates(end: string, count: number): string[] {
+  const result: string[] = []
+  const date = new Date(`${end}T00:00:00Z`)
+  for (let index = count - 1; index >= 0; index--) {
+    const current = new Date(date)
+    current.setUTCDate(current.getUTCDate() - index)
+    result.push(current.toISOString().slice(0, 10))
+  }
+  return result
+}
+
+function stateLabel(state: AgentHealth['state']): string {
+  if (state === 'running') return '运行'
+  if (state === 'error') return '异常'
+  return '停止'
 }
 
 function isRunning(value: AgentInstance): boolean {
@@ -214,6 +324,21 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadHistory() {
+  historyLoading.value = true
+  try {
+    history.value = await readAgentHistory(project, { days: 30 })
+  } catch {
+    history.value = null
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function goHistory() {
+  void router.push(`/monitor/agents/${encodeURIComponent(project)}/history`)
 }
 
 function confirmService(action: AgentServiceAction) {
@@ -283,7 +408,7 @@ function goBack() {
 }
 
 onMounted(async () => {
-  await load()
+  await Promise.all([load(), loadHistory()])
   if (instance.value) await readLog()
 })
 
@@ -294,6 +419,23 @@ onBeforeUnmount(stopFollow)
 .server-detail-page { display: flex; flex-direction: column; gap: 12px; }
 .page-subtitle { margin: 4px 0 0; color: var(--td-text-color-placeholder); font-size: 13px; }
 .empty-panel { padding: 32px 0; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .detail-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .detail-card { padding: 14px 16px; border: 1px solid var(--td-component-stroke); border-radius: 8px; background: var(--td-bg-color-container); }
 .detail-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .detail-card__head h3 { margin: 0; font-size: 16px; }
@@ -309,6 +451,50 @@ onBeforeUnmount(stopFollow)
 .detail-table th, .detail-table td { padding: 6px 8px; border-bottom: 1px solid var(--td-component-stroke); text-align: left; }
 .detail-table th { color: var(--td-text-color-placeholder); font-weight: 500; }
 .detail-uri { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+}
+
+.history-strip {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.history-cell {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--td-bg-color-component);
+}
+
+.history-cell-running { background: var(--td-success-color); }
+.history-cell-stopped { background: var(--td-warning-color); }
+.history-cell-error { background: var(--td-error-color); }
+.history-cell-unknown { background: var(--td-bg-color-component); }
+
+.history-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--td-text-color-placeholder);
+  font-size: 10px;
+}
+
+.history-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 8px;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+}
+
 .log-meta { display: flex; justify-content: space-between; margin-top: 10px; color: var(--td-text-color-placeholder); font-size: 12px; }
 .log-following { color: var(--td-success-color); }
 .server-log { max-height: 460px; margin: 8px 0 0; padding: 10px; overflow: auto; border-radius: 6px; color: var(--td-text-color-primary); font-family: monospace; font-size: 12px; line-height: 1.5; background: var(--td-bg-color-container-hover); white-space: pre-wrap; }
