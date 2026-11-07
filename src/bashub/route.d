@@ -66,7 +66,8 @@ import std.string : indexOf, replace, split, startsWith, strip, toLower;
 private enum int LogFollowIntervalSeconds = 3;
 private enum int LogFollowDefaultTail = 200;
 private enum long LogFollowMaxTail = 2000;
-private enum int LogReadTimeoutSeconds = 5;
+/// 日志窗口可能要扫描较大的 console.out，给足读盘与传输时间。
+private enum int LogReadTimeoutSeconds = 30;
 /// service:* 可能包含一次 stop（默认等 15s）再加启动与依赖解析，给足两分钟。
 private enum int ServiceTimeoutSeconds = 120;
 /// 来自 agent 的日志窗口上限；不能信任对端会遵守 basctl 侧的限制。
@@ -1545,7 +1546,7 @@ class HubService {
     auto session = pickAgent(req, res, project);
     if (session is null)
       return;
-    auto reply = agents.logRead(project, instance, from, to, 5.seconds, tail, session.ip);
+    auto reply = agents.logRead(project, instance, from, to, LogReadTimeoutSeconds.seconds, tail, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok:
       writeJsonApi(res, reply.data, HTTPStatus.ok);
@@ -1581,7 +1582,7 @@ class HubService {
     auto session = pickAgent(req, res, project);
     if (session is null)
       return;
-    auto reply = agents.agentLog(project, from, to, 5.seconds, tail, session.ip);
+    auto reply = agents.agentLog(project, from, to, LogReadTimeoutSeconds.seconds, tail, session.ip);
     final switch (reply.outcome) {
     case RequestOutcome.ok:
       writeJsonApi(res, reply.data, HTTPStatus.ok);
