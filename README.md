@@ -2,6 +2,9 @@
 
 BAS 控制台这一个产品的 monorepo，两部分各自独立构建：
 
+0.0.8 发布说明见 [docs/release-0.0.8.md](docs/release-0.0.8.md)，变更摘要见
+[CHANGELOG.md](CHANGELOG.md)。
+
 | 部分 | 位置 | 构建 | 产物 |
 |---|---|---|---|
 | 前端 SPA | `packages/web` | pnpm + vite | `packages/web/dist`、`release/bashub-web.zip` |
@@ -360,6 +363,9 @@ curl -s -H 'Accept: application/vnd.api+json' \
 scripts/build_rpm.sh          # Fedora/RHEL：target/bashub-<version>-<release>.x86_64.rpm
 scripts/build_deb.sh          # Debian/Ubuntu：target/bashub_<version>-<revision>_amd64.deb
 ```
+
+Arch Linux 可使用 AUR 包 [`bashub`](https://aur.archlinux.org/packages/bashub)，安装布局与
+deb/rpm 一致；首次启动前仍需准备 `/var/lib/bas/.ems/bas` 下的 EMS project。
 
 两个脚本都接受一个可选的 revision 参数。安装布局：
 
