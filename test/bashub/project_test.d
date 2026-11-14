@@ -13,7 +13,7 @@ import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
-import bashub.project.proxy : renderProxy, renderProxyForEndpoint;
+import bashub.project.proxy : ProxyModel, ProxyWebapp, renderHaproxy, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
 import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
@@ -409,4 +409,23 @@ unittest {
 
   assert(renderHostScript(store, reg, project, "10.0.0.10").length == 0);
   assert(renderHostScript(store, reg, project, "192.168.1.1").length == 0);
+}
+
+@("proxy routes are emitted longest prefix first") unittest {
+  auto proxy = Json(["attributes": Json([
+    "maxconn": Json(30000), "httpPort": Json(80), "httpsPort": Json(443),
+    "enableHttps": Json(false), "forceHttps": Json(false),
+    "sslCiphers": Json(""), "sslProtocols": Json(""),
+  ])]);
+  auto model = ProxyModel(Json.emptyObject, proxy, "", "default", "haproxy");
+  auto broad = ProxyWebapp("broad", "/api/edu", ["/api/edu"], "", "", []);
+  auto narrow = ProxyWebapp("narrow", "/api/edu/exam", ["/api/edu/exam"], "", "", []);
+  model.webapps = [broad, narrow];
+  model.backendByWebapp["broad"] = "edu";
+  model.backendByWebapp["narrow"] = "exam";
+  auto text = renderHaproxy(model);
+  auto exam = text.indexOf("use_backend exam");
+  auto edu = text.indexOf("use_backend edu");
+  assert(exam >= 0 && edu >= 0);
+  assert(exam < edu, text);
 }

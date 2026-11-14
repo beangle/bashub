@@ -382,6 +382,38 @@ private ServerGroup* findServerGroup(ref FarmGroup farm, string key) {
   return null;
 }
 
+private struct ProxyRoute {
+  string path;
+  string backend;
+}
+
+/// 所有代理路径按“最长前缀优先”排序：HAProxy 的 use_backend 是首个匹配生效，
+/// 不能把 /api/edu 放在 /api/edu/exam 前面。
+private ProxyRoute[] proxyRoutes(ProxyModel model) {
+  ProxyRoute[] routes;
+  if (model.micdnBackend.servers.length)
+    foreach (path; model.micdnPaths) {
+      ProxyRoute route;
+      route.path = path;
+      route.backend = "micdn";
+      routes ~= route;
+    }
+  foreach (webapp; model.webapps) {
+    auto backend = model.backendByWebapp.get(webapp.id, "");
+    if (backend.length == 0)
+      continue;
+    foreach (path; webapp.urlPaths) {
+      ProxyRoute route;
+      route.path = path;
+      route.backend = backend;
+      routes ~= route;
+    }
+  }
+  sort!((a, b) => a.path.length != b.path.length
+      ? a.path.length > b.path.length : a.path < b.path)(routes);
+  return routes;
+}
+
 /// nginx：每个 webapp 的每个 urlPath 一个 location，后端来自 server 集合。
 string renderNginx(ProxyModel model) {
   auto project = model.project;
@@ -430,13 +462,6 @@ string renderNginx(ProxyModel model) {
     line(out_, "    ssl_session_timeout 10m;");
   }
   line(out_, "    include /etc/nginx/conf.d/*.conf;");
-
-  if (model.micdnBackend.servers.length) {
-    line(out_, "");
-    line(out_, "backend micdn");
-    foreach (server; model.micdnBackend.servers)
-      line(out_, "    server " ~ server.ip ~ ":" ~ server.port.to!string ~ ";");
-  }
 
   auto backends = model.backends.dup;
   sort!((a, b) => a.name < b.name)(backends);
@@ -506,23 +531,10 @@ string renderNginx(ProxyModel model) {
   line(out_, "            access_log off;");
   line(out_, "        }");
 
-  foreach (path; model.micdnPaths) {
-    line(out_, "        location " ~ path ~ " {");
-    line(out_, "            proxy_pass http://micdn;");
+  foreach (route; proxyRoutes(model)) {
+    line(out_, "        location " ~ route.path ~ " {");
+    line(out_, "            proxy_pass http://" ~ route.backend ~ ";");
     line(out_, "        }");
-  }
-
-  auto webapps = model.webapps.dup;
-  sort!((a, b) => a.contextPath < b.contextPath)(webapps);
-  foreach (webapp; webapps) {
-    auto backend = model.backendByWebapp.get(webapp.id, "");
-    if (backend.length == 0)
-      continue;
-    foreach (path; webapp.urlPaths) {
-      line(out_, "        location " ~ path ~ " {");
-      line(out_, "            proxy_pass http://" ~ backend ~ ";");
-      line(out_, "        }");
-    }
   }
   line(out_, "    }");
   line(out_, "}");
@@ -603,22 +615,8 @@ string renderHaproxy(ProxyModel model) {
   }
   line(out_, "");
 
-  foreach (path; model.micdnPaths)
-    line(out_, "    use_backend micdn if { path_beg " ~ path ~ " }");
-
-  auto apps = model.webapps.dup;
-  sort!((a, b) => a.contextPath < b.contextPath)(apps);
-  foreach (webapp; apps) {
-    auto backend = model.backendByWebapp.get(webapp.id, "");
-    if (backend.length == 0)
-      continue;
-    foreach (path; webapp.urlPaths) {
-      if (path == "/")
-        line(out_, "    use_backend " ~ backend ~ " if { path_beg / }");
-      else
-        line(out_, "    use_backend " ~ backend ~ " if { path_beg " ~ path ~ " }");
-    }
-  }
+  foreach (route; proxyRoutes(model))
+    line(out_, "    use_backend " ~ route.backend ~ " if { path_beg " ~ route.path ~ " }");
 
   auto backends = model.backends.dup;
   sort!((a, b) => a.name < b.name)(backends);
