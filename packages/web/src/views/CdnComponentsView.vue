@@ -5,23 +5,30 @@
         <h2 class="page-title">Micdn 组件目录</h2>
         <p class="page-subtitle">可复用的静态包和文档</p>
       </div>
-      <div class="page-actions">
-        <t-button theme="primary" @click="openCreate">
-          <template #icon><AddIcon /></template>
-          新建组件
-        </t-button>
-      </div>
     </div>
 
-    <div class="catalog-card">
+    <section class="catalog-card">
+      <header class="catalog-card__head">
+        <div>
+          <h3>静态包</h3>
+          <p>可复用的 jar / npm / dir 静态资源</p>
+        </div>
+        <div class="catalog-tools">
+          <t-input v-model="staticQuery" clearable placeholder="查询名称 / 挂载名" class="catalog-search" />
+          <t-button theme="primary" @click="openCreate('static_bundle')">
+            <template #icon><AddIcon /></template>
+            新建静态包
+          </t-button>
+        </div>
+      </header>
       <t-loading :loading="loading" show-overlay>
-        <div v-if="components.length === 0 && !loading" class="catalog-empty">
-          还没有组件。创建后可被任意 Project 引用。
+        <div v-if="staticComponents.length === 0 && !loading" class="catalog-empty">
+          {{ staticQuery ? '没有匹配的静态包。' : '还没有静态包。创建后可被任意 Project 引用。' }}
         </div>
         <table v-else class="component-table">
           <thead>
             <tr>
-              <th class="component-table__kind">类型</th>
+              <th class="component-table__index">序号</th>
               <th>名称</th>
               <th>挂载名</th>
               <th>说明</th>
@@ -30,8 +37,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="component in components" :key="component.id">
-              <td><span class="kind-tag" :class="`kind-tag--${component.kind}`">{{ kindLabel(component.kind) }}</span></td>
+            <tr v-for="(component, index) in staticComponents" :key="component.id">
+              <td class="component-table__index">{{ index + 1 }}</td>
               <td><strong>{{ component.name }}</strong></td>
               <td><code class="component-table__mount">{{ component.mountName }}</code></td>
               <td class="component-table__muted">{{ component.remark || '—' }}</td>
@@ -44,7 +51,53 @@
           </tbody>
         </table>
       </t-loading>
-    </div>
+    </section>
+
+    <section class="catalog-card">
+      <header class="catalog-card__head">
+        <div>
+          <h3>文档</h3>
+          <p>可复用的 npm 包或 zip 文档</p>
+        </div>
+        <div class="catalog-tools">
+          <t-input v-model="docQuery" clearable placeholder="查询名称 / 挂载名" class="catalog-search" />
+          <t-button theme="primary" @click="openCreate('www_doc')">
+            <template #icon><AddIcon /></template>
+            新建文档
+          </t-button>
+        </div>
+      </header>
+      <t-loading :loading="loading" show-overlay>
+        <div v-if="docComponents.length === 0 && !loading" class="catalog-empty">
+          {{ docQuery ? '没有匹配的文档。' : '还没有文档组件。创建后可被任意 Project 引用。' }}
+        </div>
+        <table v-else class="component-table">
+          <thead>
+            <tr>
+              <th class="component-table__index">序号</th>
+              <th>名称</th>
+              <th>挂载名</th>
+              <th>说明</th>
+              <th>规格</th>
+              <th class="component-table__action">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(component, index) in docComponents" :key="component.id">
+              <td class="component-table__index">{{ index + 1 }}</td>
+              <td><strong>{{ component.name }}</strong></td>
+              <td><code class="component-table__mount">{{ component.mountName }}</code></td>
+              <td class="component-table__muted">{{ component.remark || '—' }}</td>
+              <td><code class="component-table__spec">{{ specSummary(component) }}</code></td>
+              <td class="component-table__action">
+                <t-button size="small" variant="text" theme="primary" @click="openEdit(component)">编辑</t-button>
+                <t-button size="small" variant="text" theme="danger" @click="remove(component)">删除</t-button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </t-loading>
+    </section>
 
     <t-drawer v-model:visible="drawerVisible" :header="draft.id ? '编辑组件' : '新建组件'" size="760px">
       <div class="component-form">
@@ -112,9 +165,12 @@
               <span>默认页</span>
               <t-input v-model="draft.tryFile" placeholder="index.html" />
             </label>
-            <div class="form-field form-field--switch">
+            <div class="form-field form-field--switch form-field--switch-wide">
               <span>自动部署</span>
               <t-switch v-model="draft.autoDeploy" :disabled="draft.source.kind !== 'zip'" />
+              <p class="form-hint">
+                监听 zip 源文件变化，自动重新部署并重建索引；仅 zip 来源支持。
+              </p>
             </div>
             <div class="form-field form-field--switch">
               <span>自动 gzip</span>
@@ -137,7 +193,7 @@
 <script setup lang="ts">
 import { AddIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   createCdnComponent,
   deleteCdnComponent,
@@ -187,9 +243,24 @@ const draft = reactive({
 })
 
 const components = ref<CdnComponent[]>([])
+const staticQuery = ref('')
+const docQuery = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const drawerVisible = ref(false)
+
+const staticComponents = computed(() => filterComponents('static_bundle', staticQuery.value))
+const docComponents = computed(() => filterComponents('www_doc', docQuery.value))
+
+function filterComponents(kind: MicdnComponentKind, query: string): CdnComponent[] {
+  const needle = query.trim().toLowerCase()
+  return components.value
+    .filter((component) => component.kind === kind)
+    .filter((component) => !needle
+      || component.name.toLowerCase().includes(needle)
+      || component.mountName.toLowerCase().includes(needle)
+      || (component.remark || '').toLowerCase().includes(needle))
+}
 
 async function load() {
   loading.value = true
@@ -202,10 +273,10 @@ async function load() {
   }
 }
 
-function openCreate() {
+function openCreate(kind: MicdnComponentKind) {
   Object.assign(draft, {
     id: '',
-    kind: 'static_bundle',
+    kind,
     name: '',
     mountName: '',
     remark: '',
@@ -429,10 +500,45 @@ onMounted(load)
   text-align: center;
 }
 
+.catalog-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.catalog-card__head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.catalog-card__head p {
+  margin: 3px 0 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.catalog-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catalog-search {
+  width: 220px;
+}
+
 .component-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+.component-table__index {
+  width: 48px;
+  color: var(--td-text-color-placeholder);
+  text-align: right !important;
 }
 
 .component-table th,
@@ -527,6 +633,17 @@ onMounted(load)
 
 .form-field--wide {
   grid-column: 1 / -1;
+}
+
+.form-field--switch-wide {
+  grid-column: 1 / -1;
+}
+
+.form-hint {
+  margin: 4px 0 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  font-weight: normal;
 }
 
 .form-field--switch {
