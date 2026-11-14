@@ -626,6 +626,58 @@ unittest {
   assert(ex.status == 401);
 }
 
+@("proxy bundle is a zip with manifest, config, certificate and key") unittest {
+  auto router = newRouter();
+  auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];
+  auto ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=nginx&endpoint=edge-web", auth);
+  assert(ex.status == 200, ex.body);
+  assert(ex.contentType == "application/zip");
+  import std.zip : ZipArchive;
+  auto zip = new ZipArchive(cast(ubyte[]) ex.body.dup);
+  auto manifest = zip.directory["manifest.json"];
+  zip.expand(manifest);
+  auto manifestText = cast(string) manifest.expandedData;
+  auto doc = parseJson(manifestText);
+  assert(doc["engine"].get!string == "nginx");
+  assert(doc["endpoint"].get!string == "edge-web");
+  assert(doc["files"]["config"]["path"].get!string == "config/nginx.conf");
+  string readMember(string name) {
+    auto member = zip.directory[name];
+    zip.expand(member);
+    return cast(string) member.expandedData;
+  }
+  auto config = readMember("config/nginx.conf");
+  auto cert = readMember("certificate/cert.pem");
+  auto key = readMember("certificate/key.pem");
+  assert(config.canFind("upstream prod-farm{"));
+  assert(cert.canFind("BEGIN CERTIFICATE"));
+  assert(key.canFind("BEGIN PRIVATE KEY"));
+  string sha256Lower(string text) {
+    return toHexString!(LetterCase.lower)(sha256Of(text)).idup;
+  }
+  assert(doc["files"]["config"]["sha256"].get!string == sha256Lower(config));
+  assert(doc["files"]["certificate"]["sha256"].get!string == sha256Lower(cert));
+  assert(doc["files"]["privateKey"]["sha256"].get!string == sha256Lower(key));
+
+  ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=haproxy&endpoint=edge-ip", auth);
+  assert(ex.status == 200, ex.body);
+  zip = new ZipArchive(cast(ubyte[]) ex.body.dup);
+  auto hconfig = readMember("config/haproxy.cfg");
+  assert(hconfig.canFind("backend prod-farm"));
+  assert(hconfig.canFind("use_backend prod-farm"));
+  assert(!hconfig.canFind("setline.map"));
+
+  ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=nginx&endpoint=edge-ip", auth);
+  assert(ex.status == 400, ex.body);
+  ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=nginx&endpoint=edge-web",
+      ["Authorization": "Bearer openurp.prod:wrong"]);
+  assert(ex.status == 401);
+}
+
 @("project routes are derived from the live agent bas report") unittest {
   auto reg = hubRegistry();
   auto store = createHubStore(reg, testDao(reg));

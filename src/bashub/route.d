@@ -31,7 +31,7 @@ import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.project.menus : renderEmsMenus;
-import bashub.project.manifest : renderSetlineManifest;
+import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
@@ -61,6 +61,7 @@ import std.conv : ConvException, to;
 import std.file : read;
 import std.functional : toDelegate;
 import std.string : indexOf, replace, split, startsWith, strip, toLower;
+import std.zip : ArchiveMember, CompressionMethod, ZipArchive;
 
 /// `log/follow` 的轮询节拍与窗口。agent 侧仍是普通 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
 private enum int LogFollowIntervalSeconds = 3;
@@ -507,6 +508,85 @@ class HubService {
       logError("Render endpoint proxy config failed: %s", e.msg);
       res.writeBody("", HTTPStatus.internalServerError);
     }
+  }
+
+  /// `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx`：
+  /// 下载可直接安装的代理配置与证书，basctl proxy 只负责校验和落盘。
+  void projectProxyBundle(HTTPServerRequest req, HTTPServerResponse res) {
+    auto projectName = req.params.get("project", "");
+    ProjectContext project;
+    if (!findProject(reg, store, projectName, project)) {
+      writeJsonApi(res, errorDocument(404, "项目不存在", "project not found"), HTTPStatus.notFound);
+      return;
+    }
+    if (!projectTokenAccepted(req, projectName, attributeText(project.data, "key"))) {
+      writeConfigUnauthorized(res);
+      return;
+    }
+    auto engine = req.query.get("engine", "").strip;
+    if (engine != "haproxy" && engine != "nginx") {
+      writeJsonApi(res, errorDocument(400, "引擎非法", "engine must be haproxy or nginx", "engine"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    auto endpointName = req.query.get("endpoint", "").strip;
+    if (endpointName.length == 0)
+      endpointName = defaultEndpointName(project);
+    if (endpointName.length == 0) {
+      writeJsonApi(res, errorDocument(404, "代理点不存在", "no endpoint"), HTTPStatus.notFound);
+      return;
+    }
+    Json endpoint;
+    if (!findEndpointJson(project, endpointName, endpoint)) {
+      writeJsonApi(res, errorDocument(404, "代理点不存在", endpointName), HTTPStatus.notFound);
+      return;
+    }
+    auto endpointEngine = attributeText(endpoint, "engine").strip;
+    if (endpointEngine != engine) {
+      writeJsonApi(res, errorDocument(400, "引擎不匹配",
+          "endpoint " ~ endpointName ~ " uses " ~ endpointEngine, "engine"), HTTPStatus.badRequest);
+      return;
+    }
+    try {
+      auto config = renderProxyForEndpoint(store, reg, project, endpointName);
+      if (config.length == 0) {
+        writeJsonApi(res, errorDocument(404, "代理配置为空", endpointName), HTTPStatus.notFound);
+        return;
+      }
+      auto id = jsonText(endpoint["id"]);
+      Row row;
+      string certificate;
+      string privateKey;
+      if (store.fetchRaw(reg.find("endpoints"), id, row)) {
+        certificate = jsonText(rowGet(row, "certificate"));
+        privateKey = jsonText(rowGet(row, "private_key"));
+      }
+      auto configPath = engine == "haproxy" ? "config/haproxy.cfg" : "config/nginx.conf";
+      auto manifest = "{\n  \"schema\": 1,\n  \"engine\": \"" ~ engine ~ "\",\n"
+          ~ "  \"endpoint\": \"" ~ endpointName ~ "\",\n  \"files\": {\n"
+          ~ "    \"config\": {\"path\": \"" ~ configPath ~ "\", \"sha256\": \"" ~ sha256Hex(config) ~ "\"},\n"
+          ~ "    \"certificate\": {\"path\": \"certificate/cert.pem\", \"sha256\": \"" ~ sha256Hex(certificate) ~ "\"},\n"
+          ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(privateKey) ~ "\"}\n"
+          ~ "  }\n}\n";
+      auto zip = new ZipArchive();
+      addZip(zip, "manifest.json", manifest);
+      addZip(zip, configPath, config);
+      addZip(zip, "certificate/cert.pem", certificate);
+      addZip(zip, "certificate/key.pem", privateKey);
+      res.headers["Cache-Control"] = "no-store";
+      res.writeBody(cast(ubyte[]) zip.build().dup, HTTPStatus.ok, "application/zip");
+    } catch (Exception e) {
+      logError("Render proxy bundle failed: %s", e.msg);
+      writeJsonApi(res, errorDocument(500, "代理配置生成失败", e.msg), HTTPStatus.internalServerError);
+    }
+  }
+
+  private void addZip(ZipArchive zip, string name, string content) {
+    auto member = new ArchiveMember();
+    member.name = name;
+    member.compressionMethod = CompressionMethod.deflate;
+    member.expandedData = cast(ubyte[]) content.dup;
+    zip.addMember(member);
   }
 
   void projectProxy(HTTPServerRequest req, HTTPServerResponse res) {
@@ -2360,6 +2440,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   // config：机器配置分发与配置详情
   router.get(api.config ~ "/:project/server", &hub.projectServer);
   router.get(api.config ~ "/:project/proxy", &hub.projectProxy);
+  router.get(api.config ~ "/:project/proxy-bundle", &hub.projectProxyBundle);
   router.get(api.config ~ "/projects/:id/endpoints/:name/certificate", &hub.projectEndpointCertificateInfo);
   router.patch(api.config ~ "/projects/:id/endpoints/:name/certificate", &hub.updateProjectEndpointCertificate);
   router.get(api.config ~ "/:project/proxy/:endpoint", &hub.projectEndpointProxy);

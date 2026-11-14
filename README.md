@@ -169,19 +169,11 @@ src/bashub/                 业务：BAS 控制台这一份
   `<snapshot-repo remote=".../maven" token="...">` 优先取该 Project 的 micdn
   `<auth download-key>`；为空时回退 `hub.xml` 的 `maven-download-token`，用于多个 Project
   共用同一个 micdn `/maven` 的场景。
-  PEM 公钥证书与私钥单独存放在 `cfg_project_certificates`，project 的列表/详情不再携带这两个大字段；
-  管理台通过 `GET/PATCH /api/bashub/config/projects/{id}/certificate` 查看公钥、保存证书（私钥原文
-  永不回显，编辑时留空保持原值）。setline 用 Project 凭证分别拉取
-  `GET /api/bashub/config/{project}/certificate` 与
-  `GET /api/bashub/config/{project}/certificate-key`，落成 `/etc/setline/certs/cert.pem`、`key.pem` 和 haproxy 的
-  `bundle.pem`。未配置证书时两个端点返回空 Body。
-  `GET /api/bashub/config/{project}/setline-peers` 输出 sidecar 的 peer 列表（JSON）：
-  `peers` 由 Project 下的 web 节点以及 Micdn 配置中登记的服务器合并生成；Micdn 服务器
-  使用各自的 `adminListen`。没有节点时返回空数组。`setline pull` 直接把这组 peers 写回
-  节点自己的 `setline.conf`，`setline.json` 仍只保存本机监听与路由。各节点自己的 setline
-  仍需把读入口开到 sidecar 可达，并把 sidecar 主机 IP 写进 `peerReaders`。
-  `GET /api/bashub/config/{project}/setline-manifest` 用同一凭证一次返回 peers、proxy、certificate、
-  certificate-key 四个资源的 SHA-256；setline agent 据此只下载变化项，不再每轮拉取全部配置。
+  PEM 公钥证书与私钥单独存放在 `cfg_project_certificates`，管理台只回显公钥，私钥保存后不再回显。
+  `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx` 按 endpoint 的引擎返回
+  `application/zip`：`manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、证书和私钥。manifest 中记录每个文件的 role、相对路径和
+  SHA-256。配置由 bashub 渲染，节点上的 `basctl proxy apply --engine=...` 只做校验、落盘和
+  `systemctl reload`；不再需要 setline-agent，也不需要 setline 的 peer 读取接口。
   `GET /api/bashub/ems/{project}/menus/{appName}`
   按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/bashub/micdn/{project}/micdn.xml` 输出
   Project 的完整 micdn 配置；`GET /api/bashub/config/{project}/script/{host}` 按 Host 平台与

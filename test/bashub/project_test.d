@@ -189,32 +189,25 @@ unittest {
   assert(nginx.canFind("server 10.0.0.12:9081;"));
   assert(nginx.canFind("location /bas {"));
   assert(nginx.canFind("proxy_pass http://prod-farm;"));
-  assert(nginx.canFind("ssl_certificate /etc/setline/certs/edge-web.pem;"));
-  assert(nginx.canFind("ssl_certificate_key /etc/setline/certs/edge-web.key.pem;"));
+  assert(nginx.canFind("ssl_certificate /etc/basproxy/certs/edge-web.pem;"));
+  assert(nginx.canFind("ssl_certificate_key /etc/basproxy/certs/edge-web.key.pem;"));
   assert(nginx.canFind("server_name  www.openurp.net;"));
   assertThrown!Exception(renderProxyForEndpoint(store, reg, project, "missing"));
 
   auto haproxy = renderProxyForEndpoint(store, reg, project, "edge-ip");
-  assert(haproxy.canFind("# HAProxy main configuration."));
+  assert(haproxy.canFind("# HAProxy main configuration"));
   assert(!haproxy.canFind("setline.json"));
   assert(!haproxy.canFind(`"agent"`));
   assert(haproxy.canFind("frontend main"));
   assert(haproxy.canFind("bind *:80"));
   assert(!haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
-  assert(haproxy.canFind("map_beg(/var/lib/setline/haproxy/setline.map)"));
-  assert(haproxy.canFind("use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)]"));
-  assert(haproxy.canFind("# setline path routes: backends and map are written by the setline agent " ~
-      "to /var/lib/setline/haproxy"));
+  assert(haproxy.canFind("backend prod-farm"));
+  assert(haproxy.canFind("server 10.0.0.11:9080 check inter 5s;"));
+  assert(haproxy.canFind("use_backend prod-farm if { path_beg /bas }"));
   assert(haproxy.all!isASCII);
-  assert(!haproxy.canFind("setline_path"));
+  assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
-  auto firstLookup = haproxy.indexOf("use_backend");
-  assert(firstLookup >= 0);
-  assert(haproxy.indexOf("use_backend", firstLookup + 1) < 0);
-  assert(!haproxy.canFind("path_beg"));
-  assert(!haproxy.canFind("acl "));
-  assert(!haproxy.canFind("backend prod-farm"));
-  assert(!haproxy.canFind("server 10_0_0_11_9080"));
+  assert(haproxy.indexOf("use_backend") >= 0);
 }
 
 @("proxy model handles url overrides and single/multi-server groups")
@@ -266,11 +259,10 @@ unittest {
 
   assert(findProject(reg, store, "openurp.prod", project));
   auto haproxy = renderProxyForEndpoint(store, reg, project, "edge-ip");
-  assert(haproxy.canFind("map_beg(/var/lib/setline/haproxy/setline.map)"));
-  assert(haproxy.canFind("use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)]"));
+  assert(haproxy.canFind("backend prod-farm"));
+  assert(haproxy.canFind("use_backend prod-farm if { path_beg /bas }"));
+  assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
-  assert(!haproxy.canFind("path_beg"));
-  assert(!haproxy.canFind("backend prod-farm2"));
 }
 
 @("micdn project state renders every configured section")

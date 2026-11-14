@@ -12,6 +12,7 @@ module bashub.project.proxy;
 /// 同一个 farm 内按 server 集合拆后端；多个 server 的集合命名为 `farm2`、`farm3`…。
 
 import bashub.project.distribution : ProjectData, loadProjectData;
+import bashub.project.micdnconfig : MicdnProjectView, loadMicdnProject;
 import bashub.project.resolver : ProjectContext;
 
 import beangle.data.resource : Registry;
@@ -25,7 +26,7 @@ import vibe.data.json : Json;
 import std.algorithm : canFind, sort;
 import std.array : appender, join, split;
 import std.conv : to;
-import std.string : replace, strip;
+import std.string : indexOf, lastIndexOf, replace, strip;
 
 /// 反代后端里的一台 server。
 struct ProxyServer {
@@ -70,6 +71,9 @@ struct ProxyModel {
   ProxyWebapp[] webapps;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
+  /// 每个 endpoint 都追加同一份 micdn 代理，路径来自 Project 的 micdn 配置。
+  ProxyBackend micdnBackend;
+  string[] micdnPaths;
 }
 
 private struct ServerGroup {
@@ -86,8 +90,85 @@ private struct FarmGroup {
   ServerGroup[] groups;
 }
 
-/// setline pull 的证书落点。公钥/私钥分开给 nginx；haproxy 读拼接后的 bundle。
-private enum certificateDir = "/etc/setline/certs";
+/// basctl proxy 的证书落点。公钥/私钥分开给 nginx；haproxy 读拼接后的 bundle。
+private enum certificateDir = "/etc/basproxy/certs";
+
+private Json objGet(Json obj, string key) {
+  auto value = obj[key];
+  return value.type == Json.Type.undefined || value.type == Json.Type.null_
+      ? Json.emptyObject : value;
+}
+
+private string field(Json obj, string key) {
+  auto value = obj[key];
+  return value.type == Json.Type.string ? jsonText(value) : "";
+}
+
+private bool flag(Json obj, string key, bool fallback) {
+  auto value = obj[key];
+  return value.type == Json.Type.bool_ ? value.get!bool : fallback;
+}
+
+/// 把 Project 的 micdn 服务追加为所有 endpoint 共享的代理路径。
+private void attachMicdn(ref ProxyModel model, const MicdnProjectView view) {
+  auto config = view.state.config;
+  auto servers = objGet(config, "servers");
+  if (servers.type != Json.Type.array || servers.length == 0)
+    return;
+  auto listen = field(config, "listen");
+  auto colon = listen.lastIndexOf(':');
+  if (colon <= 0 || colon + 1 >= listen.length)
+    return;
+  ushort port;
+  try
+    port = listen[colon + 1 .. $].to!ushort;
+  catch (Exception)
+    return;
+  ProxyServer[] targets;
+  foreach (ref item; servers) {
+    auto admin = field(item, "adminListen");
+    auto hostEnd = admin.indexOf(']');
+    string host;
+    if (hostEnd > 0)
+      host = admin[1 .. hostEnd];
+    else {
+      auto hc = admin.lastIndexOf(':');
+      host = hc > 0 ? admin[0 .. hc] : admin;
+    }
+    if (host.length == 0)
+      continue;
+    ProxyServer target;
+    target.name = field(item, "name");
+    target.ip = host;
+    target.port = port;
+    targets ~= target;
+  }
+  if (targets.length == 0)
+    return;
+  ProxyBackend backend;
+  backend.name = "micdn";
+  backend.servers = targets;
+  model.micdnBackend = backend;
+
+  bool staticBound, wwwBound;
+  foreach (ref component; view.state.components) {
+    if (component.kind == "static_bundle")
+      staticBound = true;
+    else if (component.kind == "www_doc")
+      wwwBound = true;
+  }
+  if (staticBound)
+    model.micdnPaths ~= "/asset";
+  if (wwwBound)
+    model.micdnPaths ~= "/www";
+  if (flag(objGet(config, "maven"), "declared", false))
+    model.micdnPaths ~= "/maven";
+  if (flag(objGet(config, "npm"), "declared", false))
+    model.micdnPaths ~= "/npm";
+  if (flag(objGet(config, "native"), "declared", false))
+    model.micdnPaths ~= "/native";
+
+}
 
 /// 渲染项目代理；未指定 endpoint 时使用 default，否则第一个 endpoint。
 string renderProxy(Store store, Registry reg, const ProjectContext context) {
@@ -112,6 +193,9 @@ string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext co
   if (wanted.length == 0)
     return "";
   auto model = buildProxyModel(data, wanted);
+  MicdnProjectView micdn;
+  if (loadMicdnProject(store, reg, context.id, micdn))
+    attachMicdn(model, micdn);
   if (model.engine == "nginx")
     return renderNginx(model);
   if (model.engine == "haproxy")
@@ -347,6 +431,13 @@ string renderNginx(ProxyModel model) {
   }
   line(out_, "    include /etc/nginx/conf.d/*.conf;");
 
+  if (model.micdnBackend.servers.length) {
+    line(out_, "");
+    line(out_, "backend micdn");
+    foreach (server; model.micdnBackend.servers)
+      line(out_, "    server " ~ server.ip ~ ":" ~ server.port.to!string ~ ";");
+  }
+
   auto backends = model.backends.dup;
   sort!((a, b) => a.name < b.name)(backends);
   foreach (backend; backends) {
@@ -360,6 +451,14 @@ string renderNginx(ProxyModel model) {
         text ~= " " ~ server.options;
       line(out_, text ~ ";");
     }
+    line(out_, "    }");
+  }
+
+  if (model.micdnBackend.servers.length) {
+    line(out_, "");
+    line(out_, "    upstream micdn{");
+    foreach (server; model.micdnBackend.servers)
+      line(out_, "        server " ~ server.ip ~ ":" ~ server.port.to!string ~ ";");
     line(out_, "    }");
   }
 
@@ -407,6 +506,12 @@ string renderNginx(ProxyModel model) {
   line(out_, "            access_log off;");
   line(out_, "        }");
 
+  foreach (path; model.micdnPaths) {
+    line(out_, "        location " ~ path ~ " {");
+    line(out_, "            proxy_pass http://micdn;");
+    line(out_, "        }");
+  }
+
   auto webapps = model.webapps.dup;
   sort!((a, b) => a.contextPath < b.contextPath)(webapps);
   foreach (webapp; webapps) {
@@ -424,7 +529,7 @@ string renderNginx(ProxyModel model) {
   return out_.data;
 }
 
-/// haproxy：主配置只保留监听与 setline 接线；backend 和路由 map 由 setline agent 生成。
+/// haproxy：完整主配置，直接包含 backend 与 use_backend 路由。
 string renderHaproxy(ProxyModel model) {
   auto project = model.project;
   auto proxy = model.proxy;
@@ -440,8 +545,8 @@ string renderHaproxy(ProxyModel model) {
   auto forceHttps = attributeBool(proxy, "forceHttps", true);
 
   auto out_ = appender!string;
-  line(out_, "# HAProxy main configuration. Start it with the setline fragment directory:");
-  line(out_, "#   -f /etc/haproxy/haproxy.cfg -f /var/lib/setline/haproxy");
+  line(out_, "# HAProxy main configuration generated by bashub.");
+  line(out_, "#   -f /etc/haproxy/haproxy.cfg");
   line(out_, "global");
   line(out_, "    log         127.0.0.1 local2");
   line(out_, "    chroot      /var/lib/haproxy");
@@ -498,9 +603,37 @@ string renderHaproxy(ProxyModel model) {
   }
   line(out_, "");
 
-  line(out_, "    # setline path routes: backends and map are written by the setline agent to /var/lib/setline/haproxy");
-  line(out_, "    use_backend %[path,map_beg(/var/lib/setline/haproxy/setline.map)] " ~
-      "if { path,map_beg(/var/lib/setline/haproxy/setline.map) -m found }");
+  foreach (path; model.micdnPaths)
+    line(out_, "    use_backend micdn if { path_beg " ~ path ~ " }");
+
+  auto apps = model.webapps.dup;
+  sort!((a, b) => a.contextPath < b.contextPath)(apps);
+  foreach (webapp; apps) {
+    auto backend = model.backendByWebapp.get(webapp.id, "");
+    if (backend.length == 0)
+      continue;
+    foreach (path; webapp.urlPaths) {
+      if (path == "/")
+        line(out_, "    use_backend " ~ backend ~ " if { path_beg / }");
+      else
+        line(out_, "    use_backend " ~ backend ~ " if { path_beg " ~ path ~ " }");
+    }
+  }
+
+  auto backends = model.backends.dup;
+  sort!((a, b) => a.name < b.name)(backends);
+  foreach (backend; backends) {
+    line(out_, "");
+    line(out_, "backend " ~ backend.name);
+    if (backend.options.length > 0)
+      putIndented(out_, backend.options, "    ");
+    foreach (server; backend.servers) {
+      auto text = "    server " ~ server.ip ~ ":" ~ server.port.to!string;
+      if (server.options.length > 0)
+        text ~= " " ~ server.options;
+      line(out_, text ~ ";");
+    }
+  }
   return out_.data;
 }
 

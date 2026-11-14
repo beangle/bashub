@@ -181,20 +181,18 @@ Freemarker 模板运行时，不属于 JSON:API。
 | `GET /api/bashub/config/{project}/proxy` | 反向代理配置（haproxy/nginx，按 `project.proxyEngine` 选择模板）；使用同样的 Project 令牌。只输出所选引擎自身的合法配置，不混入 setline agent 配置；HAProxy 按请求 `path` 做 `map_beg` 路由，不再生成 Host 分组查找、path ACL 或 inline backend |
 | `GET /api/bashub/config/{project}/certificate` | Project 的 PEM 公钥证书（可含完整证书链）；使用同样的 Project 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{project}/certificate-key` | Project 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
-| `GET /api/bashub/config/{project}/setline-manifest` | setline 的资源配置摘要（SHA-256）；使用同样的 Project 令牌 |
+
 | `GET /api/bashub/ems/{project}/menus/{appName}` | 应用菜单 |
 | `GET /api/bashub/micdn/{project}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；`X-Micdn-Token` 或 `Authorization: Bearer <project.key>` 鉴权 |
 | `GET /api/bashub/config/{project}/script/{host}` | 主机脚本（按依赖排序） |
 | `WS /api/bashub/monitor/agents/{project}/channel` | 节点通道：basctl 主动连上来的 WebSocket（**不是** HTTP 接口，握手用 `Authorization: Bearer <project>:<Project.key>`，兼容只发 key），见下 |
 | `GET /api/bashub/config/projects/{id}/server` | 管理台查看最终 server.xml；登录会话鉴权 |
+| `GET /api/bashub/config/{project}/proxy-bundle` | `engine=haproxy\|nginx`；返回 ZIP bundle（manifest、配置、证书、私钥），节点用 Project 凭证鉴权 |
 | `GET /api/bashub/config/projects/{id}/proxy` | 管理台查看所选引擎的最终代理配置；登录会话鉴权 |
 | `GET /api/bashub/config/projects/{id}/certificate` | 管理台读取 PEM 公钥证书与 `keySet`（私钥原文永不回显）；登录会话鉴权 |
 | `PATCH /api/bashub/config/projects/{id}/certificate` | 保存公钥证书；`privateKey` 留空表示保持原私钥；登录会话鉴权 |
 
-sidecar 的 `[agent] peers` 只负责“读哪些节点”。各 web 节点自己那份 setline 配置仍需让
-`listen` 可被 sidecar 主机访问，并把 sidecar 主机地址写进 `peerReaders`；这条读链路按
-来源地址放行，不带 token。peers 模式没有监听段，也不会常驻：`setline` 渲染
-一轮后退出，由 `setline-agent.timer` 周期拉起并 apply。
+节点代理配置由 bashub 生成完整 bundle，`basctl proxy apply` 负责校验和应用；不再使用 setline-agent 的 peers 汇聚。
 
 ## `/api/bashub/monitor`（节点与监控）
 
