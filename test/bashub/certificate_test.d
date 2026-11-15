@@ -1,0 +1,30 @@
+module bashub.certificate_test;
+
+import bashub.project.certificate : certificateNotAfter;
+
+private immutable string cert = q"EOF
+-----BEGIN CERTIFICATE-----
+MIIDBDCCAeygAwIBAgIUMLgsOx686ODaQ8eVE64944sy4rIwDQYJKoZIhvcNAQEL
+BQAwFjEUMBIGA1UEAwwLZXhwaXJ5LXRlc3QwHhcNMjYxMTE1MDkwODM1WhcNMjYx
+MjE1MDkwODM1WjAWMRQwEgYDVQQDDAtleHBpcnktdGVzdDCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAL1i7m0wQuU6QExyvc426ZhEuxCXn/faeBOuJf5y
+6mrpmFT8QLpvaBdspNGzEIJl51HCRGSkYf1cjbQ94rLcH+nHzqiPMjAm1Purrm6P
+rm96kS7mOmNe0A9cJso5SxM2CUrb4NNdUJ8MxeYzapHwRHMGFCkJizuo09+SwFbf
+VYFf644TIYa10LIINdMZqxNZ/OzfgbF22rgz7t0dVD+HLLsphjaAxDN50Xws6KcT
+g5rDQvv7GioEosXyi17LzGoiQlz2nWpMbXgzdm7FIIoKje/AJqeWxTeGp+NSHftq
+cbAltt4aMLre/7KYZhB5bE4iUVXOzU9D5cQqjiHH0ngQrf0CAwEAAaNKMEgwHQYD
+VR0OBBYEFMF2bvqXFxFQrev+Tphrqdj5Z2yQMA8GA1UdEwEB/wQFMAMBAf8wFgYD
+VR0RBA8wDYILZXhwaXJ5LXRlc3QwDQYJKoZIhvcNAQELBQADggEBAB+KJ37JMm+i
+q9t0nfIhG3f0LGogExnGsDLjfO59qtys3i6TO7i3dMg1mnBHrDFhDJ1TG1AwASb+
+LEsRTZEIabJ/pojGvfVEnu/dIf1zYFXV77htTt7SVoIkgrQUi9jwiUa0iXPU+7v2
+GVKM9i9zTM7lrA6w3dNvgYMRfvI43KiRPc8DUhEOMEANHN7rkSKz7JUx51OCrC/5
+jclXAV8I56PX62rmchg1Dn99ppBieTUf03MgS7HUAW6leIORepThW45fc8vVYtOQ
+eK6srl5ZusFSsfXXD6briaJTQ8ukRAdeBnoyrKJdxBhrLWlSFvx3MymuFcqDdXEq
+Q0VqVysL09A=
+-----END CERTIFICATE-----
+EOF";
+
+@("certificate parser reads notAfter from PEM") unittest {
+  assert(certificateNotAfter(cert) == "2026-12-15T09:08:35Z");
+  assert(certificateNotAfter("not a certificate").length == 0);
+}

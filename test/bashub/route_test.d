@@ -953,6 +953,15 @@ unittest {
   assert(updated["certificate"].get!string == cert2Pem);
   assert(updated["keySet"].get!bool);
 
+  body["certificateNotAfter"] = Json("2030-01-01T00:00:00Z");
+  ex = call(router, HTTPMethod.PATCH,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate", body.toString);
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["certificateNotAfter"].get!string == "2030-01-01T00:00:00Z");
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate");
+  assert(parseJson(ex.body)["certificateNotAfter"].get!string == "2030-01-01T00:00:00Z");
+
   auto newKey = "-----BEGIN PRIVATE KEY-----\nNEWKEY\n-----END PRIVATE KEY-----";
   body["privateKey"] = Json(newKey);
   ex = call(router, HTTPMethod.PATCH,

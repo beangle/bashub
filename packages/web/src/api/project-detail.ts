@@ -29,6 +29,8 @@ export async function readProjectConfig(projectId: string, kind: ProjectConfigKi
 export interface EndpointCertificateInfo {
   /** PEM 公钥证书（可含完整链）。 */
   certificate: string
+  /** 证书 notAfter；自动解析或人工填写，格式 YYYY-MM-DDTHH:MM:SSZ。 */
+  certificateNotAfter: string
   /** 私钥是否已设置；私钥原文永远不下发。 */
   keySet: boolean
 }
@@ -42,7 +44,7 @@ export function readEndpointCertificate(projectId: string, endpointName: string)
 export async function saveEndpointCertificate(
   projectId: string,
   endpointName: string,
-  input: { certificate: string; privateKey: string },
+  input: { certificate: string; privateKey: string; certificateNotAfter?: string },
 ): Promise<EndpointCertificateInfo> {
   const document = await apiClient.patch<unknown>(
     apiPath('config', `/projects/${encodeURIComponent(projectId)}/endpoints/${encodeURIComponent(endpointName)}/certificate`),

@@ -186,6 +186,7 @@
             <column name="engine" type="varchar(255)" nullable="false" defaultValue="haproxy" comment="代理引擎：haproxy / nginx"/>
             <column name="certificate" type="text" comment="PEM 证书"/>
             <column name="private_key" type="text" comment="PEM 私钥"/>
+            <column name="certificate_not_after" type="varchar(64)" comment="证书过期时间；自动解析或人工填写"/>
             <column name="http_port" type="integer" nullable="false" defaultValue="80" comment="HTTP 端口"/>
             <column name="https_port" type="integer" nullable="false" defaultValue="443" comment="HTTPS 端口"/>
             <column name="enable_https" type="boolean" nullable="false" defaultValue="false" comment="是否启用 HTTPS"/>

@@ -31,6 +31,7 @@ import bashub.api : ApiPrefixes, hubApiPrefixes, resourceApiGroup;
 import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.project.menus : renderEmsMenus;
+import bashub.project.certificate : certificateNotAfter;
 import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
@@ -652,6 +653,10 @@ class HubService {
     auto endpoints = reg.find("endpoints");
     if (store.fetchRaw(endpoints, jsonText(endpoint["id"]), row))
       doc["certificate"] = Json(jsonText(rowGet(row, "certificate")));
+    auto expires = jsonText(rowGet(row, "certificate_not_after")).strip;
+    if (expires.length == 0)
+      expires = certificateNotAfter(jsonText(rowGet(row, "certificate")));
+    doc["certificateNotAfter"] = Json(expires);
     doc["keySet"] = Json(jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key")).length > 0);
     res.headers["Cache-Control"] = "no-store";
     writeJsonApi(res, doc, HTTPStatus.ok);
@@ -686,8 +691,12 @@ class HubService {
           HTTPStatus.badRequest);
       return;
     }
+    auto manualExpiry = jsonText(jsonGet(body, "certificateNotAfter")).strip;
+    auto detectedExpiry = certificateNotAfter(certificate);
+    auto expires = detectedExpiry.length > 0 ? detectedExpiry : manualExpiry;
     Row values;
     values["certificate"] = Json(certificate);
+    values["certificate_not_after"] = Json(expires);
     if (privateKey.length > 0)
       values["private_key"] = Json(privateKey);
     auto endpoints = reg.find("endpoints");
@@ -695,6 +704,7 @@ class HubService {
     store.updateColumns(endpoints, endpointId, values);
     auto doc = Json.emptyObject;
     doc["certificate"] = Json(certificate);
+    doc["certificateNotAfter"] = Json(expires);
     doc["keySet"] = Json(jsonText(store.fetchColumn(endpoints, endpointId, "private_key")).length > 0);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }

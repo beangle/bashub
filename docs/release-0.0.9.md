@@ -65,6 +65,8 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 
 - 修复保存代理私钥后仍显示“私钥未设置”的问题：`private_key` 从非资源列单独读取，
   不再受通用 JSON:API 列清单限制。
+- 保存证书时解析 X.509 `notAfter`，管理台显示到期时间并提示 30 天内到期；无法解析时
+  支持手工填写。新增 `cfg_endpoints.certificate_not_after` 迁移。
 - 延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
 
 ## 升级
@@ -77,7 +79,7 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 ## 验证
 
 ```text
-dub test: 33 modules passed
+dub test: 35 modules passed
 vue-tsc --noEmit: 通过
 pnpm build:web: 通过
 ```

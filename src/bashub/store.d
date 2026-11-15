@@ -19,6 +19,7 @@ import beangle.jsonapi.store : Store, StoreException;
 import beangle.data.value : Row, isBlank, jsonGet, jsonText, rowGet;
 
 import bashub.present : decorateHub;
+import bashub.project.certificate : certificateNotAfter;
 import bashub.project.resolver : dataOf;
 
 import vibe.data.json : Json;
@@ -88,6 +89,13 @@ void fillHubDefaults(const Resource res, ref Row values) {
 
 /// 写入前的 BAS 特化：白名单枚举、唯一性、脚本文本规范化。
 private void normalizeHubWrite(Store store, Registry reg, const Resource res, string id, ref Row values) {
+  if (res.path == "endpoints" && "certificate" in values) {
+    auto certificate = jsonText(values["certificate"]);
+    auto detected = certificateNotAfter(certificate);
+    auto manual = jsonText(rowGet(values, "certificate_not_after")).strip;
+    values["certificate_not_after"] = Json(detected.length > 0 ? detected : manual);
+  }
+
   if (res.path == "channels") {
     if (auto value = "channel_type" in values)
       values["channel_type"] = Json(normalizeChannelType(jsonText(*value)));

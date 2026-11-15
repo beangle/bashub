@@ -184,12 +184,16 @@
                   <t-button size="small" theme="primary" @click="openCertificateEditor">编辑证书</t-button>
                 </div>
               </header>
+              <p v-if="certificateExpiryWarning" class="form-hint form-hint--warning">
+                {{ certificateExpiryWarning }}
+              </p>
               <div class="fact-grid">
                 <div class="fact"><span>HTTPS 端口</span><strong>{{ enableHttps ? (httpsPort || '—') : '—' }}</strong></div>
                 <div class="fact"><span>强制 HTTPS</span><strong>{{ forceHttps ? '是' : '否' }}</strong></div>
                 <div class="fact"><span>SSL 协议</span><strong>{{ sslProtocols || '代理默认' }}</strong></div>
                 <div class="fact"><span>SSL 加密套件</span><strong>{{ sslCiphers || '代理默认' }}</strong></div>
                 <div class="fact"><span>公钥证书</span><strong>{{ certificateText ? '已设置' : '未设置' }}</strong></div>
+                <div class="fact"><span>证书过期</span><strong>{{ certificateExpiryLabel }}</strong></div>
                 <div class="fact"><span>私钥</span><strong>{{ privateKeySet ? '已设置' : '未设置' }}</strong></div>
               </div>
             </article>
@@ -458,6 +462,12 @@
           :autosize="{ minRows: 4, maxRows: 10 }"
           placeholder="-----BEGIN PRIVATE KEY-----"
         />
+        <label>证书过期时间（自动解析失败时填写）</label>
+        <t-input
+          v-model="certificateNotAfterDraft"
+          placeholder="2030-01-01T00:00:00Z"
+        />
+        <p class="form-hint">优先使用证书内的 notAfter；无法解析时才使用这里的时间。</p>
         <t-alert v-if="certificateError" theme="error" :message="certificateError" />
       </div>
     </t-dialog>
@@ -587,10 +597,27 @@ const proxyEngineLabel = computed(() => {
 })
 const sslProtocols = computed(() => attrOf(proxy.value, 'sslProtocols'))
 const sslCiphers = computed(() => attrOf(proxy.value, 'sslCiphers'))
+const certificateExpiryLabel = computed(() => {
+  if (!certificateNotAfter.value) return '未记录'
+  const date = new Date(certificateNotAfter.value)
+  if (Number.isNaN(date.getTime())) return certificateNotAfter.value
+  return date.toLocaleString('zh-CN', { hour12: false })
+})
+const certificateExpiryWarning = computed(() => {
+  if (!certificateNotAfter.value) return ''
+  const date = new Date(certificateNotAfter.value)
+  if (Number.isNaN(date.getTime())) return ''
+  const days = Math.ceil((date.getTime() - Date.now()) / 86400000)
+  if (days < 0) return '证书已过期'
+  if (days <= 30) return `证书将在 ${days} 天内过期`
+  return ''
+})
 const certificateText = ref('')
+const certificateNotAfter = ref('')
 const privateKeySet = ref(false)
 const certificateVisible = ref(false)
 const certificateDraft = ref('')
+const certificateNotAfterDraft = ref('')
 const privateKeyDraft = ref('')
 const savingCertificate = ref(false)
 const certificateError = ref('')
@@ -838,12 +865,14 @@ async function loadEndpointCertificate() {
   const endpointName = certificateEndpointName.value
   if (!endpointName) {
     certificateText.value = ''
+    certificateNotAfter.value = ''
     privateKeySet.value = false
     return
   }
   try {
     const info = await readEndpointCertificate(projectId, endpointName)
     certificateText.value = info.certificate
+    certificateNotAfter.value = info.certificateNotAfter
     privateKeySet.value = info.keySet
   } catch (reason) {
     warning('certificate', '证书', reason)
@@ -869,8 +898,10 @@ async function saveCertificate() {
     const info = await saveEndpointCertificate(projectId, certificateEndpointName.value, {
       certificate: certificateDraft.value,
       privateKey: privateKeyDraft.value,
+      certificateNotAfter: certificateNotAfterDraft.value,
     })
     certificateText.value = info.certificate
+    certificateNotAfter.value = info.certificateNotAfter
     privateKeySet.value = info.keySet
     certificateVisible.value = false
     MessagePlugin.success('证书已保存')
@@ -1400,6 +1431,16 @@ onMounted(load)
   background: var(--td-bg-color-container-hover);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 11px;
+}
+
+.form-hint {
+  margin: 6px 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.form-hint--warning {
+  color: var(--td-warning-color);
 }
 
 .config-preview {

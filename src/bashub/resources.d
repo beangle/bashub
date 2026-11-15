@@ -66,6 +66,7 @@ Registry hubRegistry() {
         Column("force_https", "forceHttps", Kind.boolean),
         Column("engine", "engine", Kind.text),
         Column("certificate", "certificate", Kind.text),
+        Column("certificate_not_after", "certificateNotAfter", Kind.text),
         Column("http_port", "httpPort", Kind.number),
         Column("https_port", "httpsPort", Kind.number),
         Column("enable_https", "enableHttps", Kind.boolean),

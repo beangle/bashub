@@ -191,7 +191,7 @@ Freemarker 模板运行时，不属于 JSON:API。
 | `GET /api/bashub/config/projects/{id}/proxy-bundle` | 管理台按登录会话下载同一份 ZIP bundle，不需要 Project key |
 | `GET /api/bashub/config/projects/{id}/proxy` | 管理台查看所选引擎的最终代理配置；登录会话鉴权 |
 | `GET /api/bashub/config/projects/{id}/certificate` | 管理台读取 PEM 公钥证书与 `keySet`（私钥原文永不回显）；登录会话鉴权 |
-| `PATCH /api/bashub/config/projects/{id}/certificate` | 保存公钥证书；`privateKey` 留空表示保持原私钥；登录会话鉴权 |
+| `GET/PATCH /api/bashub/config/projects/{id}/endpoints/{name}/certificate` | 读取/保存 endpoint 证书；返回 `certificateNotAfter`，自动解析失败时可用请求字段手工填写；私钥不回显 |
 
 节点代理配置由 bashub 生成完整 bundle，`basctl proxy apply` 负责校验和应用；机器侧不再需要常驻 agent 或 peers 汇聚。
 

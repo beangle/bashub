@@ -303,7 +303,7 @@ basagent 不需要采样间隔或时间窗口配置。
 
 数据库脚本在仓库根目录 `db/postgresql/`：`db.xml` 是当前 schema，`init/*.sql` 用于全新安装
 （按文件名序号执行）。0.0.8 起不再提供增量迁移脚本；已有旧库需要历史迁移时，从 git 历史取回原
-`migrate/0.0.8-*.sql`。详见 [db/postgresql/README.md](db/postgresql/README.md)。
+`migrate/YYYYMMDD-NN-*.sql`。详见 [db/postgresql/README.md](db/postgresql/README.md)。
 
 systemd 服务默认不传 `--listen`，因此读取应用文件的 `listen`，再没有才使用内置
 `127.0.0.1:8080`。如果要在 systemd 层覆盖应用文件，用 drop-in 重写 `ExecStart`：

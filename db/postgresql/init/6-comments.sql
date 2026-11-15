@@ -155,6 +155,7 @@ comment on column bas.cfg_endpoints.force_https is '是否强制 HTTPS';
 comment on column bas.cfg_endpoints.engine is '代理引擎：haproxy / nginx';
 comment on column bas.cfg_endpoints.certificate is 'PEM 证书';
 comment on column bas.cfg_endpoints.private_key is 'PEM 私钥';
+comment on column bas.cfg_endpoints.certificate_not_after is '证书过期时间；自动解析或人工填写';
 comment on column bas.cfg_endpoints.http_port is 'HTTP 端口';
 comment on column bas.cfg_endpoints.https_port is 'HTTPS 端口';
 comment on column bas.cfg_endpoints.enable_https is '是否启用 HTTPS';
