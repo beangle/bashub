@@ -134,7 +134,6 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'sslCiphers', label: 'SSL 加密套件', column: false },
       { key: 'sslProtocols', label: 'SSL 协议', column: false },
       { key: 'certificate', label: '证书', type: 'textarea', rows: 4, column: false, help: '可留空；证书随代理 ZIP bundle 下发' },
-      { key: 'certificateNotAfter', label: '证书到期', form: false, width: '13%' },
     ],
   },
   {

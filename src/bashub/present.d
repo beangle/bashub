@@ -20,6 +20,9 @@ import beangle.jsonapi.document : RelIndex;
 import vibe.data.json : Json;
 
 import std.algorithm : sort;
+import std.conv : to;
+import std.datetime.systime : Clock;
+import std.datetime.timezone : UTC;
 import std.array : appender;
 import std.string : replace, split, strip;
 
@@ -52,11 +55,39 @@ private void decorateEndpoint(Row row, ref Json attributes) {
   auto httpsPort = jsonText(rowGet(row, "https_port"));
   auto enabled = jsonText(rowGet(row, "enable_https")) == "true";
   auto forced = enabled && jsonText(rowGet(row, "force_https")) == "true";
-  auto text = "HTTP " ~ httpPort;
-  text ~= enabled ? " / HTTPS " ~ httpsPort : " / 无 HTTPS";
+  auto text = httpPort ~ "/" ~ (enabled ? httpsPort : "-");
   if (forced)
-    text ~= " (强制)";
+    text ~= " 强制";
+  if (certificateExpiring(jsonText(rowGet(row, "certificate_not_after")), 30))
+    text ~= " ⚠";
   attributes["entry"] = Json(text);
+}
+
+/// 仅用于列表提醒：证书剩余不超过 `days` 天时在入口列加警示符号，不展示日期本身。
+private bool certificateExpiring(string expires, int days) {
+  if (expires.length < 10)
+    return false;
+  int year, month, day;
+  try {
+    year = expires[0 .. 4].to!int;
+    month = expires[5 .. 7].to!int;
+    day = expires[8 .. 10].to!int;
+  } catch (Exception)
+    return false;
+  auto today = Clock.currTime(UTC());
+  auto remaining = daysFromCivil(year, month, day) -
+      daysFromCivil(today.year, today.month, today.day);
+  return remaining <= days;
+}
+
+/// Howard Hinnant 的 civil date → epoch day，避免引入日期格式化依赖。
+private long daysFromCivil(long year, long month, long day) {
+  year -= month <= 2 ? 1 : 0;
+  auto era = (year >= 0 ? year : year - 399) / 400;
+  auto yoe = year - era * 400;
+  auto doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+  auto doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + doe - 719468;
 }
 
 private void decorateWebapp(Registry reg, Dao dao, const Resource res, Row row, RelIndex relIndex,

@@ -636,7 +636,7 @@ unittest {
   auto found = false;
   foreach (row; rows) {
     if (row["id"].get!string == "9002") {
-      assert(row["attributes"]["entry"].get!string == "HTTP 80 / HTTPS 443", row.toString);
+      assert(row["attributes"]["entry"].get!string == "80/443", row.toString);
       found = true;
     }
   }
