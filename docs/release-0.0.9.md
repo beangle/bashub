@@ -47,7 +47,7 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 - 修复 `bind` 的证书/密码套件空格和 `server` 缺少名字导致的 HAProxy 配置错误。
 - 恢复 HAProxy 旧配置的 `/var/run/haproxy.pid`、HTTPS 条件
   `X-Forwarded-Port`、默认 `balance roundrobin` / `check`，并补回 Micdn 的
-  `/blob`、`/static`、`/std/spa` 路径。
+  `/blob`、`/static` 路径；`/std/spa` 由 webapp/www 配置推导。
 - Nginx 主配置内联 upstream 和 location。
 - 所有路由按最长前缀优先生成：
 

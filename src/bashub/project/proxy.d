@@ -179,10 +179,9 @@ private void attachMicdn(ref ProxyModel model, const MicdnProjectView view) {
     model.micdnPaths ~= "/npm";
   if (flag(objGet(config, "native"), "declared", false))
     model.micdnPaths ~= "/native";
-  // 旧代理配置中这些固定路径也由 micdn 提供。
+  // blob/static 由 micdn 提供；/std/spa 不是固定 micdn 路径，来自 webapp 或 www mount。
   model.micdnPaths ~= "/blob";
   model.micdnPaths ~= "/static";
-  model.micdnPaths ~= "/std/spa";
 
 }
 

@@ -12,7 +12,7 @@
   避免 `bundle.pemciphers` 和 `server expects <name>` 错误。
 - **HAProxy 兼容默认值**：恢复 `/var/run/haproxy.pid`、HTTPS 下才设置
   `X-Forwarded-Port`、backend 默认 `balance roundrobin`、server 默认 `check`；
-  Micdn 固定路径补回 `/blob`、`/static`、`/std/spa`。
+  Micdn 固定路径补回 `/blob`、`/static`；`/std/spa` 改由 webapp/www 配置推导。
 - **Micdn 路由**：Project 登记 Micdn 服务器后，所有 endpoint 的 bundle 都固定追加
   `/asset`、`/www`、`/maven`、`/npm`、`/native` 等路径，后端端口取 Micdn 的 `listen`。
 - **Micdn www 挂载路径**：www 文档的 `mountName`（如 `m/edu/learning`）

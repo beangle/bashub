@@ -490,3 +490,20 @@ unittest {
   assert(renderHaproxy(model).canFind("use_backend farm if { path_beg /m/edu/learning }"));
   assert(renderNginx(model).canFind("location /m/edu/learning {"));
 }
+
+@("micdn server emits fixed static and blob routes") unittest {
+  auto reg = hubRegistry();
+  auto store = createHubStore(reg, testDao(reg));
+  auto config = defaultMicdnConfig();
+  config["listen"] = Json("0.0.0.0:8888");
+  config["servers"] = Json([
+    Json(["name": Json("cdn01"), "adminListen": Json("10.0.0.31:8081")]),
+  ]);
+  assert(store.updateColumns(reg.find("project-micdn"), "1002", ["config": config]));
+  ProjectContext project;
+  assert(findProject(reg, store, "openurp.prod", project));
+  auto text = renderProxyForEndpoint(store, reg, project, "edge-ip");
+  assert(text.canFind("use_backend micdn if { path_beg /blob }"));
+  assert(text.canFind("use_backend micdn if { path_beg /static }"));
+  assert(!text.canFind("use_backend micdn if { path_beg /std/spa }"));
+}
