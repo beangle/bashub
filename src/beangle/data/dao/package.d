@@ -37,6 +37,9 @@ interface Dao {
   /// 取单条；不存在返回 `Json[string].init`。
   Json[string] findById(const Resource res, string id);
 
+  /// 取单条记录的一个非资源列（例如不暴露给通用 API 的私钥）；不存在返回 undefined。
+  Json selectColumn(const Resource res, string id, string column);
+
   /// 新建，返回新 id。
   string insert(const Resource res, Json[string] values);
 

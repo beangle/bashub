@@ -178,7 +178,7 @@ Freemarker 模板运行时，不属于 JSON:API。
 | URL | 说明 |
 |---|---|
 | `GET /api/bashub/config/{project}/server` | 服务器/集群配置；`Authorization: Bearer <project>:<project.key>` 鉴权。`<snapshot-repo>` 的 `token` 取 Project 的 micdn `<auth download-key>`，为空时回退 hub.xml 的 `<snapshot download-token>`（兼容 `maven-download-token` 属性）；都没有则不写 `token`。不再生成 `<host>` 的 setline 端口、`<setline>` 或 `setline-hostname`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
-| `GET /api/bashub/config/{project}/proxy` | 反向代理配置（haproxy/nginx，按 `project.proxyEngine` 选择模板）；使用同样的 Project 令牌。只输出所选引擎自身的合法配置，不混入 setline agent 配置；HAProxy 按请求 `path` 做 `map_beg` 路由，不再生成 Host 分组查找、path ACL 或 inline backend |
+| `GET /api/bashub/config/{project}/proxy` | 反向代理配置（haproxy/nginx，按 endpoint 的 engine 选择模板）；使用同样的 Project 令牌。输出完整配置：HAProxy 内联 backend 和 `use_backend`，Nginx 内联 upstream/location，并包含 Micdn 路径。新客户端应优先使用 `proxy-bundle` |
 | `GET /api/bashub/config/{project}/certificate` | Project 的 PEM 公钥证书（可含完整证书链）；使用同样的 Project 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{project}/certificate-key` | Project 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
 
@@ -188,11 +188,12 @@ Freemarker 模板运行时，不属于 JSON:API。
 | `WS /api/bashub/monitor/agents/{project}/channel` | 节点通道：basctl 主动连上来的 WebSocket（**不是** HTTP 接口，握手用 `Authorization: Bearer <project>:<Project.key>`，兼容只发 key），见下 |
 | `GET /api/bashub/config/projects/{id}/server` | 管理台查看最终 server.xml；登录会话鉴权 |
 | `GET /api/bashub/config/{project}/proxy-bundle` | `engine=haproxy\|nginx`；返回 ZIP bundle（manifest、配置、证书、私钥），节点用 Project 凭证鉴权 |
+| `GET /api/bashub/config/projects/{id}/proxy-bundle` | 管理台按登录会话下载同一份 ZIP bundle，不需要 Project key |
 | `GET /api/bashub/config/projects/{id}/proxy` | 管理台查看所选引擎的最终代理配置；登录会话鉴权 |
 | `GET /api/bashub/config/projects/{id}/certificate` | 管理台读取 PEM 公钥证书与 `keySet`（私钥原文永不回显）；登录会话鉴权 |
 | `PATCH /api/bashub/config/projects/{id}/certificate` | 保存公钥证书；`privateKey` 留空表示保持原私钥；登录会话鉴权 |
 
-节点代理配置由 bashub 生成完整 bundle，`basctl proxy apply` 负责校验和应用；不再使用 setline-agent 的 peers 汇聚。
+节点代理配置由 bashub 生成完整 bundle，`basctl proxy apply` 负责校验和应用；机器侧不再需要常驻 agent 或 peers 汇聚。
 
 ## `/api/bashub/monitor`（节点与监控）
 

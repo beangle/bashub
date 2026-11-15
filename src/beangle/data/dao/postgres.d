@@ -119,6 +119,21 @@ class DbDao : Dao {
     return rows.length == 0 ? emptyRow() : rows[0];
   }
 
+  Json selectColumn(const Resource res, string id, string column) {
+    // 只允许简单列名；调用方传的是固定内部列，不接受用户输入。
+    foreach (ch; column)
+      if (!(ch >= 'a' && ch <= 'z') && ch != '_')
+        throw new DaoException("invalid secret column: " ~ column);
+    auto sql = "select coalesce(" ~ column ~ ", '') from " ~ res.table ~ " where " ~ res.keyColumn ~ " = ?";
+    try {
+      foreach (row; run(sql, [id]))
+        return Json(row[0].toString);
+    } catch (Exception e) {
+      throw new DaoException("load " ~ column ~ " for " ~ res.path ~ " failed: " ~ e.msg);
+    }
+    return Json.undefined;
+  }
+
   string insert(const Resource res, Json[string] values) {
     try {
       string id;

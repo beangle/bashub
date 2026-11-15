@@ -189,8 +189,8 @@ unittest {
   assert(nginx.canFind("server 10.0.0.12:9081;"));
   assert(nginx.canFind("location /bas {"));
   assert(nginx.canFind("proxy_pass http://prod-farm;"));
-  assert(nginx.canFind("ssl_certificate /etc/basproxy/certs/edge-web.pem;"));
-  assert(nginx.canFind("ssl_certificate_key /etc/basproxy/certs/edge-web.key.pem;"));
+  assert(nginx.canFind("ssl_certificate /etc/nginx/certs/edge-web.pem;"));
+  assert(nginx.canFind("ssl_certificate_key /etc/nginx/certs/edge-web.key.pem;"));
   assert(nginx.canFind("server_name  www.openurp.net;"));
   assertThrown!Exception(renderProxyForEndpoint(store, reg, project, "missing"));
 

@@ -55,7 +55,7 @@ Registry hubRegistry() {
       ],
       "name",
       []),
-    /// 代理/SETLINE 配置与 project 1:1；IP 是 setline 下载用的内部地址。
+    /// 代理 endpoint 与 project 1:1；IP 是代理机的内部地址。
     /// 代理 endpoint：同一 project 下 name/domain 唯一；ips 是代理机内网地址列表。
     Resource(
       "endpoints", "endpoints", "bas.cfg_endpoints", "id",

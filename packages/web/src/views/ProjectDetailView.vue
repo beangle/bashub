@@ -123,9 +123,20 @@
                   <h4>{{ proxyEngineLabel }} 入口</h4>
                   <p>负载均衡器监听、TLS 与连接数设置。</p>
                 </div>
-                <t-tag :theme="proxyConfig ? 'success' : 'default'" variant="light">
-                  {{ proxyConfig ? '配置已生成' : '未生成配置' }}
-                </t-tag>
+                <div class="detail-card__actions">
+                  <t-button
+                    size="small"
+                    theme="primary"
+                    :loading="bundleDownloading"
+                    :disabled="!proxyEngine || !proxyConfig"
+                    @click="downloadBundle"
+                  >
+                    下载 ZIP
+                  </t-button>
+                  <t-tag :theme="proxyConfig ? 'success' : 'default'" variant="light">
+                    {{ proxyConfig ? '配置已生成' : '未生成配置' }}
+                  </t-tag>
+                </div>
               </header>
               <div class="fact-grid">
                 <div class="fact"><span>引擎</span><strong>{{ proxyEngineLabel }}</strong></div>
@@ -136,7 +147,7 @@
                 <div class="fact"><span>最大连接数</span><strong>{{ maxconn || '默认' }}</strong></div>
               </div>
               <div class="detail-note">
-                下载到服务器的代理配置按该 Project 下的群集、服务、主机与 setline 路由渲染；修改 Project 后重新生成。
+                下载到服务器的代理 ZIP 按该 Project 下的群集、服务、主机与 Micdn 路径生成；修改 Project 后重新生成。
               </div>
             </article>
 
@@ -204,7 +215,7 @@
               <header class="detail-card__head">
                 <div>
                   <h4>私钥保护</h4>
-                  <p>配置下载端点使用 Project key 鉴权，私钥只交给 setline 等受信组件。</p>
+                  <p>代理配置从管理台下载时使用登录会话鉴权；ZIP 内的私钥只随 bundle 下发。</p>
                 </div>
                 <t-tag :theme="privateKeySet ? 'success' : 'warning'" variant="light">
                   {{ privateKeySet ? '已设置' : '未设置' }}
@@ -410,7 +421,7 @@
               </header>
               <table v-if="micdnServers.length > 0" class="detail-table">
                 <thead>
-                  <tr><th>名称</th><th>Setline adminListen</th></tr>
+                  <tr><th>名称</th><th>代理 adminListen</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="server in micdnServers" :key="`${server.name}|${server.adminListen}`">
@@ -469,6 +480,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { listAgents, type AgentInstance, type AgentStatus } from '@/api/agents'
 import { getMicdnProject, type MicdnBinding, type MicdnProjectDocument } from '@/api/micdn'
 import {
+  downloadProjectProxyBundle,
   readEndpointCertificate,
   readProjectConfig,
   saveEndpointCertificate,
@@ -545,6 +557,7 @@ const hosts = ref<ResourceRow[]>([])
 const webapps = ref<ResourceRow[]>([])
 const agents = ref<AgentStatus[]>([])
 const proxyConfig = ref('')
+const bundleDownloading = ref(false)
 const serverConfig = ref('')
 const micdn = ref<MicdnProjectDocument>()
 const loading = ref(false)
@@ -792,6 +805,20 @@ function warning(key: string, label: string, reason: unknown) {
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
+}
+
+async function downloadBundle() {
+  if (!proxyEngine.value || !proxy.value) return
+  bundleDownloading.value = true
+  try {
+    const endpoint = attributeText(proxy.value.attributes.name)
+    await downloadProjectProxyBundle(projectId, proxyEngine.value as 'haproxy' | 'nginx', endpoint)
+    MessagePlugin.success('代理 bundle 已开始下载')
+  } catch (error) {
+    MessagePlugin.error(errorText(error) || '代理 bundle 下载失败')
+  } finally {
+    bundleDownloading.value = false
+  }
 }
 
 async function copyText(value: string, label: string) {

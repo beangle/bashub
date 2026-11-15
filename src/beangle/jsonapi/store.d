@@ -105,6 +105,11 @@ class Store {
     return row.length > 0;
   }
 
+  /// 读取未注册到 Resource 的敏感列（例如 endpoint.private_key）。
+  Json fetchColumn(const Resource res, string id, string column) {
+    return dao.selectColumn(res, id, column);
+  }
+
   /// 新建：补默认值、落库，然后重新读一遍（拿到库端默认值与派生属性）。
   Json create(const Resource res, Json body) {
     auto write = parseWrite(res, body, true);

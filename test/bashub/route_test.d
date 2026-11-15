@@ -661,6 +661,13 @@ unittest {
   assert(doc["files"]["privateKey"]["sha256"].get!string == sha256Lower(key));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=nginx&endpoint=edge-web&cert-dir=/etc/custom/certs", auth);
+  assert(ex.status == 200, ex.body);
+  zip = new ZipArchive(cast(ubyte[]) ex.body.dup);
+  auto custom = readMember("config/nginx.conf");
+  assert(custom.canFind("ssl_certificate /etc/custom/certs/edge-web.pem;"));
+
+  ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=haproxy&endpoint=edge-ip", auth);
   assert(ex.status == 200, ex.body);
   zip = new ZipArchive(cast(ubyte[]) ex.body.dup);
@@ -668,6 +675,15 @@ unittest {
   assert(hconfig.canFind("backend prod-farm"));
   assert(hconfig.canFind("use_backend prod-farm"));
   assert(!hconfig.canFind("setline.map"));
+
+  // 管理台按登录会话下载 ZIP，不要求 Project key。
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/projects/1002/proxy-bundle?engine=nginx&endpoint=edge-web");
+  assert(ex.status == 200, ex.body);
+  assert(ex.contentType == "application/zip");
+  zip = new ZipArchive(cast(ubyte[]) ex.body.dup);
+  assert(zip.directory["manifest.json"] !is null);
+  assert(zip.directory["config/nginx.conf"] !is null);
 
   ex = callWithHeaders(router, HTTPMethod.GET,
       "http://localhost/api/bashub/config/openurp.prod/proxy-bundle?engine=nginx&endpoint=edge-ip", auth);
@@ -926,7 +942,7 @@ unittest {
   assert(info["keySet"].get!bool);
   assert(!ex.body.canFind("PRIVATE KEY"));
 
-  // PATCH 只换公钥：私钥留空保持原值
+  // PATCH 只换公钥：私钥留空保持原值；再单独保存新私钥。
   auto body = Json.emptyObject;
   body["certificate"] = Json(cert2);
   ex = call(router, HTTPMethod.PATCH,
@@ -936,6 +952,17 @@ unittest {
   auto updated = parseJson(ex.body);
   assert(updated["certificate"].get!string == cert2Pem);
   assert(updated["keySet"].get!bool);
+
+  auto newKey = "-----BEGIN PRIVATE KEY-----\nNEWKEY\n-----END PRIVATE KEY-----";
+  body["privateKey"] = Json(newKey);
+  ex = call(router, HTTPMethod.PATCH,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate", body.toString);
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["keySet"].get!bool);
+  ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/projects/1002/endpoints/edge-ip/certificate");
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["keySet"].get!bool);
 
   // 非法 PEM 拒绝
   body["certificate"] = Json("not a certificate");
@@ -953,7 +980,7 @@ unittest {
   assert(ex.body == cert2Pem);
   ex = callWithHeaders(router, HTTPMethod.GET, url ~ "-key", auth);
   assert(ex.status == 200, ex.body);
-  assert(ex.body == key);
+  assert(ex.body == newKey ~ "\n");
   ex = callWithHeaders(router, HTTPMethod.GET, url ~ "-key",
       ["Authorization": "Bearer openurp.prod:wrong"]);
   assert(ex.status == 401, ex.body);

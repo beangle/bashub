@@ -68,6 +68,8 @@ struct ProxyModel {
   string hostname;
   string endpointName;
   string engine;
+  /// bundle 配置中引用的证书目录；由调用方按部署位置指定。
+  string certificateDir;
   ProxyWebapp[] webapps;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
@@ -90,8 +92,10 @@ private struct FarmGroup {
   ServerGroup[] groups;
 }
 
-/// basctl proxy 的证书落点。公钥/私钥分开给 nginx；haproxy 读拼接后的 bundle。
-private enum certificateDir = "/etc/basproxy/certs";
+/// 未指定时的证书落点：放在各自代理配置目录下。
+private string defaultCertificateDir(string engine) {
+  return engine == "haproxy" ? "/etc/haproxy/certs" : "/etc/nginx/certs";
+}
 
 private Json objGet(Json obj, string key) {
   auto value = obj[key];
@@ -176,7 +180,7 @@ string renderProxy(Store store, Registry reg, const ProjectContext context) {
 }
 
 string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext context,
-    string endpointName) {
+    string endpointName, string certificateDir = "") {
   auto data = loadProjectData(store, reg, context);
   string wanted = endpointName;
   if (wanted.length == 0 && data.endpoints.length > 0) {
@@ -193,6 +197,7 @@ string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext co
   if (wanted.length == 0)
     return "";
   auto model = buildProxyModel(data, wanted);
+  model.certificateDir = certificateDir.length ? certificateDir : defaultCertificateDir(model.engine);
   MicdnProjectView micdn;
   if (loadMicdnProject(store, reg, context.id, micdn))
     attachMicdn(model, micdn);
@@ -508,10 +513,10 @@ string renderNginx(ProxyModel model) {
     line(out_, "        server_name  " ~ hostname ~ ";");
   if (enableHttps) {
     auto legacy = model.endpointName.length == 0 || model.endpointName == "default";
-    auto cert = legacy ? certificateDir ~ "/cert.pem"
-        : certificateDir ~ "/" ~ model.endpointName ~ ".pem";
-    auto key = legacy ? certificateDir ~ "/key.pem"
-        : certificateDir ~ "/" ~ model.endpointName ~ ".key.pem";
+    auto cert = legacy ? model.certificateDir ~ "/cert.pem"
+        : model.certificateDir ~ "/" ~ model.endpointName ~ ".pem";
+    auto key = legacy ? model.certificateDir ~ "/key.pem"
+        : model.certificateDir ~ "/" ~ model.endpointName ~ ".key.pem";
     line(out_, "        ssl_certificate " ~ cert ~ ";");
     line(out_, "        ssl_certificate_key " ~ key ~ ";");
     line(out_, "        ssl_protocols      " ~ sslProtocols ~ ";");
@@ -600,8 +605,8 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "    bind *:" ~ httpPort.to!string);
   if (enableHttps) {
     auto bundle = (model.endpointName.length == 0 || model.endpointName == "default")
-        ? certificateDir ~ "/bundle.pem"
-        : certificateDir ~ "/" ~ model.endpointName ~ ".bundle.pem";
+        ? model.certificateDir ~ "/bundle.pem"
+        : model.certificateDir ~ "/" ~ model.endpointName ~ ".bundle.pem";
     auto bind = "    bind *:" ~ httpsPort.to!string ~ " ssl crt " ~ bundle;
     if (sslCiphers.length > 0)
       bind ~= "ciphers " ~ sslCiphers ~ " ";

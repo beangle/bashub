@@ -98,6 +98,13 @@ class MemoryDao : Dao {
     return emptyRow();
   }
 
+  Json selectColumn(const Resource res, string id, string column) {
+    if (auto row = slot(res.path, id) in rows)
+      if (auto value = column in *row)
+        return *value;
+    return Json.undefined;
+  }
+
   /// 测试用：预置多值子表（`cfg_engines_listeners` 这类）。
   void seedValues(const Resource res, string attr, string ownerId, const string[] values) {
     valueStore[storeSlot(res.path, attr, ownerId)] = values.dup;

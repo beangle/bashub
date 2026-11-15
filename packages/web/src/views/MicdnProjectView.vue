@@ -53,7 +53,7 @@
               <div>
                 <h3>Micdn 服务器</h3>
                 <p>
-                  登记运行 micdn 的节点。每台服务器的 setline <code>adminListen</code> 会写入
+                  登记运行 micdn 的节点。每台服务器的代理 <code>adminListen</code> 会写入
                   本机 setline 从 <code>http://&lt;adminListen&gt;/_setline/routes</code>
                   读取路由表。
                 </p>
@@ -67,7 +67,7 @@
               <thead>
                 <tr>
                   <th>名称</th>
-                  <th>Setline adminListen</th>
+                  <th>代理 adminListen</th>
                   <th class="server-table__action">操作</th>
                 </tr>
               </thead>

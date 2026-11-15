@@ -50,3 +50,34 @@ export async function saveEndpointCertificate(
   )
   return document as unknown as EndpointCertificateInfo
 }
+/** 管理台按登录会话下载代理 ZIP；不需要 Project key。 */
+export async function downloadProjectProxyBundle(
+  projectId: string,
+  engine: 'haproxy' | 'nginx',
+  endpoint: string,
+): Promise<void> {
+  const query = new URLSearchParams({ engine })
+  if (endpoint) query.set('endpoint', endpoint)
+  const url = apiClient.resolveUrl(apiPath('config', `/projects/${encodeURIComponent(projectId)}/proxy-bundle?${query}`))
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: {
+      ...sessionService.getAuthHeaders(''),
+      Accept: 'application/zip',
+    },
+  })
+  if (!response.ok) {
+    throw new Error(`代理 bundle 下载失败（HTTP ${response.status}）`)
+  }
+  const blob = await response.blob()
+  const disposition = response.headers.get('Content-Disposition') || ''
+  const match = /filename="?([^";]+)"?/.exec(disposition)
+  const filename = match?.[1] || `proxy-bundle-${engine}.zip`
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(link.href)
+}

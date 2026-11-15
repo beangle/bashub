@@ -31,7 +31,7 @@ struct ProjectContext {
   Json data;
 }
 
-/// setline 下载配置：只匹配 proxy_setting.ip（内部地址），不回退 Host.ip。
+/// 按 endpoint 登记的内网 IP 定位 Project；不回退 Host.ip。
 bool resolveSetlineProject(Registry reg, Store store, string qualifiedName, string ipHeader,
     out ProjectContext context) {
   if (!findProject(reg, store, qualifiedName, context))

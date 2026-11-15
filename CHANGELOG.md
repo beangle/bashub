@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.0.9 (unreleased)
+
+- **代理 ZIP bundle**：新增 `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx`，
+  支持 `cert-dir` 按部署目录生成证书路径；
+  一次返回 `manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、证书和私钥；
+  manifest 记录每个文件的 role、相对路径和 SHA-256。
+- **完整代理配置**：HAProxy 配置直接内联 backend 和 `use_backend` 规则，不再依赖
+  `/var/lib/setline/haproxy` 的 map/片段；Nginx 配置包含完整 upstream 和 location。
+- **Micdn 路由**：Project 登记 Micdn 服务器后，所有 endpoint 的 bundle 都固定追加
+  `/asset`、`/www`、`/maven`、`/npm`、`/native` 等路径，后端端口取 Micdn 的 `listen`。
+- **最长前缀优先**：所有代理路由按路径长度从长到短生成，确保 `/api/edu/exam`
+  优先于 `/api/edu`，避免考务请求被泛教学路由截获。
+- **管理台下载**：Project 详情页增加代理 ZIP 下载，使用登录会话，不需要 Project key；
+  `cert-dir` 让机器 bundle 的证书路径与 basctl 的部署目录一致。
+- **私钥状态修复**：`private_key` 不再依赖通用资源查询的列清单，保存私钥后立即返回
+  `keySet=true`，重新打开证书页也不会显示“未设置”。
+- **组件目录**：管理台将静态包与文档拆成两个目录，分别搜索和新建，并增加序号、
+  自动部署说明。
+- **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- **测试**：`dub test` 通过 33 个模块；新增 ZIP bundle、Micdn 路由和最长前缀回归测试。
+
 ## v0.0.8 (2026-11-07)
 
 - **D 后端替换 JVM/Scala 后端**：新增 `target/d/bashub`，使用模块化 vibe 与 libpq，

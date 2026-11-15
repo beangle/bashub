@@ -236,7 +236,7 @@ class HubService {
     }
   }
 
-  /// `GET /api/bashub/config/{project}/endpoints?ip=...`：setline agent 按 project+IP 查询 endpoint。
+  /// `GET /api/bashub/config/{project}/endpoints?ip=...`：按 project+IP 查询 endpoint。
   void projectEndpoints(HTTPServerRequest req, HTTPServerResponse res) {
     auto projectName = req.params.get("project", "");
     ProjectContext project;
@@ -418,10 +418,14 @@ class HubService {
       return;
     }
     auto id = jsonText(endpoints["id"]);
-    Row row;
     string text;
-    if (store.fetchRaw(reg.find("endpoints"), id, row))
-      text = jsonText(rowGet(row, privateKey ? "private_key" : "certificate"));
+    if (privateKey)
+      text = jsonText(store.fetchColumn(reg.find("endpoints"), id, "private_key"));
+    else {
+      Row row;
+      if (store.fetchRaw(reg.find("endpoints"), id, row))
+        text = jsonText(rowGet(row, "certificate"));
+    }
     res.headers["Cache-Control"] = "no-store";
     res.writeBody(text, HTTPStatus.ok, "application/x-pem-file");
   }
@@ -547,38 +551,45 @@ class HubService {
           "endpoint " ~ endpointName ~ " uses " ~ endpointEngine, "engine"), HTTPStatus.badRequest);
       return;
     }
+    auto certDir = req.query.get("cert-dir", "").strip;
     try {
-      auto config = renderProxyForEndpoint(store, reg, project, endpointName);
-      if (config.length == 0) {
-        writeJsonApi(res, errorDocument(404, "代理配置为空", endpointName), HTTPStatus.notFound);
-        return;
-      }
-      auto id = jsonText(endpoint["id"]);
-      Row row;
-      string certificate;
-      string privateKey;
-      if (store.fetchRaw(reg.find("endpoints"), id, row)) {
-        certificate = jsonText(rowGet(row, "certificate"));
-        privateKey = jsonText(rowGet(row, "private_key"));
-      }
-      auto configPath = engine == "haproxy" ? "config/haproxy.cfg" : "config/nginx.conf";
-      auto manifest = "{\n  \"schema\": 1,\n  \"engine\": \"" ~ engine ~ "\",\n"
-          ~ "  \"endpoint\": \"" ~ endpointName ~ "\",\n  \"files\": {\n"
-          ~ "    \"config\": {\"path\": \"" ~ configPath ~ "\", \"sha256\": \"" ~ sha256Hex(config) ~ "\"},\n"
-          ~ "    \"certificate\": {\"path\": \"certificate/cert.pem\", \"sha256\": \"" ~ sha256Hex(certificate) ~ "\"},\n"
-          ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(privateKey) ~ "\"}\n"
-          ~ "  }\n}\n";
-      auto zip = new ZipArchive();
-      addZip(zip, "manifest.json", manifest);
-      addZip(zip, configPath, config);
-      addZip(zip, "certificate/cert.pem", certificate);
-      addZip(zip, "certificate/key.pem", privateKey);
+      auto bytes = createProxyBundle(project, engine, endpointName, certDir);
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(cast(ubyte[]) zip.build().dup, HTTPStatus.ok, "application/zip");
+      res.writeBody(bytes, HTTPStatus.ok, "application/zip");
     } catch (Exception e) {
       logError("Render proxy bundle failed: %s", e.msg);
       writeJsonApi(res, errorDocument(500, "代理配置生成失败", e.msg), HTTPStatus.internalServerError);
     }
+  }
+
+  private ubyte[] createProxyBundle(ProjectContext project, string engine, string endpointName,
+      string certDir = "") {
+    Json endpoint;
+    if (!findEndpointJson(project, endpointName, endpoint))
+      throw new Exception("endpoint not found: " ~ endpointName);
+    auto config = renderProxyForEndpoint(store, reg, project, endpointName, certDir);
+    if (config.length == 0)
+      throw new Exception("empty proxy config");
+    Row row;
+    string certificate;
+    string privateKey;
+    auto endpoints = reg.find("endpoints");
+    if (store.fetchRaw(endpoints, jsonText(endpoint["id"]), row))
+      certificate = jsonText(rowGet(row, "certificate"));
+    privateKey = jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key"));
+    auto configPath = engine == "haproxy" ? "config/haproxy.cfg" : "config/nginx.conf";
+    auto manifest = "{\n  \"schema\": 1,\n  \"engine\": \"" ~ engine ~ "\",\n"
+        ~ "  \"endpoint\": \"" ~ endpointName ~ "\",\n  \"files\": {\n"
+        ~ "    \"config\": {\"path\": \"" ~ configPath ~ "\", \"sha256\": \"" ~ sha256Hex(config) ~ "\"},\n"
+        ~ "    \"certificate\": {\"path\": \"certificate/cert.pem\", \"sha256\": \"" ~ sha256Hex(certificate) ~ "\"},\n"
+        ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(privateKey) ~ "\"}\n"
+        ~ "  }\n}\n";
+    auto zip = new ZipArchive();
+    addZip(zip, "manifest.json", manifest);
+    addZip(zip, configPath, config);
+    addZip(zip, "certificate/cert.pem", certificate);
+    addZip(zip, "certificate/key.pem", privateKey);
+    return cast(ubyte[]) zip.build().dup;
   }
 
   private void addZip(ZipArchive zip, string name, string content) {
@@ -638,10 +649,10 @@ class HubService {
     auto doc = Json.emptyObject;
     doc["certificate"] = Json("");
     doc["keySet"] = Json(false);
-    if (store.fetchRaw(reg.find("endpoints"), jsonText(endpoint["id"]), row)) {
+    auto endpoints = reg.find("endpoints");
+    if (store.fetchRaw(endpoints, jsonText(endpoint["id"]), row))
       doc["certificate"] = Json(jsonText(rowGet(row, "certificate")));
-      doc["keySet"] = Json(jsonText(rowGet(row, "private_key")).length > 0);
-    }
+    doc["keySet"] = Json(jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key")).length > 0);
     res.headers["Cache-Control"] = "no-store";
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
@@ -682,11 +693,9 @@ class HubService {
     auto endpoints = reg.find("endpoints");
     auto endpointId = jsonText(endpoint["id"]);
     store.updateColumns(endpoints, endpointId, values);
-    Row stored;
     auto doc = Json.emptyObject;
     doc["certificate"] = Json(certificate);
-    doc["keySet"] = Json(store.fetchRaw(endpoints, endpointId, stored)
-        && jsonText(rowGet(stored, "private_key")).length > 0);
+    doc["keySet"] = Json(jsonText(store.fetchColumn(endpoints, endpointId, "private_key")).length > 0);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -739,10 +748,10 @@ class HubService {
     auto certificate = "";
     auto certificateKey = "";
     if (endpoint.type == Json.Type.object
-        && store.fetchRaw(reg.find("endpoints"), jsonText(endpoint["id"]), row)) {
+        && store.fetchRaw(reg.find("endpoints"), jsonText(endpoint["id"]), row))
       certificate = jsonText(rowGet(row, "certificate"));
-      certificateKey = jsonText(rowGet(row, "private_key"));
-    }
+    if (endpoint.type == Json.Type.object)
+      certificateKey = jsonText(store.fetchColumn(reg.find("endpoints"), jsonText(endpoint["id"]), "private_key"));
     try {
       auto proxy = endpoint.type == Json.Type.object
           ? renderProxyForEndpoint(store, reg, project, endpointName)
@@ -753,6 +762,47 @@ class HubService {
     } catch (Exception e) {
       logError("Render setline manifest failed: %s", e.msg);
       res.writeBody("", HTTPStatus.internalServerError);
+    }
+  }
+
+  /// `GET /api/bashub/config/projects/{id}/proxy-bundle`：管理台直接下载 ZIP bundle。
+  /// 只按登录会话鉴权，不要求 Project key。
+  void projectProxyBundleView(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found"), HTTPStatus.notFound);
+      return;
+    }
+    auto engine = req.query.get("engine", "").strip;
+    if (engine != "haproxy" && engine != "nginx") {
+      writeJsonApi(res, errorDocument(400, "引擎非法", "engine must be haproxy or nginx", "engine"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    auto endpointName = req.query.get("endpoint", "").strip;
+    if (endpointName.length == 0)
+      endpointName = defaultEndpointName(project);
+    Json endpoint;
+    if (endpointName.length == 0 || !findEndpointJson(project, endpointName, endpoint)) {
+      writeJsonApi(res, errorDocument(404, "代理点不存在", "endpoint not found"), HTTPStatus.notFound);
+      return;
+    }
+    if (attributeText(endpoint, "engine").strip != engine) {
+      writeJsonApi(res, errorDocument(400, "引擎不匹配", "endpoint uses another engine", "engine"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    auto certDir = req.query.get("cert-dir", "").strip;
+    try {
+      auto bytes = createProxyBundle(project, engine, endpointName, certDir);
+      res.headers["Cache-Control"] = "no-store";
+      res.headers["Content-Disposition"] = "attachment; filename=\"proxy-bundle-" ~ engine ~ ".zip\"";
+      res.writeBody(bytes, HTTPStatus.ok, "application/zip");
+    } catch (Exception e) {
+      logError("Render proxy bundle for console failed: %s", e.msg);
+      writeJsonApi(res, errorDocument(500, "代理配置生成失败", e.msg), HTTPStatus.internalServerError);
     }
   }
 
@@ -2452,6 +2502,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/:project/script/:host", &hub.projectHostScript);
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);
   router.get(api.config ~ "/projects/:id/proxy", &hub.projectProxyView);
+  router.get(api.config ~ "/projects/:id/proxy-bundle", &hub.projectProxyBundleView);
 
   // micdn：下载配置、管理台聚合视图与组件目录
   router.get(api.micdn ~ "/:project/micdn.xml", &hub.projectMicdnXml);

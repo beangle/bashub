@@ -163,9 +163,9 @@ src/bashub/                 业务：BAS 控制台这一份
   下载端点也接受用户名是 Project 名的 HTTP Basic，不再依赖可伪造的 `ip` 头；server.xml 只收窄到
   本 Project 的 farms/hosts/webapps 及其引用到的 engines、servers、artifacts。管理台另用
   `GET /api/bashub/config/projects/{id}/server`（登录会话鉴权）查看同一份结果。
-  `GET /api/bashub/config/{project}/proxy` 按 `proxyEngine` 输出 haproxy / nginx；HAProxy 主配置
-  只按请求 `path` 做 `map_beg` 路由，只有带 targets 的 webapp 参与，按 farm + server 集合分组。
-  proxy 下载使用同样的 Bearer 凭证。server.xml 里的
+  `GET /api/bashub/config/{project}/proxy` 按 endpoint 的 engine 输出 haproxy / nginx；
+  HAProxy 主配置内联 backend 和按最长前缀排序的 `use_backend` 规则，只有带 targets 的
+  webapp 参与，按 farm + server 集合分组。proxy 下载使用同样的 Bearer 凭证。server.xml 里的
   `<snapshot-repo remote=".../maven" token="...">` 优先取该 Project 的 micdn
   `<auth download-key>`；为空时回退 `hub.xml` 的 `maven-download-token`，用于多个 Project
   共用同一个 micdn `/maven` 的场景。
@@ -173,7 +173,7 @@ src/bashub/                 业务：BAS 控制台这一份
   `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx` 按 endpoint 的引擎返回
   `application/zip`：`manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、证书和私钥。manifest 中记录每个文件的 role、相对路径和
   SHA-256。配置由 bashub 渲染，节点上的 `basctl proxy apply --engine=...` 只做校验、落盘和
-  `systemctl reload`；不再需要 setline-agent，也不需要 setline 的 peer 读取接口。
+  `systemctl reload`；节点不再需要常驻 agent，也不需要 setline 的 peer 读取接口。
   `GET /api/bashub/ems/{project}/menus/{appName}`
   按部署 artifact 找到 EMS 应用并输出资源/菜单 XML。`GET /api/bashub/micdn/{project}/micdn.xml` 输出
   Project 的完整 micdn 配置；`GET /api/bashub/config/{project}/script/{host}` 按 Host 平台与
