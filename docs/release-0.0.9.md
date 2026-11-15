@@ -58,6 +58,7 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 
 - Project 登记 Micdn 服务器时，所有 endpoint 都追加 `/asset`、`/www`、`/maven`、
   `/npm`、`/native` 等路径，后端端口取 Micdn 的 `listen`。
+- www 文档的 `mountName`（如 `m/edu/learning`）也会生成 micdn 路径。
 
 ### 管理台
 
