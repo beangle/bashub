@@ -13,7 +13,7 @@ import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
-import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderProxy, renderProxyForEndpoint;
+import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderNginx, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
 import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
@@ -434,7 +434,7 @@ unittest {
   auto proxy = Json(["attributes": Json([
     "maxconn": Json(30000), "httpPort": Json(80), "httpsPort": Json(443),
     "enableHttps": Json(true), "forceHttps": Json(false),
-    "sslCiphers": Json("ECDHE+AESGCM"), "sslProtocols": Json("no-tlsv10"),
+    "sslCiphers": Json("ECDHE+AESGCM"), "sslProtocols": Json("no-tlsv10 no-tlsv11 alpn h2,http/1.1"),
   ])]);
   auto model = ProxyModel(Json.emptyObject, proxy, "", "default", "haproxy");
   model.certificateDir = "/etc/haproxy/certs";
@@ -444,8 +444,8 @@ unittest {
   model.webapps = [ProxyWebapp("w1", "/", ["/"], "f1", "farm", [server])];
   model.backendByWebapp["w1"] = "farm";
   auto text = renderHaproxy(model);
-  assert(text.canFind("bind *:443 ssl crt /etc/haproxy/certs/bundle.pem ciphers ECDHE+AESGCM no-tlsv10"));
-  assert(text.canFind("server app1 10.0.0.11:9080;"));
+  assert(text.canFind("bind *:443 ssl crt /etc/haproxy/certs/bundle.pem ciphers ECDHE+AESGCM no-tlsv10 no-tlsv11 alpn h2,http/1.1"));
+  assert(text.canFind("server app1 10.0.0.11:9080 check;"));
 }
 
 @("generated haproxy config passes the local haproxy parser") unittest {
@@ -473,4 +473,20 @@ unittest {
   write(path, renderHaproxy(model));
   auto result = execute(["haproxy", "-c", "-f", path]);
   assert(result.status == 0, result.output ~ "\n---\n" ~ renderHaproxy(model));
+}
+
+
+@("configured alternate webapp path is emitted as a route") unittest {
+  auto proxy = Json(["attributes": Json([
+    "maxconn": Json(30000), "httpPort": Json(80), "httpsPort": Json(443),
+    "enableHttps": Json(false), "forceHttps": Json(false),
+    "sslCiphers": Json(""), "sslProtocols": Json(""),
+  ])]);
+  auto model = ProxyModel(Json.emptyObject, proxy, "", "default", "haproxy");
+  auto server = ProxyServer("s1", "app1", "f1", "farm", "10.0.0.11", "", 9080);
+  model.backends = [ProxyBackend("farm", "", [server], ["w1"])];
+  model.webapps = [ProxyWebapp("w1", "/edu", ["/m/edu/learning"], "f1", "farm", [server])];
+  model.backendByWebapp["w1"] = "farm";
+  assert(renderHaproxy(model).canFind("use_backend farm if { path_beg /m/edu/learning }"));
+  assert(renderNginx(model).canFind("location /m/edu/learning {"));
 }

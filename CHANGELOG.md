@@ -10,6 +10,9 @@
   `/var/lib/setline/haproxy` 的 map/片段；Nginx 配置包含完整 upstream 和 location。
 - **HAProxy 语法修复**：`bind ... ciphers/protocols` 保留空格，`server` 行补上名字，
   避免 `bundle.pemciphers` 和 `server expects <name>` 错误。
+- **HAProxy 兼容默认值**：恢复 `/var/run/haproxy.pid`、HTTPS 下才设置
+  `X-Forwarded-Port`、backend 默认 `balance roundrobin`、server 默认 `check`；
+  Micdn 固定路径补回 `/blob`、`/static`、`/std/spa`。
 - **Micdn 路由**：Project 登记 Micdn 服务器后，所有 endpoint 的 bundle 都固定追加
   `/asset`、`/www`、`/maven`、`/npm`、`/native` 等路径，后端端口取 Micdn 的 `listen`。
 - **最长前缀优先**：所有代理路由按路径长度从长到短生成，确保 `/api/edu/exam`

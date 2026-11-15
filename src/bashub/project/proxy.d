@@ -171,6 +171,10 @@ private void attachMicdn(ref ProxyModel model, const MicdnProjectView view) {
     model.micdnPaths ~= "/npm";
   if (flag(objGet(config, "native"), "declared", false))
     model.micdnPaths ~= "/native";
+  // 旧代理配置中这些固定路径也由 micdn 提供。
+  model.micdnPaths ~= "/blob";
+  model.micdnPaths ~= "/static";
+  model.micdnPaths ~= "/std/spa";
 
 }
 
@@ -567,7 +571,7 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "global");
   line(out_, "    log         127.0.0.1 local2");
   line(out_, "    chroot      /var/lib/haproxy");
-  line(out_, "    pidfile     /var/run/hapid");
+  line(out_, "    pidfile     /var/run/haproxy.pid");
   line(out_, "    maxconn     " ~ maxconn.to!string);
   line(out_, "    user        haproxy");
   line(out_, "    group       haproxy");
@@ -614,7 +618,7 @@ string renderHaproxy(ProxyModel model) {
       bind ~= " " ~ sslProtocols;
     line(out_, bind);
     line(out_, "    http-request set-header X-Forwarded-Proto https if { ssl_fc }");
-    line(out_, "    http-request set-header X-Forwarded-Port %[dst_port]");
+    line(out_, "    http-request set-header X-Forwarded-Port %[dst_port] if { ssl_fc }");
   }
   if (enableHttps && forceHttps) {
     line(out_, "    redirect scheme https if !{ ssl_fc } { hdr_beg(host) " ~ hostname ~ " }");
@@ -629,13 +633,16 @@ string renderHaproxy(ProxyModel model) {
   foreach (backend; backends) {
     line(out_, "");
     line(out_, "backend " ~ backend.name);
+    if (!backend.options.canFind("balance "))
+      line(out_, "    balance roundrobin");
     if (backend.options.length > 0)
       putIndented(out_, backend.options, "    ");
     foreach (index, server; backend.servers) {
       auto name = server.name.length > 0 ? server.name : "s" ~ (index + 1).to!string;
-      auto text = "    server " ~ name ~ " " ~ server.ip ~ ":" ~ server.port.to!string;
-      if (server.options.length > 0)
-        text ~= " " ~ server.options;
+      auto options = server.options.strip;
+      if (!options.canFind("check"))
+        options = options.length > 0 ? options ~ " check" : "check";
+      auto text = "    server " ~ name ~ " " ~ server.ip ~ ":" ~ server.port.to!string ~ " " ~ options;
       line(out_, text ~ ";");
     }
   }
