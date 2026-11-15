@@ -7,7 +7,14 @@
       </div>
     </div>
 
-    <section class="catalog-card">
+    <UnderlineTabs
+      class="catalog-tabs"
+      :tabs="tabs"
+      :model-value="activeTab"
+      @update:model-value="activeTab = $event as CatalogTab"
+    />
+
+    <section v-if="activeTab === 'static_bundle'" class="catalog-card">
       <header class="catalog-card__head">
         <div>
           <h3>静态包</h3>
@@ -53,7 +60,7 @@
       </t-loading>
     </section>
 
-    <section class="catalog-card">
+    <section v-else class="catalog-card">
       <header class="catalog-card__head">
         <div>
           <h3>文档</h3>
@@ -191,6 +198,7 @@
 </template>
 
 <script setup lang="ts">
+import { UnderlineTabs, type UnderlineTabItem } from '@beangle/bui-vue'
 import { AddIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
@@ -208,6 +216,13 @@ import {
   type StaticBundleSpec,
   type WwwDocSpec,
 } from '@/api/micdn'
+
+type CatalogTab = 'static_bundle' | 'www_doc'
+const activeTab = ref<CatalogTab>('static_bundle')
+const tabs: UnderlineTabItem[] = [
+  { value: 'static_bundle', label: '静态包' },
+  { value: 'www_doc', label: '文档' },
+]
 
 const kindOptions = [
   { value: 'static_bundle', label: '静态包 static_bundle' },
@@ -498,6 +513,10 @@ onMounted(load)
   padding: 48px 16px;
   color: var(--td-text-color-placeholder);
   text-align: center;
+}
+
+.catalog-tabs {
+  margin-bottom: 12px;
 }
 
 .catalog-card__head {

@@ -124,6 +124,9 @@
                   <p>负载均衡器监听、TLS 与连接数设置。</p>
                 </div>
                 <div class="detail-card__actions">
+                  <t-button size="small" variant="outline" @click="editProxyEndpoint">
+                    编辑代理设置
+                  </t-button>
                   <t-button
                     size="small"
                     theme="primary"
@@ -832,6 +835,13 @@ function warning(key: string, label: string, reason: unknown) {
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
+}
+
+function editProxyEndpoint() {
+  router.push({
+    path: '/config/org-config',
+    query: { tab: 'endpoints', project: projectId },
+  })
 }
 
 async function downloadBundle() {

@@ -626,6 +626,23 @@ unittest {
   assert(ex.status == 401);
 }
 
+@("endpoint list exposes a compact entry summary") unittest {
+  auto router = newRouter();
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/config/endpoints/search?filter[endpoint.project.id]=1002&pageSize=100");
+  assert(ex.status == 200, ex.body);
+  auto rows = parseJson(ex.body)["data"].get!(Json[]);
+  assert(rows.length > 0);
+  auto found = false;
+  foreach (row; rows) {
+    if (row["id"].get!string == "9002") {
+      assert(row["attributes"]["entry"].get!string == "HTTP 80 / HTTPS 443", row.toString);
+      found = true;
+    }
+  }
+  assert(found);
+}
+
 @("proxy bundle is a zip with manifest, config, certificate and key") unittest {
   auto router = newRouter();
   auto auth = ["Authorization": "Bearer openurp.prod:fedcba9876543210fedcba9876543210"];

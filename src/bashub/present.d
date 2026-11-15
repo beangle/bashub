@@ -38,9 +38,25 @@ void decorateHub(Registry reg, Dao dao, const Resource res, Row row, RelIndex re
   case "menus":
     decorateMenu(reg, dao, res, row, relIndex, attributes);
     break;
+  case "endpoints":
+    decorateEndpoint(row, attributes);
+    break;
   default:
     break;
   }
+}
+
+/// 把 HTTP/HTTPS 端口、是否启用和强制跳转压成一列，列表不再为每个开关单独占宽。
+private void decorateEndpoint(Row row, ref Json attributes) {
+  auto httpPort = jsonText(rowGet(row, "http_port"));
+  auto httpsPort = jsonText(rowGet(row, "https_port"));
+  auto enabled = jsonText(rowGet(row, "enable_https")) == "true";
+  auto forced = enabled && jsonText(rowGet(row, "force_https")) == "true";
+  auto text = "HTTP " ~ httpPort;
+  text ~= enabled ? " / HTTPS " ~ httpsPort : " / 无 HTTPS";
+  if (forced)
+    text ~= " (强制)";
+  attributes["entry"] = Json(text);
 }
 
 private void decorateWebapp(Registry reg, Dao dao, const Resource res, Row row, RelIndex relIndex,
