@@ -26,7 +26,7 @@ import vibe.data.json : Json;
 import std.algorithm : canFind, sort;
 import std.array : appender, join, split;
 import std.conv : to;
-import std.string : indexOf, lastIndexOf, replace, strip;
+import std.string : indexOf, lastIndexOf, replace, startsWith, strip;
 
 /// 反代后端里的一台 server。
 struct ProxyServer {
@@ -158,8 +158,16 @@ private void attachMicdn(ref ProxyModel model, const MicdnProjectView view) {
   foreach (ref component; view.state.components) {
     if (component.kind == "static_bundle")
       staticBound = true;
-    else if (component.kind == "www_doc")
+    else if (component.kind == "www_doc") {
       wwwBound = true;
+      // www doc 的 mountName 是 micdn 的对外路径（如 m/edu/learning），不是 webapp URL。
+      auto mount = component.mountName.strip;
+      if (mount.length > 0) {
+        auto path = mount.startsWith("/") ? mount : "/" ~ mount;
+        if (!model.micdnPaths.canFind(path))
+          model.micdnPaths ~= path;
+      }
+    }
   }
   if (staticBound)
     model.micdnPaths ~= "/asset";
