@@ -8,6 +8,8 @@
   manifest 记录每个文件的 role、相对路径和 SHA-256。
 - **完整代理配置**：HAProxy 配置直接内联 backend 和 `use_backend` 规则，不再依赖
   `/var/lib/setline/haproxy` 的 map/片段；Nginx 配置包含完整 upstream 和 location。
+- **HAProxy 语法修复**：`bind ... ciphers/protocols` 保留空格，`server` 行补上名字，
+  避免 `bundle.pemciphers` 和 `server expects <name>` 错误。
 - **Micdn 路由**：Project 登记 Micdn 服务器后，所有 endpoint 的 bundle 都固定追加
   `/asset`、`/www`、`/maven`、`/npm`、`/native` 等路径，后端端口取 Micdn 的 `listen`。
 - **最长前缀优先**：所有代理路由按路径长度从长到短生成，确保 `/api/edu/exam`
@@ -22,7 +24,8 @@
 - **组件目录**：管理台将静态包与文档拆成两个目录，分别搜索和新建，并增加序号、
   自动部署说明。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
-- **测试**：`dub test` 通过 35 个模块；新增 ZIP bundle、Micdn 路由和最长前缀回归测试。
+- **测试**：`dub test` 通过 35 个模块；新增 ZIP bundle、Micdn 路由、最长前缀回归测试，
+  并在本机存在 `haproxy` 时用 `haproxy -c` 校验生成的完整配置。
 
 ## v0.0.8 (2026-11-07)
 

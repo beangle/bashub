@@ -13,7 +13,7 @@ import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
-import bashub.project.proxy : ProxyModel, ProxyWebapp, renderHaproxy, renderProxy, renderProxyForEndpoint;
+import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
 import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
@@ -202,7 +202,7 @@ unittest {
   assert(haproxy.canFind("bind *:80"));
   assert(!haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
   assert(haproxy.canFind("backend prod-farm"));
-  assert(haproxy.canFind("server 10.0.0.11:9080 check inter 5s;"));
+  assert(haproxy.canFind("server app1 10.0.0.11:9080 check inter 5s;"));
   assert(haproxy.canFind("use_backend prod-farm if { path_beg /bas }"));
   assert(haproxy.all!isASCII);
   assert(!haproxy.canFind("setline.map"));
@@ -428,4 +428,49 @@ unittest {
   auto edu = text.indexOf("use_backend edu");
   assert(exam >= 0 && edu >= 0);
   assert(exam < edu, text);
+}
+
+@("haproxy bind keeps spaces before ciphers and protocols") unittest {
+  auto proxy = Json(["attributes": Json([
+    "maxconn": Json(30000), "httpPort": Json(80), "httpsPort": Json(443),
+    "enableHttps": Json(true), "forceHttps": Json(false),
+    "sslCiphers": Json("ECDHE+AESGCM"), "sslProtocols": Json("no-tlsv10"),
+  ])]);
+  auto model = ProxyModel(Json.emptyObject, proxy, "", "default", "haproxy");
+  model.certificateDir = "/etc/haproxy/certs";
+  auto server = ProxyServer("s1", "app1", "f1", "farm", "10.0.0.11", "", 9080);
+  auto backend = ProxyBackend("farm", "", [server], ["w1"]);
+  model.backends = [backend];
+  model.webapps = [ProxyWebapp("w1", "/", ["/"], "f1", "farm", [server])];
+  model.backendByWebapp["w1"] = "farm";
+  auto text = renderHaproxy(model);
+  assert(text.canFind("bind *:443 ssl crt /etc/haproxy/certs/bundle.pem ciphers ECDHE+AESGCM no-tlsv10"));
+  assert(text.canFind("server app1 10.0.0.11:9080;"));
+}
+
+@("generated haproxy config passes the local haproxy parser") unittest {
+  import std.file : remove, write;
+  import std.process : execute;
+  import std.uuid : randomUUID;
+
+  auto probe = execute(["/bin/sh", "-c", "command -v haproxy >/dev/null 2>&1"]);
+  if (probe.status != 0)
+    return;
+
+  auto proxy = Json(["attributes": Json([
+    "maxconn": Json(30000), "httpPort": Json(80), "httpsPort": Json(443),
+    "enableHttps": Json(false), "forceHttps": Json(false),
+    "sslCiphers": Json(""), "sslProtocols": Json(""),
+  ])]);
+  auto model = ProxyModel(Json.emptyObject, proxy, "", "default", "haproxy");
+  auto server = ProxyServer("s1", "app1", "f1", "farm", "127.0.0.1", "check inter 5s", 19080);
+  model.backends = [ProxyBackend("farm", "balance roundrobin", [server], ["w1"])];
+  model.webapps = [ProxyWebapp("w1", "/", ["/"], "f1", "farm", [server])];
+  model.backendByWebapp["w1"] = "farm";
+
+  auto path = "/tmp/bashub-haproxy-check-" ~ randomUUID().toString ~ ".cfg";
+  scope (exit) remove(path);
+  write(path, renderHaproxy(model));
+  auto result = execute(["haproxy", "-c", "-f", path]);
+  assert(result.status == 0, result.output ~ "\n---\n" ~ renderHaproxy(model));
 }

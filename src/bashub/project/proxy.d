@@ -609,8 +609,9 @@ string renderHaproxy(ProxyModel model) {
         : model.certificateDir ~ "/" ~ model.endpointName ~ ".bundle.pem";
     auto bind = "    bind *:" ~ httpsPort.to!string ~ " ssl crt " ~ bundle;
     if (sslCiphers.length > 0)
-      bind ~= "ciphers " ~ sslCiphers ~ " ";
-    bind ~= sslProtocols;
+      bind ~= " ciphers " ~ sslCiphers;
+    if (sslProtocols.length > 0)
+      bind ~= " " ~ sslProtocols;
     line(out_, bind);
     line(out_, "    http-request set-header X-Forwarded-Proto https if { ssl_fc }");
     line(out_, "    http-request set-header X-Forwarded-Port %[dst_port]");
@@ -630,8 +631,9 @@ string renderHaproxy(ProxyModel model) {
     line(out_, "backend " ~ backend.name);
     if (backend.options.length > 0)
       putIndented(out_, backend.options, "    ");
-    foreach (server; backend.servers) {
-      auto text = "    server " ~ server.ip ~ ":" ~ server.port.to!string;
+    foreach (index, server; backend.servers) {
+      auto name = server.name.length > 0 ? server.name : "s" ~ (index + 1).to!string;
+      auto text = "    server " ~ name ~ " " ~ server.ip ~ ":" ~ server.port.to!string;
       if (server.options.length > 0)
         text ~= " " ~ server.options;
       line(out_, text ~ ";");
