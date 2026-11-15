@@ -162,14 +162,3 @@
   color: var(--td-success-color);
   font-weight: 600;
 }
-
-
-/* 列表选择列只放一个复选框，收紧 BUI 默认的 40px。 */
-.data-grid .data-grid-selection-column,
-.data-grid .t-table__selection-cell,
-.data-grid .t-table__cell--selectable {
-  width: 32px !important;
-  min-width: 32px !important;
-  max-width: 32px !important;
-}
-

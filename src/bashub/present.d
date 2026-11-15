@@ -58,8 +58,12 @@ private void decorateEndpoint(Row row, ref Json attributes) {
   auto text = httpPort ~ "/" ~ (enabled ? httpsPort : "-");
   if (forced)
     text ~= " 强制";
-  if (certificateExpiring(jsonText(rowGet(row, "certificate_not_after")), 30))
+  auto expires = jsonText(rowGet(row, "certificate_not_after"));
+  if (certificateExpiring(expires, 30)) {
     text ~= " ⚠";
+    if (expires.length >= 10)
+      text ~= " " ~ expires[0 .. 10];
+  }
   attributes["entry"] = Json(text);
 }
 
