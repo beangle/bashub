@@ -601,8 +601,6 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "    daemon");
   line(out_, "    tune.ssl.default-dh-param 2048");
   line(out_, "    ssl-default-bind-options no-sslv3 no-tlsv10");
-  line(out_, "    ssl-default-bind-ciphers PROFILE=SYSTEM");
-  line(out_, "    ssl-default-server-ciphers PROFILE=SYSTEM");
   line(out_, "");
   line(out_, "defaults");
   line(out_, "    mode                    http");
@@ -637,14 +635,13 @@ string renderHaproxy(ProxyModel model) {
     line(out_, "    http-request set-header X-Forwarded-Proto https if { ssl_fc }");
     line(out_, "    http-request set-header X-Forwarded-Port %[dst_port] if { ssl_fc }");
   }
+  auto routes = proxyRoutes(model);
+  auto routeMap = model.routeMap.length ? model.routeMap : "/etc/haproxy/bas-routes.map";
+  line(out_, "    http-request set-var(req.backend) path,map_beg(" ~ routeMap ~ ")");
   if (enableHttps && forceHttps) {
     line(out_, "    redirect scheme https if !{ ssl_fc } { hdr_beg(host) " ~ hostname ~ " }");
   }
   line(out_, "");
-
-  auto routes = proxyRoutes(model);
-  auto routeMap = model.routeMap.length ? model.routeMap : "/etc/haproxy/bas-routes.map";
-  line(out_, "    http-request set-var(req.backend) path,map_beg(" ~ routeMap ~ ")");
   line(out_, "    use_backend %[var(req.backend)] if { var(req.backend) -m found }");
   foreach (route; routes)
     if (route.path == "/") {

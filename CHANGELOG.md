@@ -6,10 +6,12 @@
   支持 `cert-dir` 按部署目录生成证书路径；HAProxy bundle 额外包含
   `config/bas-routes.map`，使用 `map_beg` 做最长前缀路由；map 条目按路径字典倒排，
   方便人工检查。
-- **不再生成代理状态页**：HAProxy 删除 `stats socket`、`/status` 和硬编码
-  `stats auth`；Nginx 删除 `stub_status` location。状态采集不再由代理配置默认暴露。
   一次返回 `manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、证书和私钥；
   manifest 记录每个文件的 role、相对路径和 SHA-256。
+- **不再生成代理状态页**：HAProxy 删除 `stats socket`、`/status` 和硬编码
+  `stats auth`；Nginx 删除 `stub_status` location。状态采集不再由代理配置默认暴露。
+- **HAProxy 兼容性**：移除 `ssl-default-bind-ciphers PROFILE=SYSTEM` 等 OpenSSL
+  3-only 默认值，并把 map 的 `http-request` 放到 `redirect` 之前，兼容 HAProxy 3.4.1。
 - **完整代理配置**：HAProxy 配置直接内联 backend 和 `use_backend` 规则，不再依赖
   `/var/lib/setline/haproxy` 的 map/片段；Nginx 配置包含完整 upstream 和 location。
 - **HAProxy 语法修复**：`bind ... ciphers/protocols` 保留空格，`server` 行补上名字，

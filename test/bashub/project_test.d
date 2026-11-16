@@ -209,6 +209,7 @@ unittest {
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
   assert(!haproxy.canFind("stats"));
+  assert(!haproxy.canFind("PROFILE=SYSTEM"));
   assert(!nginx.canFind("/status"));
   assert(haproxy.indexOf("use_backend") >= 0);
 }
@@ -268,6 +269,7 @@ unittest {
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
   assert(!haproxy.canFind("stats"));
+  assert(!haproxy.canFind("PROFILE=SYSTEM"));
   assert(!nginx.canFind("/status"));
 }
 
