@@ -32,6 +32,7 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
   ```text
   manifest.json
   config/haproxy.cfg   或 config/nginx.conf
+  config/bas-routes.map   # 仅 HAProxy
   certificate/cert.pem
   certificate/key.pem
   ```

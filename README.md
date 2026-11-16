@@ -171,7 +171,7 @@ src/bashub/                 业务：BAS 控制台这一份
   共用同一个 micdn `/maven` 的场景。
   PEM 公钥证书与私钥单独存放在 `cfg_project_certificates`，管理台只回显公钥，私钥保存后不再回显。
   `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx` 按 endpoint 的引擎返回
-  `application/zip`：`manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、证书和私钥。manifest 中记录每个文件的 role、相对路径和
+  `application/zip`：`manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、HAProxy 的路由 map、证书和私钥。manifest 中记录每个文件的 role、相对路径和
   SHA-256。配置由 bashub 渲染，节点上的 `basctl proxy apply --engine=...` 只做校验、落盘和
   `systemctl reload`；节点不再需要常驻 agent，也不需要 setline 的 peer 读取接口。
   `GET /api/bashub/ems/{project}/menus/{appName}`

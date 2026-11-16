@@ -689,8 +689,11 @@ unittest {
   assert(ex.status == 200, ex.body);
   zip = new ZipArchive(cast(ubyte[]) ex.body.dup);
   auto hconfig = readMember("config/haproxy.cfg");
+  auto hmap = readMember("config/bas-routes.map");
   assert(hconfig.canFind("backend prod-farm"));
-  assert(hconfig.canFind("use_backend prod-farm"));
+  assert(hconfig.canFind("map_beg(/etc/haproxy/bas-routes.map)"));
+  assert(hconfig.canFind("use_backend %[var(req.backend)]"));
+  assert(hmap.canFind("/bas\tprod-farm"));
   assert(!hconfig.canFind("setline.map"));
 
   // 管理台按登录会话下载 ZIP，不要求 Project key。

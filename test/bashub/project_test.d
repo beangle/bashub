@@ -13,7 +13,7 @@ import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
-import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderNginx, renderProxy, renderProxyForEndpoint;
+import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderHaproxyMap, renderHaproxyMapForEndpoint, renderNginx, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
 import bashub.project.script : FeatureScript, HostScriptModel, ScriptFeature, loadHostScriptModel, orderScripts,
@@ -202,8 +202,9 @@ unittest {
   assert(haproxy.canFind("bind *:80"));
   assert(!haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
   assert(haproxy.canFind("backend prod-farm"));
-  assert(haproxy.canFind("server app1 10.0.0.11:9080 check inter 5s;"));
-  assert(haproxy.canFind("use_backend prod-farm if { path_beg /bas }"));
+  assert(haproxy.canFind("server app1 10.0.0.11:9080 check inter 5s"));
+  auto hmap = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
+  assert(hmap.canFind("/bas\tprod-farm"));
   assert(haproxy.all!isASCII);
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
@@ -260,7 +261,8 @@ unittest {
   assert(findProject(reg, store, "openurp.prod", project));
   auto haproxy = renderProxyForEndpoint(store, reg, project, "edge-ip");
   assert(haproxy.canFind("backend prod-farm"));
-  assert(haproxy.canFind("use_backend prod-farm if { path_beg /bas }"));
+  auto hmap = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
+  assert(hmap.canFind("/bas\tprod-farm"));
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
 }
@@ -423,11 +425,11 @@ unittest {
   model.webapps = [broad, narrow];
   model.backendByWebapp["broad"] = "edu";
   model.backendByWebapp["narrow"] = "exam";
-  auto text = renderHaproxy(model);
-  auto exam = text.indexOf("use_backend exam");
-  auto edu = text.indexOf("use_backend edu");
+  auto map = renderHaproxyMap(model);
+  auto exam = map.indexOf("/api/edu/exam\texam");
+  auto edu = map.indexOf("/api/edu\tedu");
   assert(exam >= 0 && edu >= 0);
-  assert(exam < edu, text);
+  assert(exam < edu, map);
 }
 
 @("haproxy bind keeps spaces before ciphers and protocols") unittest {
@@ -445,7 +447,7 @@ unittest {
   model.backendByWebapp["w1"] = "farm";
   auto text = renderHaproxy(model);
   assert(text.canFind("bind *:443 ssl crt /etc/haproxy/certs/bundle.pem ciphers ECDHE+AESGCM no-tlsv10 no-tlsv11 alpn h2,http/1.1"));
-  assert(text.canFind("server app1 10.0.0.11:9080 check;"));
+  assert(text.canFind("server app1 10.0.0.11:9080 check"));
 }
 
 @("generated haproxy config passes the local haproxy parser") unittest {
@@ -467,9 +469,15 @@ unittest {
   model.backends = [ProxyBackend("farm", "balance roundrobin", [server], ["w1"])];
   model.webapps = [ProxyWebapp("w1", "/", ["/"], "f1", "farm", [server])];
   model.backendByWebapp["w1"] = "farm";
+  auto mapPath = "/tmp/bashub-haproxy-check-" ~ randomUUID().toString ~ ".map";
+  model.routeMap = mapPath;
 
   auto path = "/tmp/bashub-haproxy-check-" ~ randomUUID().toString ~ ".cfg";
-  scope (exit) remove(path);
+  scope (exit) {
+    remove(path);
+    remove(mapPath);
+  }
+  write(mapPath, renderHaproxyMap(model));
   write(path, renderHaproxy(model));
   auto result = execute(["haproxy", "-c", "-f", path]);
   assert(result.status == 0, result.output ~ "\n---\n" ~ renderHaproxy(model));
@@ -487,7 +495,7 @@ unittest {
   model.backends = [ProxyBackend("farm", "", [server], ["w1"])];
   model.webapps = [ProxyWebapp("w1", "/edu", ["/m/edu/learning"], "f1", "farm", [server])];
   model.backendByWebapp["w1"] = "farm";
-  assert(renderHaproxy(model).canFind("use_backend farm if { path_beg /m/edu/learning }"));
+  assert(renderHaproxyMap(model).canFind("/m/edu/learning\tfarm"));
   assert(renderNginx(model).canFind("location /m/edu/learning {"));
 }
 
@@ -503,7 +511,8 @@ unittest {
   ProjectContext project;
   assert(findProject(reg, store, "openurp.prod", project));
   auto text = renderProxyForEndpoint(store, reg, project, "edge-ip");
-  assert(text.canFind("use_backend micdn if { path_beg /blob }"));
-  assert(text.canFind("use_backend micdn if { path_beg /static }"));
-  assert(!text.canFind("use_backend micdn if { path_beg /std/spa }"));
+  auto map = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
+  assert(map.canFind("/blob\tmicdn"));
+  assert(map.canFind("/static\tmicdn"));
+  assert(!map.canFind("/std/spa\tmicdn"));
 }

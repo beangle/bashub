@@ -36,7 +36,7 @@ import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
-import bashub.project.proxy : renderProxy, renderProxyForEndpoint;
+import bashub.project.proxy : renderHaproxyMapForEndpoint, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, dataOf, findProject, findProjectById, ipHeaderAddresses,
   loadAll, matchHostIp, resolveHostProject, resolveSetlineProject;
 import bashub.project.script : renderHostScript;
@@ -553,8 +553,9 @@ class HubService {
       return;
     }
     auto certDir = req.query.get("cert-dir", "").strip;
+    auto routeMap = req.query.get("route-map", "").strip;
     try {
-      auto bytes = createProxyBundle(project, engine, endpointName, certDir);
+      auto bytes = createProxyBundle(project, engine, endpointName, certDir, routeMap);
       res.headers["Cache-Control"] = "no-store";
       res.writeBody(bytes, HTTPStatus.ok, "application/zip");
     } catch (Exception e) {
@@ -564,11 +565,11 @@ class HubService {
   }
 
   private ubyte[] createProxyBundle(ProjectContext project, string engine, string endpointName,
-      string certDir = "") {
+      string certDir = "", string routeMapPath = "") {
     Json endpoint;
     if (!findEndpointJson(project, endpointName, endpoint))
       throw new Exception("endpoint not found: " ~ endpointName);
-    auto config = renderProxyForEndpoint(store, reg, project, endpointName, certDir);
+    auto config = renderProxyForEndpoint(store, reg, project, endpointName, certDir, routeMapPath);
     if (config.length == 0)
       throw new Exception("empty proxy config");
     Row row;
@@ -579,17 +580,23 @@ class HubService {
       certificate = jsonText(rowGet(row, "certificate"));
     privateKey = jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key"));
     auto configPath = engine == "haproxy" ? "config/haproxy.cfg" : "config/nginx.conf";
+    auto routeMap = engine == "haproxy"
+        ? renderHaproxyMapForEndpoint(store, reg, project, endpointName, routeMapPath) : "";
+    auto routeMapFile = "config/bas-routes.map";
     auto manifest = "{\n  \"schema\": 1,\n  \"engine\": \"" ~ engine ~ "\",\n"
         ~ "  \"endpoint\": \"" ~ endpointName ~ "\",\n  \"files\": {\n"
         ~ "    \"config\": {\"path\": \"" ~ configPath ~ "\", \"sha256\": \"" ~ sha256Hex(config) ~ "\"},\n"
         ~ "    \"certificate\": {\"path\": \"certificate/cert.pem\", \"sha256\": \"" ~ sha256Hex(certificate) ~ "\"},\n"
-        ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(privateKey) ~ "\"}\n"
-        ~ "  }\n}\n";
+        ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(privateKey) ~ "\"}"
+        ~ (engine == "haproxy" ? ",\n    \"routeMap\": {\"path\": \"" ~ routeMapFile ~ "\", \"sha256\": \"" ~ sha256Hex(routeMap) ~ "\"}" : "")
+        ~ "\n  }\n}\n";
     auto zip = new ZipArchive();
     addZip(zip, "manifest.json", manifest);
     addZip(zip, configPath, config);
     addZip(zip, "certificate/cert.pem", certificate);
     addZip(zip, "certificate/key.pem", privateKey);
+    if (engine == "haproxy")
+      addZip(zip, routeMapFile, routeMap);
     return cast(ubyte[]) zip.build().dup;
   }
 
@@ -805,8 +812,9 @@ class HubService {
       return;
     }
     auto certDir = req.query.get("cert-dir", "").strip;
+    auto routeMap = req.query.get("route-map", "").strip;
     try {
-      auto bytes = createProxyBundle(project, engine, endpointName, certDir);
+      auto bytes = createProxyBundle(project, engine, endpointName, certDir, routeMap);
       res.headers["Cache-Control"] = "no-store";
       res.headers["Content-Disposition"] = "attachment; filename=\"proxy-bundle-" ~ engine ~ ".zip\"";
       res.writeBody(bytes, HTTPStatus.ok, "application/zip");

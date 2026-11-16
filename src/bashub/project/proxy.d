@@ -70,6 +70,8 @@ struct ProxyModel {
   string engine;
   /// bundle 配置中引用的证书目录；由调用方按部署位置指定。
   string certificateDir;
+  /// HAProxy 路由 map 的部署路径。
+  string routeMap;
   ProxyWebapp[] webapps;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
@@ -182,8 +184,8 @@ string renderProxy(Store store, Registry reg, const ProjectContext context) {
   return renderProxyForEndpoint(store, reg, context, "");
 }
 
-string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext context,
-    string endpointName, string certificateDir = "") {
+private ProxyModel proxyModelForEndpoint(Store store, Registry reg, const ProjectContext context,
+    string endpointName, string certificateDir, string routeMap) {
   auto data = loadProjectData(store, reg, context);
   string wanted = endpointName;
   if (wanted.length == 0 && data.endpoints.length > 0) {
@@ -198,17 +200,31 @@ string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext co
       wanted = attributeText(data.endpoints[0], "name");
   }
   if (wanted.length == 0)
-    return "";
+    return ProxyModel.init;
   auto model = buildProxyModel(data, wanted);
   model.certificateDir = certificateDir.length ? certificateDir : defaultCertificateDir(model.engine);
+  model.routeMap = routeMap.length ? routeMap
+      : (model.engine == "haproxy" ? "/etc/haproxy/bas-routes.map" : "");
   MicdnProjectView micdn;
   if (loadMicdnProject(store, reg, context.id, micdn))
     attachMicdn(model, micdn);
+  return model;
+}
+
+string renderProxyForEndpoint(Store store, Registry reg, const ProjectContext context,
+    string endpointName, string certificateDir = "", string routeMap = "") {
+  auto model = proxyModelForEndpoint(store, reg, context, endpointName, certificateDir, routeMap);
   if (model.engine == "nginx")
     return renderNginx(model);
   if (model.engine == "haproxy")
     return renderHaproxy(model);
   return "";
+}
+
+string renderHaproxyMapForEndpoint(Store store, Registry reg, const ProjectContext context,
+    string endpointName, string routeMap = "") {
+  auto model = proxyModelForEndpoint(store, reg, context, endpointName, "", routeMap);
+  return model.engine == "haproxy" ? renderHaproxyMap(model) : "";
 }
 
 /// 从共享 Project 快照建立反代模型；指定 endpoint 时只保留引用它的 webapp。
@@ -549,6 +565,14 @@ string renderNginx(ProxyModel model) {
   return out_.data;
 }
 
+/// HAProxy map_beg 路由文件：最长前缀由 HAProxy 自己选择，文件顺序不影响匹配。
+string renderHaproxyMap(ProxyModel model) {
+  auto out_ = appender!string;
+  foreach (route; proxyRoutes(model))
+    line(out_, route.path ~ "\t" ~ route.backend);
+  return out_.data;
+}
+
 /// haproxy：完整主配置，直接包含 backend 与 use_backend 路由。
 string renderHaproxy(ProxyModel model) {
   auto project = model.project;
@@ -624,8 +648,16 @@ string renderHaproxy(ProxyModel model) {
   }
   line(out_, "");
 
-  foreach (route; proxyRoutes(model))
-    line(out_, "    use_backend " ~ route.backend ~ " if { path_beg " ~ route.path ~ " }");
+  auto routes = proxyRoutes(model);
+  auto routeMap = model.routeMap.length ? model.routeMap : "/etc/haproxy/bas-routes.map";
+  line(out_, "    http-request set-var(req.backend) path,map_beg(" ~ routeMap ~ ")");
+  line(out_, "    use_backend %[var(req.backend)] if { var(req.backend) -m found }");
+  foreach (route; routes)
+    if (route.path == "/") {
+      line(out_, "    default_backend " ~ route.backend);
+      break;
+    }
+  line(out_, "");
 
   auto backends = model.backends.dup;
   sort!((a, b) => a.name < b.name)(backends);
@@ -642,7 +674,7 @@ string renderHaproxy(ProxyModel model) {
       if (!options.canFind("check"))
         options = options.length > 0 ? options ~ " check" : "check";
       auto text = "    server " ~ name ~ " " ~ hostPort(server.ip, server.port) ~ " " ~ options;
-      line(out_, text ~ ";");
+      line(out_, text);
     }
   }
   return out_.data;
