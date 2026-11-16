@@ -193,11 +193,10 @@
               <div class="fact-grid">
                 <div class="fact"><span>HTTPS 端口</span><strong>{{ enableHttps ? (httpsPort || '—') : '—' }}</strong></div>
                 <div class="fact"><span>强制 HTTPS</span><strong>{{ forceHttps ? '是' : '否' }}</strong></div>
+                <div class="fact"><span>公钥 / 私钥</span><strong>{{ certificateMaterialLabel }}</strong></div>
                 <div class="fact"><span>SSL 协议</span><strong>{{ sslProtocols || '代理默认' }}</strong></div>
-                <div class="fact"><span>SSL 加密套件</span><strong>{{ sslCiphers || '代理默认' }}</strong></div>
-                <div class="fact"><span>公钥证书</span><strong>{{ certificateText ? '已设置' : '未设置' }}</strong></div>
                 <div class="fact"><span>证书过期</span><strong>{{ certificateExpiryLabel }}</strong></div>
-                <div class="fact"><span>私钥</span><strong>{{ privateKeySet ? '已设置' : '未设置' }}</strong></div>
+                <div class="fact fact--wide"><span>SSL 加密套件</span><strong>{{ sslCiphers || '代理默认' }}</strong></div>
               </div>
             </article>
 
@@ -605,6 +604,12 @@ const certificateExpiryLabel = computed(() => {
   const date = new Date(certificateNotAfter.value)
   if (Number.isNaN(date.getTime())) return certificateNotAfter.value
   return date.toLocaleString('zh-CN', { hour12: false })
+})
+const certificateMaterialLabel = computed(() => {
+  const certificate = Boolean(certificateText.value)
+  if (certificate && privateKeySet.value) return '均已设置'
+  if (!certificate && !privateKeySet.value) return '均未设置'
+  return certificate ? '公钥已设置 / 私钥未设置' : '公钥未设置 / 私钥已设置'
 })
 const certificateExpiryWarning = computed(() => {
   if (!certificateNotAfter.value) return ''
@@ -1225,9 +1230,19 @@ onMounted(load)
 
 .fact-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px 22px;
   padding: 14px;
+}
+
+.fact--wide {
+  grid-column: 1 / -1;
+}
+
+.fact--wide strong {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .fact {
