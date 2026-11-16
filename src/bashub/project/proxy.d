@@ -567,8 +567,12 @@ string renderNginx(ProxyModel model) {
 
 /// HAProxy map_beg 路由文件：最长前缀由 HAProxy 自己选择，文件顺序不影响匹配。
 string renderHaproxyMap(ProxyModel model) {
+  auto routes = proxyRoutes(model);
+  // map_beg 自己选择最长前缀，这里的顺序只用于人工检查；倒排后更接近浏览器的
+  // 路径习惯，/api/edu/exam 在 /api/edu 之前，/ 最后。
+  sort!((a, b) => a.path > b.path)(routes);
   auto out_ = appender!string;
-  foreach (route; proxyRoutes(model))
+  foreach (route; routes)
     line(out_, route.path ~ "\t" ~ route.backend);
   return out_.data;
 }
