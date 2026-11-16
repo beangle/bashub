@@ -204,7 +204,7 @@ unittest {
   assert(haproxy.canFind("backend prod-farm"));
   assert(haproxy.canFind("server app1 10.0.0.11:9080 check inter 5s"));
   auto hmap = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
-  assert(hmap.canFind("/bas\tprod-farm"));
+  assert(hmap.canFind("/bas  prod-farm"));
   assert(haproxy.all!isASCII);
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
@@ -265,7 +265,7 @@ unittest {
   auto haproxy = renderProxyForEndpoint(store, reg, project, "edge-ip");
   assert(haproxy.canFind("backend prod-farm"));
   auto hmap = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
-  assert(hmap.canFind("/bas\tprod-farm"));
+  assert(hmap.canFind("/bas  prod-farm"));
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
   assert(!haproxy.canFind("stats"));
@@ -432,8 +432,8 @@ unittest {
   model.backendByWebapp["broad"] = "edu";
   model.backendByWebapp["narrow"] = "exam";
   auto map = renderHaproxyMap(model);
-  auto exam = map.indexOf("/api/edu/exam\texam");
-  auto edu = map.indexOf("/api/edu\tedu");
+  auto exam = map.indexOf("/api/edu/exam  exam");
+  auto edu = map.indexOf("/api/edu  edu");
   assert(exam >= 0 && edu >= 0);
   assert(exam < edu, map);
 }
@@ -501,7 +501,7 @@ unittest {
   model.backends = [ProxyBackend("farm", "", [server], ["w1"])];
   model.webapps = [ProxyWebapp("w1", "/edu", ["/m/edu/learning"], "f1", "farm", [server])];
   model.backendByWebapp["w1"] = "farm";
-  assert(renderHaproxyMap(model).canFind("/m/edu/learning\tfarm"));
+  assert(renderHaproxyMap(model).canFind("/m/edu/learning  farm"));
   assert(renderNginx(model).canFind("location /m/edu/learning {"));
 }
 
@@ -518,7 +518,9 @@ unittest {
   assert(findProject(reg, store, "openurp.prod", project));
   auto text = renderProxyForEndpoint(store, reg, project, "edge-ip");
   auto map = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
-  assert(map.canFind("/blob\tmicdn"));
-  assert(map.canFind("/static\tmicdn"));
-  assert(!map.canFind("/std/spa\tmicdn"));
+  assert(map.canFind("/blob  micdn"));
+  assert(map.canFind("/static  micdn"));
+  assert(text.canFind("backend micdn"));
+  assert(text.canFind("server cdn01 10.0.0.31:8888 check"));
+  assert(!map.canFind("/std/spa  micdn"));
 }

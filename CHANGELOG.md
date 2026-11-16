@@ -12,6 +12,8 @@
   `stats auth`；Nginx 删除 `stub_status` location。状态采集不再由代理配置默认暴露。
 - **HAProxy 兼容性**：移除 `ssl-default-bind-ciphers PROFILE=SYSTEM` 等 OpenSSL
   3-only 默认值，并把 map 的 `http-request` 放到 `redirect` 之前，兼容 HAProxy 3.4.1。
+- **Micdn 后端**：HAProxy 配置现在会输出 map 中引用的 `backend micdn`，此前只有路由
+  条目而没有 backend，reload 后会因未知 backend 失败。
 - **完整代理配置**：HAProxy 配置直接内联 backend 和 `use_backend` 规则，不再依赖
   `/var/lib/setline/haproxy` 的 map/片段；Nginx 配置包含完整 upstream 和 location。
 - **HAProxy 语法修复**：`bind ... ciphers/protocols` 保留空格，`server` 行补上名字，

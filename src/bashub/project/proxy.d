@@ -569,7 +569,7 @@ string renderHaproxyMap(ProxyModel model) {
   sort!((a, b) => a.path > b.path)(routes);
   auto out_ = appender!string;
   foreach (route; routes)
-    line(out_, route.path ~ "\t" ~ route.backend);
+    line(out_, route.path ~ "  " ~ route.backend);
   return out_.data;
 }
 
@@ -651,6 +651,16 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "");
 
   auto backends = model.backends.dup;
+  if (model.micdnBackend.servers.length) {
+    bool hasMicdn;
+    foreach (backend; backends)
+      if (backend.name == "micdn") {
+        hasMicdn = true;
+        break;
+      }
+    if (!hasMicdn)
+      backends ~= model.micdnBackend;
+  }
   sort!((a, b) => a.name < b.name)(backends);
   foreach (backend; backends) {
     line(out_, "");

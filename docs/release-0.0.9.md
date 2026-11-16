@@ -51,6 +51,8 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
   避免默认暴露状态和硬编码凭据。
 - 移除 HAProxy `ssl-default-bind-ciphers PROFILE=SYSTEM` 等 OpenSSL 3-only 默认值，
   并把 `http-request` 放到 `redirect` 前，兼容 HAProxy 3.4.1。
+- 修复 HAProxy 生成配置缺少 `backend micdn`：map 已有 micdn 路由，但主配置未输出
+  对应 backend；Nginx 的 micdn upstream 保持原逻辑。
 - 修复 `bind` 的证书/密码套件空格和 `server` 缺少名字导致的 HAProxy 配置错误。
 - 恢复 HAProxy 旧配置的 `/var/run/haproxy.pid`、HTTPS 条件
   `X-Forwarded-Port`、默认 `balance roundrobin` / `check`，并补回 Micdn 的
