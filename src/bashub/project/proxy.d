@@ -550,10 +550,6 @@ string renderNginx(ProxyModel model) {
   line(out_, "        proxy_set_header  Host $host:$server_port;");
   line(out_, "");
   line(out_, "        include /etc/nginx/default.d/*.conf;");
-  line(out_, "        location /status {");
-  line(out_, "            stub_status on;");
-  line(out_, "            access_log off;");
-  line(out_, "        }");
 
   foreach (route; proxyRoutes(model)) {
     line(out_, "        location " ~ route.path ~ " {");
@@ -607,7 +603,6 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "    ssl-default-bind-options no-sslv3 no-tlsv10");
   line(out_, "    ssl-default-bind-ciphers PROFILE=SYSTEM");
   line(out_, "    ssl-default-server-ciphers PROFILE=SYSTEM");
-  line(out_, "    stats socket /var/lib/haproxy/stats");
   line(out_, "");
   line(out_, "defaults");
   line(out_, "    mode                    http");
@@ -626,11 +621,6 @@ string renderHaproxy(ProxyModel model) {
   line(out_, "    timeout http-keep-alive 60s");
   line(out_, "    timeout check           60s");
   line(out_, "    maxconn                 " ~ maxconn.to!string);
-  line(out_, "");
-  line(out_, "    stats refresh 30s");
-  line(out_, "    stats uri /status");
-  line(out_, "    stats realm haproxy-user");
-  line(out_, "    stats auth admin:ChangeItNow");
   line(out_, "");
   line(out_, "frontend main");
   line(out_, "    bind *:" ~ httpPort.to!string);

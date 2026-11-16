@@ -47,6 +47,8 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 - HAProxy 主配置内联 backend 和 `use_backend`，不再依赖 setline map/fragment。
 - HAProxy 路由使用 `map_beg`；map 条目按路径字典倒排，仅用于人工检查，匹配仍由
   HAProxy 选择最长前缀。
+- 不再生成 HAProxy stats socket / `/status` 页面，也不再生成 Nginx `stub_status`；
+  避免默认暴露状态和硬编码凭据。
 - 修复 `bind` 的证书/密码套件空格和 `server` 缺少名字导致的 HAProxy 配置错误。
 - 恢复 HAProxy 旧配置的 `/var/run/haproxy.pid`、HTTPS 条件
   `X-Forwarded-Port`、默认 `balance roundrobin` / `check`，并补回 Micdn 的

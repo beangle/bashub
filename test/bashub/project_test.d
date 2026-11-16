@@ -208,6 +208,8 @@ unittest {
   assert(haproxy.all!isASCII);
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
+  assert(!haproxy.canFind("stats"));
+  assert(!nginx.canFind("/status"));
   assert(haproxy.indexOf("use_backend") >= 0);
 }
 
@@ -265,6 +267,8 @@ unittest {
   assert(hmap.canFind("/bas\tprod-farm"));
   assert(!haproxy.canFind("setline.map"));
   assert(!haproxy.canFind("setline_route"));
+  assert(!haproxy.canFind("stats"));
+  assert(!nginx.canFind("/status"));
 }
 
 @("micdn project state renders every configured section")
