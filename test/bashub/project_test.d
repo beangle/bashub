@@ -151,28 +151,28 @@ unittest {
   assert(renderServerXml(store, reg, demo, true, "hub-secret").canFind(`token="********"`));
 }
 
-@("micdn server registrations normalize adminListen and stay out of micdn.xml")
+@("micdn server registrations normalize host and stay out of micdn.xml")
 unittest {
   auto raw = defaultMicdnConfig();
   raw["servers"] = Json([
-    Json(["name": Json("cdn02"), "adminListen": Json("[2001:db8::2]:8081")]),
-    Json(["name": Json("cdn01"), "adminListen": Json(" 10.0.0.31:8081 ")]),
+    Json(["name": Json("cdn02"), "host": Json("2001:db8::2")]),
+    Json(["name": Json("cdn01"), "host": Json(" 10.0.0.31 ")]),
   ]);
   auto config = normalizeMicdnConfig(raw);
   assert(config["servers"].length == 2);
   assert(config["servers"][0]["name"].get!string == "cdn01");
-  assert(config["servers"][0]["adminListen"].get!string == "10.0.0.31:8081");
-  assert(config["servers"][1]["adminListen"].get!string == "[2001:db8::2]:8081");
+  assert(config["servers"][0]["host"].get!string == "10.0.0.31");
+  assert(config["servers"][1]["host"].get!string == "2001:db8::2");
   auto xml = renderMicdnXml(config, [], "prod", "fedcba9876543210fedcba9876543210");
-  assert(!xml.canFind("adminListen"));
+  assert(!xml.canFind("host"));
   assert(!xml.canFind("cdn01"));
 
   auto invalid = defaultMicdnConfig();
   invalid["servers"] = Json([
-    Json(["name": Json("cdn01"), "adminListen": Json("0.0.0.0:8081")]),
+    Json(["name": Json("cdn01"), "host": Json("0.0.0.0")]),
   ]);
   auto error = expectConfigError({ normalizeMicdnConfig(invalid); });
-  assert(error.field == "servers[0].adminListen");
+  assert(error.field == "servers[0].host");
 }
 
 @("proxy config groups webapps by their target server set")
@@ -497,7 +497,7 @@ unittest {
   auto config = defaultMicdnConfig();
   config["listen"] = Json("0.0.0.0:8888");
   config["servers"] = Json([
-    Json(["name": Json("cdn01"), "adminListen": Json("10.0.0.31:8081")]),
+    Json(["name": Json("cdn01"), "host": Json("10.0.0.31")]),
   ]);
   assert(store.updateColumns(reg.find("project-micdn"), "1002", ["config": config]));
   ProjectContext project;

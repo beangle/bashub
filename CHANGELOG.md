@@ -17,6 +17,8 @@
   `/asset`、`/www`、`/maven`、`/npm`、`/native` 等路径，后端端口取 Micdn 的 `listen`。
 - **Micdn www 挂载路径**：www 文档的 `mountName`（如 `m/edu/learning`）
   也会作为 micdn 代理路径下发，不再只依赖 webapp 的 `urls`。
+- **Micdn 节点字段**：`servers[].adminListen` 改为语义明确的 `servers[].host`；
+  代理端口统一取 `micdn.listen`，并提供迁移脚本。
 - **最长前缀优先**：所有代理路由按路径长度从长到短生成，确保 `/api/edu/exam`
   优先于 `/api/edu`，避免考务请求被泛教学路由截获。
 - **管理台下载**：Project 详情页增加代理 ZIP 下载，使用登录会话，不需要 Project key；

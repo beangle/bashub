@@ -26,7 +26,7 @@ import vibe.data.json : Json, parseJson;
 import std.algorithm : canFind, sort;
 import std.array : appender, split;
 import std.conv : ConvException, to;
-import std.string : indexOf, lastIndexOf, strip, toLower;
+import std.string : endsWith, indexOf, lastIndexOf, startsWith, strip, toLower;
 
 /// 配置或组件不合法。`field` 供 API 的 400 响应定位到具体属性。
 class MicdnConfigException : Exception {
@@ -671,7 +671,7 @@ private void normalizeBlob(Json source, ref Json result) {
 }
 
 /// Micdn 部署节点只服务配置分发，不写进 micdn.xml。每个节点登记自己的
-/// setline adminListen。
+/// 可达地址（host），代理端口统一取 micdn.listen。
 private void normalizeServers(Json source, ref Json result) {
   auto raw = jsonGet(source, "servers");
   if (raw.type == Json.Type.undefined || raw.type == Json.Type.null_) {
@@ -682,7 +682,7 @@ private void normalizeServers(Json source, ref Json result) {
     throw new MicdnConfigException("servers", "servers 必须是数组");
 
   bool[string] names;
-  bool[string] listeners;
+  bool[string] hosts;
   Json[] servers;
   foreach (size_t i, ref item; raw) {
     auto fieldName = "servers[" ~ i.to!string ~ "]";
@@ -694,54 +694,32 @@ private void normalizeServers(Json source, ref Json result) {
       throw new MicdnConfigException(fieldName ~ ".name", "服务器名称重复: " ~ name);
     names[name.toLower] = true;
 
-    auto adminListen = normalizeAdminListen(field(item, "adminListen"), fieldName ~ ".adminListen");
-    if (adminListen in listeners)
-      throw new MicdnConfigException(fieldName ~ ".adminListen", "adminListen 重复: " ~ adminListen);
-    listeners[adminListen] = true;
+    auto host = normalizeHost(field(item, "host"), fieldName ~ ".host");
+    if (host in hosts)
+      throw new MicdnConfigException(fieldName ~ ".host", "host 重复: " ~ host);
+    hosts[host] = true;
 
     auto server = Json.emptyObject;
     server["name"] = Json(name);
-    server["adminListen"] = Json(adminListen);
+    server["host"] = Json(host);
     servers ~= server;
   }
   sort!((a, b) => nameBefore(field(a, "name"), field(b, "name")))(servers);
   result["servers"] = Json(servers);
 }
 
-private string normalizeAdminListen(string text, string fieldName) {
+private string normalizeHost(string text, string fieldName) {
   auto value = text.strip;
   if (value.length == 0)
-    throw new MicdnConfigException(fieldName, "adminListen 不能为空");
-
-  string host;
-  string portText;
-  if (value[0] == '[') {
-    auto close = value.indexOf(']');
-    if (close <= 1 || close + 1 >= value.length || value[close + 1] != ':')
-      throw new MicdnConfigException(fieldName, "adminListen 必须是 host:port");
-    host = value[1 .. close];
-    portText = value[close + 2 .. $];
-  } else {
-    auto colon = value.lastIndexOf(':');
-    if (colon <= 0 || colon + 1 >= value.length)
-      throw new MicdnConfigException(fieldName, "adminListen 必须是 host:port");
-    host = value[0 .. colon];
-    portText = value[colon + 1 .. $];
-  }
-  if (host.length == 0 || host == "0.0.0.0" || host == "*" || host == "::"
-      || host.indexOf("/") >= 0)
-    throw new MicdnConfigException(fieldName, "adminListen 必须使用节点可达地址");
-
-  ushort port;
-  try {
-    port = portText.to!ushort;
-  } catch (ConvException e) {
-    throw new MicdnConfigException(fieldName, "adminListen 端口必须是数字");
-  }
-  if (port == 0)
-    throw new MicdnConfigException(fieldName, "adminListen 端口必须在 1-65535 之间");
-  return (host.indexOf(':') >= 0 ? "[" ~ host ~ "]" : host) ~ ":" ~ port.to!string;
+    throw new MicdnConfigException(fieldName, "host 不能为空");
+  if (value == "0.0.0.0" || value == "*" || value == "::" || value.indexOf("/") >= 0
+      || value.indexOf(" ") >= 0 || value.indexOf("\t") >= 0)
+    throw new MicdnConfigException(fieldName, "host 必须是节点可达地址，不能是通配地址或包含端口/路径");
+  if (value.startsWith("[") || value.endsWith("]"))
+    throw new MicdnConfigException(fieldName, "host 不需要方括号，IPv6 直接写地址");
+  return value;
 }
+
 
 private Json normalizeSource(Json source, string fieldName) {
   if (source.type != Json.Type.object)

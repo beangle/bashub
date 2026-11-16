@@ -423,17 +423,17 @@
               <header class="detail-card__head">
                 <div>
                   <h4>Micdn 节点</h4>
-                  <p>这些 adminListen 由本机 setline 管理。</p>
+                  <p>这些节点地址用于生成 Micdn 代理后端。</p>
                 </div>
               </header>
               <table v-if="micdnServers.length > 0" class="detail-table">
                 <thead>
-                  <tr><th>名称</th><th>代理 adminListen</th></tr>
+                  <tr><th>名称</th><th>节点地址</th></tr>
                 </thead>
                 <tbody>
-                  <tr v-for="server in micdnServers" :key="`${server.name}|${server.adminListen}`">
+                  <tr v-for="server in micdnServers" :key="`${server.name}|${server.host}`">
                     <td>{{ server.name }}</td>
-                    <td><code>{{ server.adminListen }}</code></td>
+                    <td><code>{{ server.host }}</code></td>
                   </tr>
                 </tbody>
               </table>

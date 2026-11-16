@@ -50,7 +50,7 @@ export interface MicdnAuthConfig {
 
 export interface MicdnServer {
   name: string
-  adminListen: string
+  host: string
 }
 
 export interface MicdnConfig {

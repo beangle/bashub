@@ -130,15 +130,7 @@ private void attachMicdn(ref ProxyModel model, const MicdnProjectView view) {
     return;
   ProxyServer[] targets;
   foreach (ref item; servers) {
-    auto admin = field(item, "adminListen");
-    auto hostEnd = admin.indexOf(']');
-    string host;
-    if (hostEnd > 0)
-      host = admin[1 .. hostEnd];
-    else {
-      auto hc = admin.lastIndexOf(':');
-      host = hc > 0 ? admin[0 .. hc] : admin;
-    }
+    auto host = field(item, "host").strip;
     if (host.length == 0)
       continue;
     ProxyServer target;
@@ -487,7 +479,7 @@ string renderNginx(ProxyModel model) {
     if (backend.options.length > 0)
       putIndented(out_, backend.options, "        ");
     foreach (server; backend.servers) {
-      auto text = "        server " ~ server.ip ~ ":" ~ server.port.to!string;
+      auto text = "        server " ~ hostPort(server.ip, server.port);
       if (server.options.length > 0)
         text ~= " " ~ server.options;
       line(out_, text ~ ";");
@@ -499,7 +491,7 @@ string renderNginx(ProxyModel model) {
     line(out_, "");
     line(out_, "    upstream micdn{");
     foreach (server; model.micdnBackend.servers)
-      line(out_, "        server " ~ server.ip ~ ":" ~ server.port.to!string ~ ";");
+      line(out_, "        server " ~ hostPort(server.ip, server.port) ~ ";");
     line(out_, "    }");
   }
 
@@ -649,11 +641,17 @@ string renderHaproxy(ProxyModel model) {
       auto options = server.options.strip;
       if (!options.canFind("check"))
         options = options.length > 0 ? options ~ " check" : "check";
-      auto text = "    server " ~ name ~ " " ~ server.ip ~ ":" ~ server.port.to!string ~ " " ~ options;
+      auto text = "    server " ~ name ~ " " ~ hostPort(server.ip, server.port) ~ " " ~ options;
       line(out_, text ~ ";");
     }
   }
   return out_.data;
+}
+
+/// HAProxy/Nginx 的 IPv6 地址必须带方括号。
+private string hostPort(string host, long port) {
+  auto formatted = host.canFind(":") && !host.startsWith("[") ? "[" ~ host ~ "]" : host;
+  return formatted ~ ":" ~ port.to!string;
 }
 
 private void line(A)(ref A out_, string text) {

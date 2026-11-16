@@ -209,7 +209,7 @@ private void validateWebappEndpoints(Store store, Registry reg, string id) {
   }
 }
 
-/// Webapp.targets 最终会写成 server.xml 的 run-at；目标 server 所在主机必须部署 setline。
+/// Webapp.targets 最终会写成 server.xml 的 run-at；目标 server 必须在对应主机上可运行。
 private void validateWebappTargets(Store store, Registry reg, string id) {
   Json document;
   if (!store.fetch(reg.find("webapps"), id, Query.init, document))

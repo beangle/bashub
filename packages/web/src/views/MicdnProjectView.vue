@@ -53,9 +53,8 @@
               <div>
                 <h3>Micdn 服务器</h3>
                 <p>
-                  登记运行 micdn 的节点。每台服务器的代理 <code>adminListen</code> 会写入
-                  本机 setline 从 <code>http://&lt;adminListen&gt;/_setline/routes</code>
-                  读取路由表。
+                  登记运行 micdn 的节点。代理 bundle 使用节点地址的 host，
+                  端口取 Micdn 配置中的 <code>listen</code>。
                 </p>
               </div>
               <t-button variant="outline" @click="addServer">添加服务器</t-button>
@@ -67,7 +66,7 @@
               <thead>
                 <tr>
                   <th>名称</th>
-                  <th>代理 adminListen</th>
+                  <th>节点地址（host:port）</th>
                   <th class="server-table__action">操作</th>
                 </tr>
               </thead>
@@ -77,7 +76,7 @@
                     <t-input v-model="server.name" placeholder="cdn01" />
                   </td>
                   <td>
-                    <t-input v-model="server.adminListen" placeholder="10.0.0.31:8081" />
+                    <t-input v-model="server.host" placeholder="10.0.0.31" />
                   </td>
                   <td class="server-table__action">
                     <t-button size="small" variant="text" theme="danger" @click="removeServer(index)">移除</t-button>
@@ -373,7 +372,7 @@ function addServer() {
   while (used.has(`cdn${String(index).padStart(2, '0')}`)) index += 1
   config.value.servers.push({
     name: `cdn${String(index).padStart(2, '0')}`,
-    adminListen: '',
+    host: '',
   })
 }
 
