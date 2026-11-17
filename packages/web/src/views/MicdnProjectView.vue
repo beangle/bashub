@@ -48,6 +48,39 @@
                 <t-input v-model="serverHost" placeholder="10.0.0.31" />
               </label>
             </div>
+            <hr class="form-divider" />
+            <header class="config-card__head config-card__head--section">
+              <div>
+                <h3>仓库鉴权</h3>
+                <p>同时作用于 maven、npm、native。两个 key 都为空时不生成 auth 段。</p>
+              </div>
+            </header>
+            <div class="form-grid form-grid--base">
+              <div class="form-field">
+                <span>发布密钥 publish-key</span>
+                <t-input
+                  v-model="authDraft.publishKey"
+                  type="password"
+                  :placeholder="config.auth.publishKeySet ? '已设置，留空保持不变' : '未设置'"
+                  clearable
+                />
+                <t-checkbox v-if="config.auth.publishKeySet" v-model="clearPublishKey">清空发布密钥</t-checkbox>
+              </div>
+              <div class="form-field">
+                <span>下载密钥 download-key</span>
+                <t-input
+                  v-model="authDraft.downloadKey"
+                  type="password"
+                  :placeholder="config.auth.downloadKeySet ? '已设置，留空保持不变' : '未设置'"
+                  clearable
+                />
+                <t-checkbox v-if="config.auth.downloadKeySet" v-model="clearDownloadKey">清空下载密钥</t-checkbox>
+              </div>
+              <label class="form-field">
+                <span>上传大小上限</span>
+                <t-input v-model="config.auth.maxSize" placeholder="64M" />
+              </label>
+            </div>
           </section>
         </template>
 
@@ -117,43 +150,6 @@
           </section>
         </template>
 
-        <template v-else-if="activeTab === 'auth'">
-          <section class="config-card">
-            <header class="config-card__head">
-              <div>
-                <h3>仓库鉴权</h3>
-                <p>同时作用于 maven、npm、native。两个 key 都为空时不生成 auth 段。</p>
-              </div>
-            </header>
-            <div class="form-grid">
-              <div class="form-field">
-                <span>发布密钥 publish-key</span>
-                <t-input
-                  v-model="authDraft.publishKey"
-                  type="password"
-                  :placeholder="config.auth.publishKeySet ? '已设置，留空保持不变' : '未设置'"
-                  clearable
-                />
-                <t-checkbox v-if="config.auth.publishKeySet" v-model="clearPublishKey">清空发布密钥</t-checkbox>
-              </div>
-              <div class="form-field">
-                <span>下载密钥 download-key</span>
-                <t-input
-                  v-model="authDraft.downloadKey"
-                  type="password"
-                  :placeholder="config.auth.downloadKeySet ? '已设置，留空保持不变' : '未设置'"
-                  clearable
-                />
-                <t-checkbox v-if="config.auth.downloadKeySet" v-model="clearDownloadKey">清空下载密钥</t-checkbox>
-              </div>
-              <label class="form-field">
-                <span>上传大小上限</span>
-                <t-input v-model="config.auth.maxSize" placeholder="64M" />
-              </label>
-            </div>
-          </section>
-        </template>
-
         <template v-else-if="activeTab === 'static'">
           <section class="config-card config-card--compact">
             <div class="form-grid">
@@ -207,7 +203,7 @@
                 <t-input v-model="config.blob.maxSize" placeholder="100M" />
               </label>
               <div class="form-field form-field--switch">
-                <span>图片公开读取</span>
+                <span>公开读取</span>
                 <t-switch v-model="config.blob.publicImages" />
               </div>
             </div>
@@ -259,7 +255,6 @@ const projectId = String(route.params.id || '')
 const tabs: UnderlineTabItem[] = [
   { value: 'base', label: '基础' },
   { value: 'repos', label: 'Maven / NPM / Native' },
-  { value: 'auth', label: '鉴权' },
   { value: 'static', label: 'Static' },
   { value: 'www', label: 'WWW' },
   { value: 'blob', label: 'Blob' },
@@ -477,6 +472,12 @@ onMounted(load)
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.form-divider {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--td-component-stroke);
+}
+
 .form-field {
   display: flex;
   min-width: 0;
@@ -489,6 +490,12 @@ onMounted(load)
 .form-field > span {
   color: var(--td-text-color-secondary);
   font-size: 13px;
+}
+
+.form-field--switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 .form-field small {
