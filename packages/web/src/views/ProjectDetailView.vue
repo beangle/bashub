@@ -427,11 +427,10 @@
               </header>
               <table v-if="micdnServers.length > 0" class="detail-table">
                 <thead>
-                  <tr><th>名称</th><th>节点地址</th></tr>
+                  <tr><th>节点 IP</th></tr>
                 </thead>
                 <tbody>
-                  <tr v-for="server in micdnServers" :key="`${server.name}|${server.host}`">
-                    <td>{{ server.name }}</td>
+                  <tr v-for="server in micdnServers" :key="server.host">
                     <td><code>{{ server.host }}</code></td>
                   </tr>
                 </tbody>
@@ -747,7 +746,7 @@ const webappRows = computed(() =>
 const staticBindings = computed(() => bindingsOf('static_bundle'))
 const wwwBindings = computed(() => bindingsOf('www_doc'))
 const micdnServers = computed(() =>
-  [...(micdn.value?.config.servers ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+  [...(micdn.value?.config.servers ?? [])].sort((a, b) => a.host.localeCompare(b.host)),
 )
 const warningList = computed(() => Object.values(warnings).filter(Boolean))
 const activeSectionMeta = computed(() => sectionItems.find((item) => item.key === activeSection.value))

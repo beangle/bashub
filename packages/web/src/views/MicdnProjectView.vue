@@ -26,7 +26,7 @@
                 <p>对应 micdn.xml 根属性；home 为空时由 micdn 使用 XML 所在目录。</p>
               </div>
             </header>
-            <div class="form-grid">
+            <div class="form-grid form-grid--base">
               <label class="form-field">
                 <span>监听地址</span>
                 <t-input v-model="config.listen" placeholder="0.0.0.0:8888" />
@@ -43,47 +43,11 @@
                 <span>日志级别</span>
                 <t-select v-model="config.logLevel" :options="logLevelOptions" />
               </label>
+              <label class="form-field">
+                <span>Micdn 节点 IP</span>
+                <t-input v-model="serverHost" placeholder="10.0.0.31" />
+              </label>
             </div>
-          </section>
-        </template>
-
-        <template v-else-if="activeTab === 'servers'">
-          <section class="config-card">
-            <header class="config-card__head">
-              <div>
-                <h3>Micdn 服务器</h3>
-                <p>
-                  登记运行 micdn 的节点。代理 bundle 使用节点地址的 host，
-                  端口取 Micdn 配置中的 <code>listen</code>。
-                </p>
-              </div>
-              <t-button variant="outline" @click="addServer">添加服务器</t-button>
-            </header>
-            <div v-if="config.servers.length === 0" class="server-empty">
-              尚未登记 micdn 服务器。
-            </div>
-            <table v-else class="server-table">
-              <thead>
-                <tr>
-                  <th>名称</th>
-                  <th>节点地址（host:port）</th>
-                  <th class="server-table__action">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(server, index) in config.servers" :key="index">
-                  <td>
-                    <t-input v-model="server.name" placeholder="cdn01" />
-                  </td>
-                  <td>
-                    <t-input v-model="server.host" placeholder="10.0.0.31" />
-                  </td>
-                  <td class="server-table__action">
-                    <t-button size="small" variant="text" theme="danger" @click="removeServer(index)">移除</t-button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </section>
         </template>
 
@@ -294,7 +258,6 @@ const projectId = String(route.params.id || '')
 
 const tabs: UnderlineTabItem[] = [
   { value: 'base', label: '基础' },
-  { value: 'servers', label: '服务器' },
   { value: 'repos', label: 'Maven / NPM / Native' },
   { value: 'auth', label: '鉴权' },
   { value: 'static', label: 'Static' },
@@ -366,24 +329,19 @@ function lines(value: string): string[] {
     .filter((line) => line.length > 0)
 }
 
-function addServer() {
-  const used = new Set(config.value.servers.map((server) => server.name))
-  let index = config.value.servers.length + 1
-  while (used.has(`cdn${String(index).padStart(2, '0')}`)) index += 1
-  config.value.servers.push({
-    name: `cdn${String(index).padStart(2, '0')}`,
-    host: '',
-  })
-}
-
-function removeServer(index: number) {
-  config.value.servers.splice(index, 1)
-}
+const serverHost = computed({
+  get: () => config.value.servers[0]?.host || '',
+  set: (value: string) => {
+    const host = value.trim()
+    config.value.servers = host ? [{ host }] : []
+  },
+})
 
 function outgoingConfig(): MicdnConfig {
   const next = structuredClone(toRaw(config.value))
   next.maven.remotes = lines(mavenRemotesText.value)
   next.npm.remotes = lines(npmRemotesText.value)
+  next.servers = serverHost.value ? [{ host: serverHost.value }] : []
 
   const auth: MicdnAuthConfig = { maxSize: next.auth.maxSize }
   if (clearPublishKey.value) auth.publishKey = ''
@@ -394,7 +352,18 @@ function outgoingConfig(): MicdnConfig {
   return next
 }
 
+function invalidServerHost(host: string): boolean {
+  const value = host.trim()
+  if (value.length === 0) return true
+  const first = value.indexOf(':')
+  return first >= 0 && first === value.lastIndexOf(':')
+}
+
 async function save() {
+  if (invalidServerHost(serverHost.value)) {
+    MessagePlugin.error('Micdn 节点只填写 IP，不要带端口')
+    return
+  }
   saving.value = true
   try {
     const payload = await saveMicdnProject(
@@ -504,6 +473,10 @@ onMounted(load)
   padding: 16px;
 }
 
+.form-grid--base {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .form-field {
   display: flex;
   min-width: 0;
@@ -521,40 +494,6 @@ onMounted(load)
 .form-field small {
   color: var(--td-text-color-placeholder);
   font-size: 12px;
-}
-
-.server-empty {
-  padding: 20px 16px;
-  color: var(--td-text-color-placeholder);
-  font-size: 13px;
-}
-
-.server-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.server-table th,
-.server-table td {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.server-table th {
-  color: var(--td-text-color-secondary);
-  font-weight: 500;
-}
-
-.server-table tr:last-child td {
-  border-bottom: 0;
-}
-
-.server-table__action {
-  width: 80px;
-  text-align: right !important;
 }
 
 .readonly-value {
@@ -599,7 +538,8 @@ onMounted(load)
 }
 
 @media (max-width: 860px) {
-  .form-grid {
+  .form-grid,
+  .form-grid--base {
     grid-template-columns: 1fr;
   }
 

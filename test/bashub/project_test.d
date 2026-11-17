@@ -160,7 +160,6 @@ unittest {
   ]);
   auto config = normalizeMicdnConfig(raw);
   assert(config["servers"].length == 2);
-  assert(config["servers"][0]["name"].get!string == "cdn01");
   assert(config["servers"][0]["host"].get!string == "10.0.0.31");
   assert(config["servers"][1]["host"].get!string == "2001:db8::2");
   auto xml = renderMicdnXml(config, [], "prod", "fedcba9876543210fedcba9876543210");
@@ -172,6 +171,12 @@ unittest {
     Json(["name": Json("cdn01"), "host": Json("0.0.0.0")]),
   ]);
   auto error = expectConfigError({ normalizeMicdnConfig(invalid); });
+  assert(error.field == "servers[0].host");
+
+  invalid["servers"] = Json([
+    Json(["name": Json("cdn01"), "host": Json("127.0.0.1:8888")]),
+  ]);
+  error = expectConfigError({ normalizeMicdnConfig(invalid); });
   assert(error.field == "servers[0].host");
 }
 
@@ -521,6 +526,6 @@ unittest {
   assert(map.canFind("/blob  micdn"));
   assert(map.canFind("/static  micdn"));
   assert(text.canFind("backend micdn"));
-  assert(text.canFind("server cdn01 10.0.0.31:8888 check"));
+  assert(text.canFind("server s1 10.0.0.31:8888 check"));
   assert(!map.canFind("/std/spa  micdn"));
 }

@@ -49,7 +49,6 @@ export interface MicdnAuthConfig {
 }
 
 export interface MicdnServer {
-  name: string
   host: string
 }
 

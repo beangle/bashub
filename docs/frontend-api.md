@@ -160,9 +160,9 @@ Micdn 资源不挂在通用 CRUD 下，统一在 `/api/bashub/micdn` 暴露。Mi
 | `GET/POST /api/bashub/micdn/components` | 组件目录列表/新建 |
 | `PATCH/DELETE /api/bashub/micdn/components/{id}` | 组件修改/删除 |
 
-`config.servers` 登记运行 micdn 的节点，每项为 `{name, host}`，例如
-`{"name":"cdn01","host":"10.0.0.31"}`。`host` 不写入 `micdn.xml`；代理端口统一取
-`config.listen`。
+`config.servers` 登记运行 micdn 的节点，每项为 `{host}`，例如
+`{"host":"10.0.0.31"}`。节点没有独立名称；`host` 不写入 `micdn.xml`，代理端口统一取
+`config.listen`。SPA 只提供一个节点输入域。
 
 ## 机器端点（config / ems / micdn / monitor）
 

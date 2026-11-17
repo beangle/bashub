@@ -681,30 +681,20 @@ private void normalizeServers(Json source, ref Json result) {
   if (raw.type != Json.Type.array)
     throw new MicdnConfigException("servers", "servers 必须是数组");
 
-  bool[string] names;
   bool[string] hosts;
   Json[] servers;
   foreach (size_t i, ref item; raw) {
     auto fieldName = "servers[" ~ i.to!string ~ "]";
     if (item.type != Json.Type.object)
       throw new MicdnConfigException(fieldName, "服务器必须是对象");
-    auto name = field(item, "name");
-    validateSingleName(name, fieldName ~ ".name");
-    if (name.toLower in names)
-      throw new MicdnConfigException(fieldName ~ ".name", "服务器名称重复: " ~ name);
-    names[name.toLower] = true;
-
     auto host = normalizeHost(field(item, "host"), fieldName ~ ".host");
     if (host in hosts)
       throw new MicdnConfigException(fieldName ~ ".host", "host 重复: " ~ host);
     hosts[host] = true;
-
-    auto server = Json.emptyObject;
-    server["name"] = Json(name);
-    server["host"] = Json(host);
-    servers ~= server;
+    // 服务器只需要节点地址；名称不参与 micdn.xml 或代理语义。
+    servers ~= Json(["host": Json(host)]);
   }
-  sort!((a, b) => nameBefore(field(a, "name"), field(b, "name")))(servers);
+  sort!((a, b) => field(a, "host") < field(b, "host"))(servers);
   result["servers"] = Json(servers);
 }
 
@@ -717,6 +707,9 @@ private string normalizeHost(string text, string fieldName) {
     throw new MicdnConfigException(fieldName, "host 必须是节点可达地址，不能是通配地址或包含端口/路径");
   if (value.startsWith("[") || value.endsWith("]"))
     throw new MicdnConfigException(fieldName, "host 不需要方括号，IPv6 直接写地址");
+  auto firstColon = value.indexOf(':');
+  if (firstColon >= 0 && firstColon == value.lastIndexOf(':'))
+    throw new MicdnConfigException(fieldName, "host 只写节点地址，端口统一取 micdn.listen");
   return value;
 }
 
