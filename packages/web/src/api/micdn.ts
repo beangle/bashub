@@ -32,6 +32,21 @@ export interface CdnComponent {
   spec: MicdnComponentSpec
 }
 
+export interface ComponentDeployment {
+  projectId: string
+  projectName: string
+  projectTitle: string
+  qualifiedName: string
+  componentId: string
+  version: string
+  contextPath: string
+}
+
+export interface CdnComponentDetail {
+  data: CdnComponent
+  deployments: ComponentDeployment[]
+}
+
 export interface MicdnRepoConfig {
   declared: boolean
   base: string
@@ -142,6 +157,10 @@ export async function saveMicdnProject(
 export async function listCdnComponents(): Promise<CdnComponent[]> {
   const document = await apiClient.getPlain<{ data: CdnComponent[] }>(apiPath('micdn', '/components'))
   return document.data || []
+}
+
+export function getCdnComponent(id: string): Promise<CdnComponentDetail> {
+  return apiClient.getPlain<CdnComponentDetail>(apiPath('micdn', `/components/${encodeURIComponent(id)}`))
 }
 
 export async function createCdnComponent(input: CdnComponentInput): Promise<CdnComponent> {

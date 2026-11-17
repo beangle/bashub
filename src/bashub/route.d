@@ -975,6 +975,72 @@ class HubService {
     }
   }
 
+  /// `GET /api/bashub/micdn/components/{id}`：组件详情及各 Project 的部署。
+  void cdnComponentDetail(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto id = req.params.get("id", "");
+    try {
+      Json resource;
+      if (!store.fetch(reg.find("cdn-components"), id, Query.init, resource)) {
+        writeJsonApi(res, errorDocument(404, "记录不存在", "no cdn-components with id " ~ id),
+            HTTPStatus.notFound);
+        return;
+      }
+      auto component = plainComponent(resource["data"]);
+      auto name = jsonText(jsonGet(component, "name"));
+      auto kind = jsonText(jsonGet(component, "kind"));
+      auto catalog = loadAll(store, reg.find("cdn-components"));
+      Json[string] byId;
+      foreach (ref item; catalog)
+        byId[jsonText(jsonGet(item, "id"))] = plainComponent(item);
+
+      Json[] deployments;
+      foreach (ref row; loadAll(store, reg.find("project-micdn"))) {
+        auto projectId = jsonText(jsonGet(row, "id"));
+        auto bindings = jsonGet(jsonGet(row, "attributes"), "components");
+        if (bindings.type != Json.Type.array)
+          continue;
+        string boundComponentId;
+        foreach (ref binding; bindings) {
+          auto bindingId = binding.type == Json.Type.string
+              ? jsonText(binding) : jsonText(jsonGet(binding, "componentId"));
+          if (bindingId.length == 0 || !(bindingId in byId))
+            continue;
+          auto bound = byId[bindingId];
+          if (jsonText(jsonGet(bound, "name")) == name
+              && jsonText(jsonGet(bound, "kind")) == kind) {
+            boundComponentId = bindingId;
+            break;
+          }
+        }
+        if (boundComponentId.length == 0)
+          continue;
+        Json projectDoc;
+        if (!store.fetch(reg.find("projects"), projectId, Query.init, projectDoc))
+          continue;
+        auto project = projectDoc["data"];
+        auto bound = byId[boundComponentId];
+        auto deployment = Json.emptyObject;
+        deployment["projectId"] = Json(projectId);
+        deployment["projectName"] = Json(attributeText(project, "name"));
+        deployment["projectTitle"] = Json(attributeText(project, "title"));
+        deployment["qualifiedName"] = Json(attributeText(project, "qualifiedName"));
+        deployment["componentId"] = Json(boundComponentId);
+        deployment["version"] = Json(componentVersion(bound));
+        deployment["contextPath"] = Json(componentContextPath(bound));
+        deployments ~= deployment;
+      }
+      deployments.sort!((a, b) => jsonText(a["projectTitle"]) < jsonText(b["projectTitle"]));
+      auto doc = Json.emptyObject;
+      doc["data"] = component;
+      doc["deployments"] = Json(deployments);
+      writeJsonApi(res, doc, HTTPStatus.ok);
+    } catch (Exception e) {
+      writeMicdnError(res, e);
+    }
+  }
+
   /// `POST /api/bashub/micdn/components`：新建组件。
   void createCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
@@ -1168,6 +1234,26 @@ class HubService {
     res.headers["Cache-Control"] = "no-store";
     res.writeBody("micdn config requires a token (Authorization: Bearer/Basic or X-Micdn-Token)",
         HTTPStatus.unauthorized, "text/plain; charset=utf-8");
+  }
+
+  /// 组件版本来自来源坐标的最后一段；仅用于详情展示。
+  private string componentVersion(Json component) {
+    auto spec = jsonGet(component, "spec");
+    string source;
+    if (jsonText(jsonGet(component, "kind")) == "www_doc")
+      source = jsonText(jsonGet(jsonGet(spec, "source"), "ref"));
+    else {
+      auto sources = jsonGet(spec, "sources");
+      if (sources.type == Json.Type.array && sources.length > 0)
+        source = jsonText(jsonGet(sources[0], "ref"));
+    }
+    auto parts = source.split(":");
+    return parts.length > 0 ? parts[$ - 1] : source;
+  }
+
+  private string componentContextPath(Json component) {
+    auto mount = jsonText(jsonGet(component, "mountName"));
+    return (jsonText(jsonGet(component, "kind")) == "www_doc" ? "/www/" : "/asset/") ~ mount;
   }
 
   private Json componentById(string id) {
@@ -2528,6 +2614,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.micdn ~ "/projects/:id", &hub.projectMicdn);
   router.patch(api.micdn ~ "/projects/:id", &hub.updateProjectMicdn);
   router.get(api.micdn ~ "/components", &hub.cdnComponents);
+  router.get(api.micdn ~ "/components/:id", &hub.cdnComponentDetail);
   router.post(api.micdn ~ "/components", &hub.createCdnComponent);
   router.patch(api.micdn ~ "/components/:id", &hub.updateCdnComponent);
   router.delete_(api.micdn ~ "/components/:id", &hub.deleteCdnComponent);

@@ -27,7 +27,8 @@
   也会作为 micdn 代理路径下发，不再只依赖 webapp 的 `urls`。
 - **Micdn 节点字段**：`servers[].adminListen` 改为语义明确的 `servers[].host`；
   代理端口统一取 `micdn.listen`，并提供迁移脚本。`host` 只接受节点地址，填写
-  `host:port` 会被拒绝，避免生成 `[host:port]:listen`。
+  `host:port` 会被拒绝，避免生成 `[host:port]:listen`。SPA 将节点收缩为基础页的
+  单个 IP 输入并移除名称；新增 `20261117-01-micdn-server-host-port.sql` 清理历史端口。
 - **最长前缀优先**：所有代理路由按路径长度从长到短生成，确保 `/api/edu/exam`
   优先于 `/api/edu`，避免考务请求被泛教学路由截获。
 - **管理台下载**：Project 详情页增加代理 ZIP 下载，使用登录会话，不需要 Project key；
@@ -51,6 +52,8 @@
   CAS 会话、资源授权、CORS、安全响应头和 schema 检查。
 - **管理台 SPA**：`packages/web` 提供项目、端点、代理、证书、组件、Micdn、平台特性和
   节点监控页面，并增加节点详情、实例内存、历史聚合与项目级筛选。
+- **组件详情**：Micdn 组件目录增加详情页，展示组件基本信息和各 Project 的版本、
+  context path 部署情况。
 - **配置分发**：输出 `server.xml`、反代配置、证书、setline peers/manifest、Micdn 配置、
   EMS 菜单和主机脚本；证书按 endpoint 拆分，私钥不回显。
 - **节点监控**：出站 WebSocket、中继、master 选举、日志读取、实例启停、健康采样和

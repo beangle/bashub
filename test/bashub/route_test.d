@@ -1054,6 +1054,18 @@ unittest {
   assert(ex.status == 400, ex.body);
   assert(parseJson(ex.body)["errors"][0]["source"]["parameter"].get!string == "kind");
 
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/components/" ~ bundleId);
+  assert(ex.status == 200, ex.body);
+  auto detail = parseJson(ex.body);
+  assert(detail["data"]["id"].get!string == bundleId);
+  assert(detail["deployments"].type == Json.Type.array);
+
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/components/17001");
+  assert(ex.status == 200, ex.body);
+  auto bound = parseJson(ex.body);
+  assert(bound["data"]["name"].get!string == "bas-static");
+  assert(bound["deployments"].get!(Json[]).length > 0);
+
   ex = call(router, HTTPMethod.DELETE, "http://localhost/api/bashub/micdn/components/" ~ bundleId);
   assert(ex.status == 200, ex.body);
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/components");

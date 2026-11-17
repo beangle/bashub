@@ -46,7 +46,7 @@
           <tbody>
             <tr v-for="(component, index) in staticComponents" :key="component.id">
               <td class="component-table__index">{{ index + 1 }}</td>
-              <td><strong>{{ component.name }}</strong></td>
+              <td><router-link class="component-link" :to="`/micdn/components/${component.id}`">{{ component.name }}</router-link></td>
               <td><code class="component-table__mount">{{ component.mountName }}</code></td>
               <td class="component-table__muted">{{ component.remark || '—' }}</td>
               <td><code class="component-table__spec">{{ specSummary(component) }}</code></td>
@@ -92,7 +92,7 @@
           <tbody>
             <tr v-for="(component, index) in docComponents" :key="component.id">
               <td class="component-table__index">{{ index + 1 }}</td>
-              <td><strong>{{ component.name }}</strong></td>
+              <td><router-link class="component-link" :to="`/micdn/components/${component.id}`">{{ component.name }}</router-link></td>
               <td><code class="component-table__mount">{{ component.mountName }}</code></td>
               <td class="component-table__muted">{{ component.remark || '—' }}</td>
               <td><code class="component-table__spec">{{ specSummary(component) }}</code></td>
@@ -586,6 +586,16 @@ onMounted(load)
   width: 110px;
   text-align: right !important;
   white-space: nowrap;
+}
+
+.component-link {
+  color: var(--td-brand-color);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.component-link:hover {
+  text-decoration: underline;
 }
 
 .component-table__muted {

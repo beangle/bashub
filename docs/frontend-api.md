@@ -158,6 +158,7 @@ Micdn 资源不挂在通用 CRUD 下，统一在 `/api/bashub/micdn` 暴露。Mi
 | `PATCH /api/bashub/micdn/projects/{id}` | 一次保存 `config` 与 `bindings` |
 | `GET /api/bashub/micdn/projects/{id}/micdn.xml` | 下载含真实密钥的 XML（`no-store`） |
 | `GET/POST /api/bashub/micdn/components` | 组件目录列表/新建 |
+| `GET /api/bashub/micdn/components/{id}` | 组件详情、绑定 Project 的部署版本与 context path |
 | `PATCH/DELETE /api/bashub/micdn/components/{id}` | 组件修改/删除 |
 
 `config.servers` 登记运行 micdn 的节点，每项为 `{host}`，例如

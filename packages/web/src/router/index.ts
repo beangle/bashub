@@ -47,6 +47,11 @@ const detailRoutes = [
     component: () => import('@/views/CdnComponentsView.vue'),
     meta: { title: 'Micdn 组件目录' },
   },
+  {
+    path: '/micdn/components/:id',
+    component: () => import('@/views/CdnComponentDetailView.vue'),
+    meta: { title: 'Micdn 组件详情' },
+  },
 ]
 
 const router = createRouter({
