@@ -529,9 +529,12 @@ function agentGroupStopped(group: AgentGroup): number {
   return group.agents.reduce((sum, agent) => sum + stoppedOf(agent), 0)
 }
 
-/** 单台 agent 的实例，按 server 名升序；卡片只展示这台机器的服务，不做跨 agent 合并。 */
+/** 单台 agent 的实例：运行中的在前，失败/停止的在后，两组内按 server 名升序。 */
 function agentInstances(agent: AgentStatus): AgentInstance[] {
-  return instancesOf(agent).sort((a, b) => (a.id || '').localeCompare(b.id || '', 'zh-CN', { numeric: true }))
+  return instancesOf(agent).sort((a, b) => {
+    const rank = Number(!isRunning(a)) - Number(!isRunning(b))
+    return rank || (a.id || '').localeCompare(b.id || '', 'zh-CN', { numeric: true })
+  })
 }
 
 /**
