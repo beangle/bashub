@@ -71,6 +71,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 | `/config/servers`（含 `?farm={id}`） | 服务管理，`servers` | `/api/bashub/config/servers` | 从属页面，不单独占菜单 |
 | `/config/engines` | 引擎管理，`engines` | `/api/bashub/config/engines` | — |
 | `/config/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 批量刷新版本：`POST /api/bashub/config/artifacts/update-version` |
+| `/config/artifacts/:id` | 组件详情，`ArtifactDetailView` | `GET /api/bashub/config/artifacts/{id}`、`GET /api/bashub/config/artifacts/{id}/webapps?include=project` |
 | `/config/webapps` | 应用部署，`webapps` | `/api/bashub/config/webapps` | 批量升级：`POST /api/bashub/config/webapps/upgrade` |
 | `/ems/app-config?tab=apps` | 应用管理，`apps` | `/api/bashub/ems/apps` | — |
 | `/ems/app-config?tab=channels` | 应用端，`channels` | `/api/bashub/ems/channels` | — |

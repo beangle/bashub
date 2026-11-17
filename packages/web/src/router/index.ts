@@ -28,6 +28,11 @@ const detailRoutes = [
     meta: { title: '平台功能' },
   },
   {
+    path: '/config/artifacts/:id',
+    component: () => import('@/views/ArtifactDetailView.vue'),
+    meta: { title: '组件详情' },
+  },
+  {
     path: '/config/hosts/:id',
     component: () => import('@/views/HostDetailView.vue'),
     meta: { title: '主机详情' },

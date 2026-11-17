@@ -52,7 +52,7 @@
   CAS 会话、资源授权、CORS、安全响应头和 schema 检查。
 - **管理台 SPA**：`packages/web` 提供项目、端点、代理、证书、组件、Micdn、平台特性和
   节点监控页面，并增加节点详情、实例内存、历史聚合与项目级筛选。
-- **组件详情**：Micdn 组件目录增加详情页，展示组件基本信息和各 Project 的版本、
+- **组件详情**：Micdn 组件目录和组件管理增加详情页，展示基本信息及各 Project 的版本、
   context path 部署情况。
 - **配置分发**：输出 `server.xml`、反代配置、证书、setline peers/manifest、Micdn 配置、
   EMS 菜单和主机脚本；证书按 endpoint 拆分，私钥不回显。

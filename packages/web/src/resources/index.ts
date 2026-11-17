@@ -270,7 +270,7 @@ export const resourceSchemas: ResourceSchema[] = [
     // 列序对齐原 artifact/list.ftl：标题 → GAV → 部署上下文 → 面向平台 → 需要解析 → 容器要求。
     columns: ['title', 'gav', 'contextPath', 'arch', 'resolveSupport', 'container'],
     fields: [
-      { key: 'title', label: '标题', required: true, width: '20%' },
+      { key: 'title', label: '标题', required: true, width: '20%', cell: { type: 'link', href: '/config/artifacts/{id}' } },
       { key: 'artifactId', label: 'artifactId', required: true, column: false },
       { key: 'groupId', label: 'groupId', required: true, column: false },
       { key: 'packaging', label: '打包类型', type: 'select', required: true, column: false, options: ['jar', 'war', 'bin', 'tar.gz'].map((value) => ({ label: value, value })) },
