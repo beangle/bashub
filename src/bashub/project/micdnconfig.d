@@ -114,6 +114,11 @@ Json defaultMicdnConfig() {
   blob["publicImages"] = Json(true);
   root["blob"] = blob;
   root["servers"] = Json.emptyArray;
+  auto prune = Json.emptyObject;
+  prune["at"] = Json("03:30");
+  prune["npmDevKeep"] = Json(1);
+  prune["mavenSnapshotKeep"] = Json(1);
+  root["prune"] = prune;
   return root;
 }
 
@@ -139,6 +144,7 @@ Json normalizeMicdnConfig(Json input) {
   normalizeRepoSection(source, result, "static");
   normalizeRepoSection(source, result, "www");
   normalizeBlob(source, result);
+  normalizePrune(source, result);
   normalizeServers(source, result);
   return result;
 }
@@ -322,9 +328,15 @@ void readMicdnConfig(Store store, Registry reg, string projectId, out Json confi
 
 /// 渲染 Project 的 micdn.xml；`projectName` / `projectKey` 用于生成唯一的 blob bucket。
 /// maskSecrets=true 时只用于页面预览，bucket key 保留首尾各两个字符。
-/// `remoteUrl` 由下载请求的 origin 推导，不进入 Project 配置。
+/// `remoteUrl` 由下载请求的 origin 推导，不进入 Project 配置；`upstreamDevToken` / `upstreamSnapshotToken`
+/// 来自 bashub 全局配置 `<snapshot download-token>`，不落库、不进 Project 配置；maven/npm 共用。
+///
+/// 安全边界：令牌会附加到**所有非空的** `<dev>` / `<snapshot>` 上游。配置者必须保证这两个上游
+/// 指向中心 micdn（或会补同值鉴权的反代）；不要把外部 registry 配成 dev/snapshot 上游，否则会把
+/// 中心读令牌发给外部。
 string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectName,
-    string projectKey, bool maskSecrets = false, string remoteUrl = "") {
+    string projectKey, bool maskSecrets = false, string remoteUrl = "",
+    string upstreamDevToken = "", string upstreamSnapshotToken = "") {
   auto config = normalizeMicdnConfig(rawConfig);
   validateMicdnConfig(config);
   validateBlobIdentity(projectName, projectKey);
@@ -351,7 +363,6 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   xml.put(`<?xml version="1.0" encoding="UTF-8"?>`);
   xml.put("\n<micdn");
   putAttr(xml, "listen", field(config, "listen"));
-  putAttr(xml, "remote", remoteUrl.strip);
   putAttr(xml, "home", field(config, "home"));
   auto logFile = field(config, "logFile");
   if (logFile != "console")
@@ -375,6 +386,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     if (snapshot.length > 0) {
       xml.put("    <snapshot");
       putAttr(xml, "remote", snapshot);
+      putAttr(xml, "token", maskSecrets && upstreamSnapshotToken.length > 0 ? "********" : upstreamSnapshotToken);
       xml.put("/>\n");
     }
     xml.put("  </maven>\n");
@@ -394,6 +406,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     if (dev.length > 0) {
       xml.put("    <dev");
       putAttr(xml, "remote", dev);
+      putAttr(xml, "token", maskSecrets && upstreamDevToken.length > 0 ? "********" : upstreamDevToken);
       xml.put("/>\n");
     }
     xml.put("  </npm>\n");
@@ -500,12 +513,22 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     xml.put("  </www>\n");
   }
 
+  auto prune = jsonGet(config, "prune");
+  if (prune.type == Json.Type.object) {
+    xml.put("  <prune");
+    putAttr(xml, "at", field(prune, "at").length > 0 ? field(prune, "at") : "03:30");
+    putAttr(xml, "npm-dev-keep", to!string(numberField(prune, "npmDevKeep", 1)));
+    putAttr(xml, "maven-snapshot-keep", to!string(numberField(prune, "mavenSnapshotKeep", 1)));
+    xml.put("/>\n");
+  }
+
   xml.put("</micdn>\n");
   return xml.data;
 }
 
 /// 页面聚合：配置（脱敏）、绑定、组件目录和预览 XML。
-Json micdnProjectDocument(const MicdnProjectView view, string remoteUrl = "") {
+Json micdnProjectDocument(const MicdnProjectView view, string remoteUrl = "",
+    string upstreamDevToken = "", string upstreamSnapshotToken = "") {
   auto doc = Json.emptyObject;
   doc["project"] = view.project;
   doc["config"] = sanitizeConfig(view.state.config);
@@ -529,7 +552,7 @@ Json micdnProjectDocument(const MicdnProjectView view, string remoteUrl = "") {
   doc["components"] = Json(catalog);
   auto projectName = jsonText(view.project["name"]);
   doc["xml"] = Json(renderMicdnXml(view.state.config, view.state.components, projectName, view.projectKey,
-      true, remoteUrl));
+      true, remoteUrl, upstreamDevToken, upstreamSnapshotToken));
   return doc;
 }
 
@@ -658,6 +681,19 @@ private void normalizeRepoSection(Json source, ref Json result, string name) {
   auto target = jsonGet(result, name);
   target["base"] = Json(field(objectAt(source, name), "base"));
   result[name] = target;
+}
+
+/// `<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`：客户 micdn 的定时清理策略。
+private void normalizePrune(Json source, ref Json result) {
+  auto section = objectAt(source, "prune");
+  auto target = jsonGet(result, "prune");
+  auto at = field(section, "at");
+  target["at"] = Json(at.length > 0 ? at : "03:30");
+  auto npmKeep = numberField(section, "npmDevKeep", 1);
+  target["npmDevKeep"] = Json(cast(int)(npmKeep > 0 ? npmKeep : 1));
+  auto mavenKeep = numberField(section, "mavenSnapshotKeep", 1);
+  target["mavenSnapshotKeep"] = Json(cast(int)(mavenKeep > 0 ? mavenKeep : 1));
+  result["prune"] = target;
 }
 
 private void normalizeBlob(Json source, ref Json result) {

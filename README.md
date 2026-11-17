@@ -286,9 +286,15 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 ```
 
 监听地址优先级为：命令行 `--listen` > `hub.xml` 的 `<app listen>` > 内置 `127.0.0.1:8080`。
-`<snapshot download-token>` 是共享 micdn 的 `/maven` 下载令牌（也兼容
-`<app maven-download-token="...">`），只在 Project 未配置 micdn `<auth download-key>` 时写进
-server.xml；两边都没配时 server.xml 保持原样，不写 `token`。
+`<snapshot download-token>` 是共享 micdn 的读令牌（也兼容 `<app maven-download-token="...">`）：
+原本用于 server.xml 的 `<snapshot-repo token>` 兜底；现在同一个值也写成客户 `micdn.xml` 的
+`<maven><snapshot token>` 和 `<npm><dev token>`（maven/npm 共用，不新增配置项、不动 bashub.xml）。
+令牌不落数据库、界面不展示/不可编辑，全局对所有 Project 的下发生效。
+Micdn 项目页的 **Reload micdn** 按钮走 `POST /api/bashub/micdn/projects/{id}/reload`：
+按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`，agent 再 GET 本机
+`http://127.0.0.1:8888/admin/reload`。只做人工触发，不自动 reload；节点没在线 agent 时逐个返回失败。
+各 Project 的 micdn 清理策略随 `micdn.xml` 下发：`<prune at="03:30" npm-dev-keep="1"
+maven-snapshot-keep="1"/>`，由 micdn 自己按本机时区每天执行（不依赖 bashub 或 basagent）。
 节点运行历史由 bashub 主动下发 `report:health` 采样：`<agent health-interval>` 是秒数，0 表示关闭；
 `health-start/end` 是 bashub 主机时区的窗口（含 start、不含 end，可跨午夜）。也兼容根元素上的旧写法
 `agent-health-interval` / `agent-health-start` / `agent-health-end`。这些只改 bashub，生产机上的

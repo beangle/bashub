@@ -12,7 +12,8 @@ module test.bashub.project_test;
 import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
-  loadMicdnState, maskSecret, normalizeComponentSpec, normalizeMicdnConfig, renderMicdnXml;
+  loadMicdnState, maskSecret, normalizeComponentSpec,
+  normalizeMicdnConfig, renderMicdnXml;
 import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderHaproxyMap, renderHaproxyMapForEndpoint, renderNginx, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
@@ -302,6 +303,7 @@ unittest {
 unittest {
   auto xml = renderMicdnXml(defaultMicdnConfig(), [], "", "");
   assert(xml.canFind(`<micdn listen="0.0.0.0:8888">`));
+  assert(xml.canFind(`<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`));
   foreach (section; ["maven", "npm", "native", "auth", "static", "www", "blob"])
     assert(!xml.canFind("<" ~ section), section ~ "\n" ~ xml);
 }
@@ -312,7 +314,6 @@ unittest {
   config["home"] = Json(`/srv/a&b"<demo>`);
   auto xml = renderMicdnXml(config, [], "", "", false, `https://example.test/a?x=1&y=2`);
   assert(xml.canFind(`home="/srv/a&amp;b&quot;&lt;demo&gt;"`));
-  assert(xml.canFind(`remote="https://example.test/a?x=1&amp;y=2"`));
   assert(!xml.canFind(`/srv/a&b"<demo>`));
 }
 
@@ -528,4 +529,23 @@ unittest {
   assert(text.canFind("backend micdn"));
   assert(text.canFind("server s1 10.0.0.31:8888 check"));
   assert(!map.canFind("/std/spa  micdn"));
+}
+
+
+@("micdn render writes global upstream tokens and masks them in preview")
+unittest {
+  auto config = defaultMicdnConfig();
+  config["maven"]["declared"] = Json(true);
+  config["maven"]["snapshotRemote"] = Json("http://central/maven");
+  config["npm"]["declared"] = Json(true);
+  config["npm"]["devRemote"] = Json("http://central/npm");
+
+  auto xml = renderMicdnXml(config, [], "", "", false, "", "dev-token", "snap-token");
+  assert(xml.canFind(`<snapshot remote="http://central/maven" token="snap-token"/>`));
+  assert(xml.canFind(`<dev remote="http://central/npm" token="dev-token"/>`));
+
+  auto masked = renderMicdnXml(config, [], "", "", true, "", "dev-token", "snap-token");
+  assert(masked.canFind(`token="********"`));
+  assert(!masked.canFind("dev-token"));
+  assert(!masked.canFind("snap-token"));
 }

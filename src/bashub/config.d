@@ -52,8 +52,9 @@ struct HubConfig {
   string casServer;
   /// 会话 cookie 名（ems 的 `Ems.sid.name`）
   string sessionIdName = "EMS_SID";
-  /// micdn `/maven` 的下载令牌；Project 的 micdn `<auth download-key>` 为空时用它写进
-  /// server.xml 的 `<snapshot-repo token>`。
+  /// 中心 micdn 的读令牌（`<snapshot download-token>` / `maven-download-token`）：
+  /// - Project 的 micdn `<auth download-key>` 为空时，写进 server.xml 的 `<snapshot-repo token>`；
+  /// - 直接写进该 Project 下发 micdn.xml 的 `<snapshot token>` 与 `<dev token>`（maven/npm 共用）。
   string mavenDownloadToken = "";
   /// 组件最新版本刷新间隔（分钟）；0 表示关闭周期刷新
   uint artifactRefreshMinutes = 360;
@@ -91,7 +92,8 @@ HubConfig loadBashub(Ems ems) {
     else
       throw new Exception("unknown auth value in " ~ cfg.appName ~ ".xml: " ~ auth);
   }
-  // 优先 hub.xml 的 <snapshot download-token="..."/>，其次兼容 app 上的同名属性
+  // 中心 micdn 读令牌：优先 <snapshot download-token="..."/>，其次兼容 <app maven-download-token>。
+  // 同一个值既写 server.xml 的 <snapshot-repo token> 兜底，也写 micdn.xml 的 <snapshot>/<dev> token。
   auto mavenToken = appFileChildAttribute(ems.env.home, cfg.appName, "snapshot", "download-token");
   if (mavenToken.length == 0)
     mavenToken = appFileAttribute(ems.env.home, cfg.appName, "maven-download-token").strip;

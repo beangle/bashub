@@ -791,7 +791,8 @@ unittest {
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(ex.body.canFind(
-      `<micdn listen="0.0.0.0:8888" remote="http://localhost/api/bashub/micdn/openurp.prod/micdn.xml" home="/var/lib/micdn">`));
+      `<micdn listen="0.0.0.0:8888" home="/var/lib/micdn">`));
+  assert(ex.body.canFind(`<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`));
   assert(ex.body.canFind(`<maven base="/var/lib/micdn/maven">`));
   assert(ex.body.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
   assert(ex.body.canFind(`<auth publish-key="publish-secret" download-key="download-secret" max-size="64M"/>`));
@@ -834,8 +835,7 @@ unittest {
       ["Authorization": "Bearer " ~ projectKey, "X-Forwarded-Proto": "https",
        "X-Forwarded-Host": "hub.example.com"]);
   assert(ex.status == 200, ex.body);
-  assert(ex.body.canFind(
-      `remote="https://hub.example.com/api/bashub/micdn/openurp.prod/micdn.xml"`));
+  assert(ex.body.canFind(`<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`));
 }
 
 @("project micdn aggregate masks secrets and preserves them on save")
@@ -854,8 +854,7 @@ unittest {
   assert(doc["project"]["keyMasked"].get!string == "fe**10");
   assert(doc["bindings"].get!(Json[]).length == 2);
   assert(doc["components"].get!(Json[]).length == 2);
-  assert(doc["xml"].get!string.canFind(
-      `remote="http://localhost/api/bashub/micdn/openurp.prod/micdn.xml"`));
+  assert(doc["xml"].get!string.canFind(`<prune at="03:30"`));
   assert(doc["xml"].get!string.canFind(`publish-key="********"`));
   assert(doc["xml"].get!string.canFind(`<bucket name="prod" key="fe**10"/>`));
   assert(!doc["xml"].get!string.canFind("publish-secret"));
