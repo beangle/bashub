@@ -963,6 +963,16 @@ final class AgentRegistry {
     return session.request("agent:log", body, timeout);
   }
 
+  /// 让某台 agent 触发本机 micdn `reload`（固定 127.0.0.1:8888/admin/reload）。
+  AgentReply micdnReload(string project, string ip = "", Duration timeout = 90.seconds) {
+    auto session = resolve(project, ip);
+    if (session is null)
+      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project);
+    if (!session.supportsPrimitive("micdn:reload"))
+      return AgentReply.failure(RequestOutcome.failed, "unsupported:micdn:reload");
+    return session.request("micdn:reload", Json.emptyObject, timeout);
+  }
+
   /// 下发 `service:start|stop|restart` 并等待 agent 的 `result`。
   AgentReply service(string project, string action, string instance,
       Duration timeout = 120.seconds, string ip = "") {

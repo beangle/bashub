@@ -89,7 +89,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 | 前端路由 | 页面 | 后端 API |
 |---|---|---|
 | `/config/projects/:id` | 配置详情，`ProjectDetailView` | `GET /api/bashub/config/projects/{id}?include=org`<br>`GET /api/bashub/config/farms/search?filter[farm.project.id]={id}&include=engine`<br>`GET /api/bashub/config/hosts/search?filter[host.project.id]={id}`<br>`GET /api/bashub/config/webapps/search?filter[webapp.project.id]={id}&include=artifact`<br>`GET /api/bashub/config/servers/search?filter[server.farm.id]={farmIds}&include=farm,host`<br>`GET /api/bashub/monitor/agents/status`<br>`GET /api/bashub/config/projects/{id}/proxy`<br>`GET /api/bashub/config/projects/{id}/server`<br>`GET /api/bashub/config/projects/{id}/certificate`<br>`PATCH /api/bashub/config/projects/{id}/certificate`<br>`GET /api/bashub/micdn/projects/{id}` |
-| `/micdn/projects/:id` | Micdn 配置，`MicdnProjectView` | `GET /api/bashub/micdn/projects/{id}`<br>`PATCH /api/bashub/micdn/projects/{id}`<br>`GET /api/bashub/micdn/projects/{id}/micdn.xml` |
+| `/micdn/projects/:id` | Micdn 配置，`MicdnProjectView` | `GET /api/bashub/micdn/projects/{id}`<br>`PATCH /api/bashub/micdn/projects/{id}`<br>`POST /api/bashub/micdn/projects/{id}/reload`<br>`GET /api/bashub/micdn/projects/{id}/micdn.xml` |
 | `/micdn/components` | Micdn 组件目录，`CdnComponentsView` | `GET /api/bashub/micdn/components`<br>`POST /api/bashub/micdn/components`<br>`PATCH /api/bashub/micdn/components/{id}`<br>`DELETE /api/bashub/micdn/components/{id}` |
 | `/micdn/components/:id` | 组件详情，`CdnComponentDetailView` | `GET /api/bashub/micdn/components/{id}` |
 | `/config/platform-features/:id` | 平台功能详情，`PlatformFeatureDetailView` | `GET /api/bashub/config/platform-features/{id}`、`PATCH /api/bashub/config/platform-features/{id}`<br>`GET /api/bashub/config/platform-features/search`<br>`GET /api/bashub/config/platforms/search`<br>`GET /api/bashub/config/platform-feature-scripts/search?filter[platformFeatureScript.feature.id]={id}`<br>`POST /api/bashub/config/platform-feature-scripts`<br>`PATCH /api/bashub/config/platform-feature-scripts/{id}`、`DELETE /api/bashub/config/platform-feature-scripts/{id}` |
@@ -164,6 +164,7 @@ EMS 自身资源使用 `ems` 域：
 | `GET /api/bashub/config/{project}/script/{host}` | 下载主机检查脚本 |
 | `GET /api/bashub/ems/{project}/menus/{appName}` | 拉取应用的 EMS 菜单与资源 XML |
 | `GET /api/bashub/micdn/{project}/micdn.xml` | micdn 下载完整配置 |
+| `POST /api/bashub/micdn/projects/{id}/reload` | 管理台人工触发：按 `config.servers` 找在线 agent，下发 `micdn:reload` |
 | `WS /api/bashub/monitor/agents/{project}/channel` | basctl 建立节点通道 |
 
 机器端点的鉴权和配置分发细节见 [`frontend-api.md`](frontend-api.md)。

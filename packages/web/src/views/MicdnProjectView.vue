@@ -8,6 +8,12 @@
       </div>
       <div class="page-actions">
         <t-button variant="outline" @click="router.push('/micdn/components')">组件目录</t-button>
+        <t-button
+          variant="outline"
+          :loading="reloading"
+          :disabled="!doc || !serverHost"
+          @click="reloadMicdn"
+        >Reload micdn</t-button>
         <t-button variant="outline" :disabled="!doc" @click="copyXml">复制 XML</t-button>
         <t-button variant="outline" tag="a" :href="downloadUrl" :disabled="!doc">下载 XML</t-button>
         <t-button theme="primary" :loading="saving" :disabled="!doc" @click="save">保存</t-button>
@@ -240,6 +246,7 @@ import {
   defaultMicdnConfig,
   getMicdnProject,
   micdnXmlUrl,
+  reloadMicdnProject,
   saveMicdnProject,
   type CdnComponent,
   type MicdnAuthConfig,
@@ -272,6 +279,7 @@ const bindings = ref<MicdnBinding[]>([])
 const components = ref<CdnComponent[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const reloading = ref(false)
 const mavenRemotesText = ref('')
 const npmRemotesText = ref('')
 const authDraft = reactive({ publishKey: '', downloadKey: '' })
@@ -374,6 +382,24 @@ async function save() {
     MessagePlugin.error(error instanceof Error ? error.message : '保存 Micdn 配置失败')
   } finally {
     saving.value = false
+  }
+}
+
+/** 人工触发当前 Project 登记的 micdn 节点 reload；失败按节点提示，不自动重试。 */
+async function reloadMicdn() {
+  reloading.value = true
+  try {
+    const results = await reloadMicdnProject(projectId)
+    const failed = results.filter((item) => !item.ok)
+    if (failed.length > 0) {
+      MessagePlugin.error(`reload 失败: ${failed.map((item) => item.host).join(', ')}`)
+    } else {
+      MessagePlugin.success('micdn 已 reload')
+    }
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : 'reload micdn 失败')
+  } finally {
+    reloading.value = false
   }
 }
 

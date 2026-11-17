@@ -912,10 +912,60 @@ class HubService {
         return;
       }
       writeJsonApi(res, micdnProjectDocument(view, projectMicdnUrl(requestOrigin(req),
-          jsonText(view.project["qualifiedName"]))), HTTPStatus.ok);
+          jsonText(view.project["qualifiedName"])),
+          cfg.mavenDownloadToken, cfg.mavenDownloadToken), HTTPStatus.ok);
     } catch (Exception e) {
       writeMicdnError(res, e);
     }
+  }
+
+  /// `POST /api/bashub/micdn/projects/{id}/reload`：让该 Project 登记的 micdn 节点 reload。
+  ///
+  /// 只按 `config.servers[].host` 找对应的在线 agent，下发 `micdn:reload`；agent 自己去调
+  /// 本机 `127.0.0.1:8888/admin/reload`。返回每个节点的结果，失败不影响其余节点；整体仍回 200，
+  /// 由 `data[].ok` 区分（人工操作，不需要 HTTP 层再区分成败）。
+  void reloadMicdn(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto id = req.params.get("id", "");
+    MicdnProjectView view;
+    try {
+      if (!loadMicdnProject(store, reg, id, view)) {
+        writeJsonApi(res, errorDocument(404, "记录不存在", "no projects with id " ~ id), HTTPStatus.notFound);
+        return;
+      }
+    } catch (Exception e) {
+      writeMicdnError(res, e);
+      return;
+    }
+    auto projectName = jsonText(view.project["name"]).strip;
+    auto servers = jsonGet(view.state.config, "servers");
+    string[] hosts;
+    if (servers.type == Json.Type.array)
+      foreach (ref item; servers) {
+        auto host = jsonText(jsonGet(item, "host")).strip;
+        if (host.length > 0)
+          hosts ~= host;
+      }
+    if (hosts.length == 0) {
+      writeJsonApi(res, errorDocument(400, "未登记 micdn 节点", "config.servers is empty", "servers"),
+          HTTPStatus.badRequest);
+      return;
+    }
+
+    Json[] entries;
+    foreach (host; hosts) {
+      auto reply = agents.micdnReload(projectName, host);
+      Json entry = ["host": Json(host), "ok": Json(reply.outcome == RequestOutcome.ok)];
+      if (reply.data.type == Json.Type.object)
+        entry["data"] = reply.data;
+      if (reply.error.length > 0)
+        entry["error"] = Json(reply.error);
+      entries ~= entry;
+    }
+    Json doc = Json.emptyObject;
+    doc["data"] = Json(entries);
+    writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
   /// `PATCH /api/bashub/micdn/projects/{id}`：一次保存配置与组件绑定。
@@ -934,7 +984,8 @@ class HubService {
         return;
       }
       writeJsonApi(res, micdnProjectDocument(view, projectMicdnUrl(requestOrigin(req),
-          jsonText(view.project["qualifiedName"]))), HTTPStatus.ok);
+          jsonText(view.project["qualifiedName"])),
+          cfg.mavenDownloadToken, cfg.mavenDownloadToken), HTTPStatus.ok);
     } catch (Exception e) {
       writeMicdnError(res, e);
     }
@@ -1146,7 +1197,8 @@ class HubService {
     auto data = project["data"];
     auto remoteUrl = origin.length > 0 ? projectMicdnUrl(origin, attributeText(data, "qualifiedName")) : "";
     return renderMicdnXml(state.config, state.components, attributeText(data, "name"),
-        attributeText(data, "key"), maskSecrets, remoteUrl);
+        attributeText(data, "key"), maskSecrets, remoteUrl,
+        cfg.mavenDownloadToken, cfg.mavenDownloadToken);
   }
 
   private string projectMicdnUrl(string origin, string qualifiedName) {
@@ -2613,6 +2665,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.micdn ~ "/projects/:id/micdn.xml", &hub.downloadProjectMicdnXml);
   router.get(api.micdn ~ "/projects/:id", &hub.projectMicdn);
   router.patch(api.micdn ~ "/projects/:id", &hub.updateProjectMicdn);
+  router.post(api.micdn ~ "/projects/:id/reload", &hub.reloadMicdn);
   router.get(api.micdn ~ "/components", &hub.cdnComponents);
   router.get(api.micdn ~ "/components/:id", &hub.cdnComponentDetail);
   router.post(api.micdn ~ "/components", &hub.createCdnComponent);

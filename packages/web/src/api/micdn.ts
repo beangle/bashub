@@ -179,6 +179,21 @@ export async function deleteCdnComponent(id: string): Promise<void> {
   await apiClient.delete(apiPath('micdn', `/components/${id}`))
 }
 
+export interface MicdnReloadResult {
+  host: string
+  ok: boolean
+  error?: string
+  data?: unknown
+}
+
+export async function reloadMicdnProject(projectId: string): Promise<MicdnReloadResult[]> {
+  const document = (await apiClient.post(
+    apiPath('micdn', `/projects/${encodeURIComponent(projectId)}/reload`),
+    {},
+  )) as { data?: MicdnReloadResult[] }
+  return document.data || []
+}
+
 export function micdnXmlUrl(projectId: string): string {
   return apiClient.resolveUrl(apiPath('micdn', `/projects/${encodeURIComponent(projectId)}/micdn.xml`))
 }
