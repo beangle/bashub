@@ -987,8 +987,9 @@ class HubService {
 
   /// `POST /api/bashub/micdn/projects/{id}/reload`：让该 Project 登记的 micdn 节点 reload。
   ///
-  /// 只按 `config.servers[].host` 找对应的在线 agent，下发 `micdn:reload`；agent 自己去调
-  /// 本机 `127.0.0.1:8888/admin/reload`。返回每个节点的结果，失败不影响其余节点；整体仍回 200，
+  /// 只按 `config.servers[].host` 找对应的在线 agent，下发 `micdn:reload`；agent 拉取
+  /// micdn.xml 后 POST 到本机 `127.0.0.1:8888/admin/config`，由 micdn 自己校验/落盘/reload。
+  /// 返回每个节点的结果，失败不影响其余节点；整体仍回 200，
   /// 由 `data[].ok` 区分（人工操作，不需要 HTTP 层再区分成败）。
   void reloadMicdn(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))

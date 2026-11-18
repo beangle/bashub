@@ -963,7 +963,7 @@ final class AgentRegistry {
     return session.request("agent:log", body, timeout);
   }
 
-  /// 让某台 agent 触发本机 micdn `reload`（固定 127.0.0.1:8888/admin/reload）。
+  /// 让某台 agent 拉取 micdn.xml 并投递给本机 `/admin/config`。
   AgentReply micdnReload(string project, string ip = "", Duration timeout = 90.seconds) {
     auto session = resolve(project, ip);
     if (session is null)

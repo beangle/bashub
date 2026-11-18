@@ -131,7 +131,7 @@
                     size="small"
                     variant="outline"
                     :loading="proxyApplying"
-                    :disabled="!proxyEngine || !proxyConfig || !proxy || !ip"
+                    :disabled="!proxyEngine || !proxyConfig || !proxy || !ip || !proxyAllOnline"
                     @click="applyProxy"
                   >
                     应用到节点
@@ -158,6 +158,9 @@
                 <div class="fact"><span>强制 HTTPS</span><strong>{{ forceHttps ? '是' : '否' }}</strong></div>
                 <div class="fact"><span>最大连接数</span><strong>{{ maxconn || '默认' }}</strong></div>
               </div>
+              <p v-if="proxyHosts.length > 0 && !proxyAllOnline" class="load-error">
+                代理节点未全部在线，无法应用配置。
+              </p>
               <div class="detail-note">
                 下载到服务器的代理 ZIP 按该 Project 下的群集、服务、主机与 Micdn 路径生成；修改 Project 后重新生成。
               </div>
@@ -364,10 +367,22 @@
                   <p>Project 是 micdn 配置与组件绑定的中心。</p>
                 </div>
                 <div class="detail-card__actions">
+                  <t-button
+                    size="small"
+                    variant="outline"
+                    :loading="micdnReloading"
+                    :disabled="!micdn || micdnServers.length === 0 || !micdnAllOnline"
+                    @click="reloadMicdn"
+                  >
+                    Reload micdn
+                  </t-button>
                   <t-button size="small" theme="primary" @click="openMicdn">编辑配置</t-button>
                 </div>
               </header>
               <p v-if="warnings.micdn" class="load-error">{{ warnings.micdn }}</p>
+              <p v-else-if="micdn && micdnServers.length > 0 && !micdnAllOnline" class="load-error">
+                Micdn 节点未全部在线，无法 reload。
+              </p>
               <div v-else-if="micdn" class="fact-grid">
                 <div class="fact"><span>监听地址</span><strong>{{ micdn.config.listen || '—' }}</strong></div>
                 <div class="fact"><span>Home</span><strong>{{ micdn.config.home || 'XML 所在目录' }}</strong></div>
@@ -498,7 +513,12 @@ import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listAgents, type AgentInstance, type AgentStatus } from '@/api/agents'
-import { getMicdnProject, type MicdnBinding, type MicdnProjectDocument } from '@/api/micdn'
+import {
+  getMicdnProject,
+  reloadMicdnProject,
+  type MicdnBinding,
+  type MicdnProjectDocument,
+} from '@/api/micdn'
 import {
   applyProjectProxy,
   downloadProjectProxyBundle,
@@ -580,6 +600,7 @@ const agents = ref<AgentStatus[]>([])
 const proxyConfig = ref('')
 const bundleDownloading = ref(false)
 const proxyApplying = ref(false)
+const micdnReloading = ref(false)
 const serverConfig = ref('')
 const micdn = ref<MicdnProjectDocument>()
 const loading = ref(false)
@@ -647,6 +668,19 @@ const organizationText = computed(() => {
 
 const onlineAgents = computed(() =>
   agents.value.filter((agent) => agent.project === qualifiedName.value || agent.project === name.value),
+)
+const onlineIps = computed(() => new Set(
+  onlineAgents.value.map((agent) => agent.ip).filter((ip): ip is string => Boolean(ip)),
+))
+const proxyHosts = computed(() => String(attrOf(proxy.value, 'ip') || '')
+  .split(',')
+  .map((ip) => ip.trim())
+  .filter(Boolean))
+const proxyAllOnline = computed(() =>
+  proxyHosts.value.length > 0 && proxyHosts.value.every((ip) => onlineIps.value.has(ip)),
+)
+const micdnAllOnline = computed(() =>
+  micdnServers.value.length > 0 && micdnServers.value.every((server) => onlineIps.value.has(server.host)),
 )
 const instanceRows = computed<InstanceRow[]>(() =>
   onlineAgents.value
@@ -781,6 +815,27 @@ function openMicdn() {
   void router.push(`/micdn/projects/${projectId}`)
 }
 
+async function reloadMicdn() {
+  if (!micdnAllOnline.value) {
+    MessagePlugin.error('Micdn 节点未全部在线，无法 reload')
+    return
+  }
+  micdnReloading.value = true
+  try {
+    const results = await reloadMicdnProject(projectId)
+    const failed = results.filter((item) => !item.ok)
+    if (failed.length > 0) {
+      MessagePlugin.error(`reload 失败: ${failed.map((item) => item.host).join(', ')}`)
+    } else {
+      MessagePlugin.success('micdn 已 reload')
+    }
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : 'reload micdn 失败')
+  } finally {
+    micdnReloading.value = false
+  }
+}
+
 function attrOf(row: ResourceRow | undefined, key: string): string {
   return attributeText(row?.attributes[key])
 }
@@ -861,6 +916,10 @@ function editProxyEndpoint() {
 
 function applyProxy() {
   if (!proxy.value || !proxyEngine.value) return
+  if (!proxyAllOnline.value) {
+    MessagePlugin.error('代理节点未全部在线，无法应用配置')
+    return
+  }
   const endpoint = attributeText(proxy.value.attributes.name)
   const dialog = DialogPlugin.confirm({
     header: '应用到代理节点',

@@ -87,14 +87,15 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
   `micdn.xml` 的 `<snapshot token>` 与 `<dev token>`，不进入数据库、管理台不展示/不可编辑。
   该上游必须指向中心 micdn 或补同值鉴权的反代，避免把令牌发给外部 registry。
 
-- 新增人工 reload：
+- 新增人工 reload（Project 详情页 Micdn 卡片上的「Reload micdn」按钮）：
 
   ```text
   POST /api/bashub/micdn/projects/{id}/reload
   ```
 
-  按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`；agent 只 GET 本机
-  `http://127.0.0.1:8888/admin/reload`。不自动执行。
+  按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`；agent 用 Project token 拉取
+  `micdn.xml`，POST 到本机 `http://127.0.0.1:8888/admin/config`，由 micdn 自己校验/落盘/reload。
+  不自动执行。
 
 ### 代理应用
 
@@ -109,7 +110,8 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
   `basproxy-apply@<engine>.service`；root helper 校验路径后执行
   `basctl proxy apply --bundle`，保留校验、原子替换、reload 和回滚。
 
-- Project 详情页代理卡片增加「应用到节点」按钮，带确认和失败节点提示。
+- Project 详情页代理卡片增加「应用到节点」按钮，带确认和失败节点提示；目标节点未全部在线时按钮禁用。
+- Project 详情页 Micdn 卡片增加「Reload micdn」；登记节点未全部在线时禁用。
 
 - CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
 
