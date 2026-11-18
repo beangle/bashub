@@ -250,6 +250,9 @@
                   <h4>BAS 资源</h4>
                   <p>server.xml 渲染所依据的部署对象与在线实例。</p>
                 </div>
+                <div class="detail-card__actions">
+                  <t-button size="small" variant="outline" @click="openMonitor">打开监控</t-button>
+                </div>
               </header>
               <div class="stat-grid">
                 <div class="stat"><span>群集</span><strong>{{ farms.length }}</strong></div>
@@ -371,6 +374,7 @@
                     size="small"
                     variant="outline"
                     :loading="micdnReloading"
+                    :title="micdnReloadTitle"
                     :disabled="!micdn || micdnServers.length === 0 || !micdnAllOnline"
                     @click="reloadMicdn"
                   >
@@ -380,9 +384,6 @@
                 </div>
               </header>
               <p v-if="warnings.micdn" class="load-error">{{ warnings.micdn }}</p>
-              <p v-else-if="micdn && micdnServers.length > 0 && !micdnAllOnline" class="load-error">
-                Micdn 节点未全部在线，无法 reload。
-              </p>
               <div v-else-if="micdn" class="fact-grid">
                 <div class="fact"><span>监听地址</span><strong>{{ micdn.config.listen || '—' }}</strong></div>
                 <div class="fact"><span>Home</span><strong>{{ micdn.config.home || 'XML 所在目录' }}</strong></div>
@@ -392,6 +393,18 @@
                 <div class="fact"><span>WWW 绑定</span><strong>{{ wwwBindings.length }}</strong></div>
               </div>
               <p v-else class="empty-text">尚未加载 Micdn 配置。</p>
+              <p v-if="micdn && micdnServerStatus.length > 0 && !micdnAllOnline" class="load-error">
+                Micdn 节点未全部在线，无法 reload。
+              </p>
+              <div v-if="micdn && micdnServerStatus.length > 0" class="micdn-host-list">
+                <span v-for="server in micdnServerStatus" :key="server.host" class="micdn-host">
+                  <code>{{ server.host }}</code>
+                  <t-tag size="small" :theme="server.online ? 'success' : 'default'" variant="light">
+                    {{ server.online ? '在线' : '离线' }}
+                  </t-tag>
+                </span>
+              </div>
+              <p v-else-if="micdn" class="empty-text">尚未登记 Micdn 节点。</p>
             </article>
 
             <article v-if="micdn" class="detail-card">
@@ -669,19 +682,28 @@ const organizationText = computed(() => {
 const onlineAgents = computed(() =>
   agents.value.filter((agent) => agent.project === qualifiedName.value || agent.project === name.value),
 )
-const onlineIps = computed(() => new Set(
-  onlineAgents.value.map((agent) => agent.ip).filter((ip): ip is string => Boolean(ip)),
+const onlineHosts = computed(() => new Set(
+  onlineAgents.value.flatMap((agent) => [agent.ip, agent.host]).filter((host): host is string => Boolean(host)),
 ))
 const proxyHosts = computed(() => String(attrOf(proxy.value, 'ip') || '')
   .split(',')
   .map((ip) => ip.trim())
   .filter(Boolean))
 const proxyAllOnline = computed(() =>
-  proxyHosts.value.length > 0 && proxyHosts.value.every((ip) => onlineIps.value.has(ip)),
+  proxyHosts.value.length > 0 && proxyHosts.value.every((host) => onlineHosts.value.has(host)),
+)
+const micdnServerStatus = computed(() =>
+  micdnServers.value.map((server) => ({ host: server.host.trim(), online: onlineHosts.value.has(server.host.trim()) })),
 )
 const micdnAllOnline = computed(() =>
-  micdnServers.value.length > 0 && micdnServers.value.every((server) => onlineIps.value.has(server.host)),
+  micdnServerStatus.value.length > 0 && micdnServerStatus.value.every((server) => server.online),
 )
+const micdnReloadTitle = computed(() => {
+  if (!micdn.value) return 'Micdn 配置尚未加载'
+  if (micdnServerStatus.value.length === 0) return '尚未登记 Micdn 节点'
+  const offline = micdnServerStatus.value.filter((server) => !server.online).map((server) => server.host)
+  return offline.length === 0 ? '向登记节点发送 reload' : `离线节点：${offline.join(', ')}`
+})
 const instanceRows = computed<InstanceRow[]>(() =>
   onlineAgents.value
     .flatMap((agent) => instancesOf(agent).map((instance) => ({ agent, instance, running: isRunning(instance) })))
@@ -813,6 +835,10 @@ watch(activeSection, (value) => {
 
 function openMicdn() {
   void router.push(`/micdn/projects/${projectId}`)
+}
+
+function openMonitor() {
+  void router.push({ path: '/monitor/agents', query: { project: qualifiedName.value } })
 }
 
 async function reloadMicdn() {
@@ -1325,6 +1351,23 @@ onMounted(load)
 
 .card-link:hover {
   text-decoration: underline;
+}
+
+.micdn-host-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.micdn-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--td-bg-color-container-hover);
+  font-size: 12px;
 }
 
 .fact-grid {
