@@ -2,6 +2,15 @@
 
 ## v0.0.9 (unreleased)
 
+- **Micdn 清理策略**：生成 `<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`，
+  由各 micdn 按本地时区执行；不再由 bashub 起定时器。
+- **共享上游令牌**：`<snapshot download-token>` 同时下发为客户 micdn 的 `<snapshot token>` 和
+  `<dev token>`，用于代理中心 micdn 的 SNAPSHOT/dev 下载；不落库、界面不展示。
+- **人工 reload**：新增 `micdn:reload` 原语、`POST /api/bashub/micdn/projects/{id}/reload`
+  和 Micdn 项目页按钮，经在线 basagent 调本机 `/admin/reload`。
+- **代理应用**：新增 `proxy:apply` 原语、`POST .../proxy/apply` 和 Project 代理页
+  「应用到节点」，按 endpoint `ips` 逐节点触发。
+- **不再生成 `<micdn remote>`**：该属性已从 micdn 配置中移除。
 - **代理 ZIP bundle**：新增 `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx`，
   支持 `cert-dir` 按部署目录生成证书路径；HAProxy bundle 额外包含
   `config/bas-routes.map`，使用 `map_beg` 做最长前缀路由；map 条目按路径字典倒排，

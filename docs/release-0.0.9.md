@@ -73,6 +73,46 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
   `host` 只接受节点地址，填写 `host:port` 会明确报错；服务器只登记一个节点 IP，
   不再要求名称。新增 `20261117-01-micdn-server-host-port.sql` 清理历史数据中的端口。
 
+### Micdn 配置与运维
+
+- Project 的 `micdn.xml` 增加默认清理策略：
+
+  ```xml
+  <prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>
+  ```
+
+  定时器在 micdn 本地执行，bashub 只负责下发配置；不写 `<prune>` 时只保留手动入口。
+
+- 中心 micdn 的读令牌复用 bashub.xml 的 `<snapshot download-token>`：同一个值同时写入客户
+  `micdn.xml` 的 `<snapshot token>` 与 `<dev token>`，不进入数据库、管理台不展示/不可编辑。
+  该上游必须指向中心 micdn 或补同值鉴权的反代，避免把令牌发给外部 registry。
+
+- 新增人工 reload：
+
+  ```text
+  POST /api/bashub/micdn/projects/{id}/reload
+  ```
+
+  按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`；agent 只 GET 本机
+  `http://127.0.0.1:8888/admin/reload`。不自动执行。
+
+### 代理应用
+
+- 新增 `proxy:apply` 原语和：
+
+  ```text
+  POST /api/bashub/config/projects/{id}/proxy/apply
+  ```
+
+  管理台只发 `{engine, endpoint}`；按 endpoint 的 `ips` 找在线 agent，返回逐节点结果。
+  agent 用 Project token 下载 bundle，再触发本机受 polkit 限制的
+  `basproxy-apply@<engine>.service`；root helper 校验路径后执行
+  `basctl proxy apply --bundle`，保留校验、原子替换、reload 和回滚。
+
+- Project 详情页代理卡片增加「应用到节点」按钮，带确认和失败节点提示。
+
+- CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
+
 ### 管理台
 
 - Project 详情页增加“下载 ZIP”，使用登录会话。
@@ -91,7 +131,10 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 ## 升级
 
 - 数据库无迁移。
-- `basctl proxy` 应升级到 0.0.3 及以上，使用 ZIP bundle。
+- `basctl proxy` 应升级到 0.0.3 及以上，使用 ZIP bundle；`proxy:apply` 还需要对应版本的
+  basagent、`basproxy-apply@.service`、root helper 和 polkit 规则（安装包已带）。
+- `micdn.xml` 的清理策略与共享 token 由 bashub 生成；修改 bashub.xml 后重启 bashub，
+  再让 micdn reload 获取新配置。
 - `GET /config/{project}/setline-manifest` 等旧机器端点为兼容保留，新客户端不再使用。
 - 管理台需要重新构建 `packages/web`。
 
