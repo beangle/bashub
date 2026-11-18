@@ -7,7 +7,7 @@
 - **共享上游令牌**：`<snapshot download-token>` 同时下发为客户 micdn 的 `<snapshot token>` 和
   `<dev token>`，用于代理中心 micdn 的 SNAPSHOT/dev 下载；不落库、界面不展示。
 - **人工 reload**：新增 `micdn:reload` 原语、`POST /api/bashub/micdn/projects/{id}/reload`
-  和 Micdn 项目页按钮，经在线 basagent 调本机 `/admin/reload`。
+  和 Project 详情页 Micdn 卡片按钮；agent 拉取 `micdn.xml` 后 POST 到本机 `/admin/config`。
 - **代理应用**：新增 `proxy:apply` 原语、`POST .../proxy/apply` 和 Project 代理页
   「应用到节点」，按 endpoint `ips` 逐节点触发。
 - **不再生成 `<micdn remote>`**：该属性已从 micdn 配置中移除。
@@ -50,6 +50,9 @@
 - **组件目录**：管理台将静态包与文档拆成两个目录，分别搜索和新建，并增加序号、
   自动部署说明。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- **监控摘要**：Project 标题行保留刷新上报/运行历史/配置，标题下方合一展示 BAS 统计、Micdn
+  节点 IP/组件/在线状态与 Reload、代理 IP/引擎版本/状态与 Apply；目标节点未全部在线时禁用操作。
+- **代理版本**：节点 `report:os` 上报 `haproxy -v` / `nginx -v`，监控摘要显示对应引擎版本。
 - **测试**：`dub test` 通过 35 个模块；新增 ZIP bundle、Micdn 路由、最长前缀回归测试，
   并在本机存在 `haproxy` 时用 `haproxy -c` 校验生成的完整配置。
 
