@@ -76,15 +76,18 @@
         <div class="agent-summary">
           <div class="summary-section">
             <span class="summary-label">BAS</span>
-            <strong>{{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止</strong>
+            <strong>
+              {{ agentGroupRunning(group) }} 运行
+              <template v-if="agentGroupStopped(group) > 0"> / {{ agentGroupStopped(group) }} 停止</template>
+            </strong>
             <span class="summary-meta">{{ group.agents.length }} 个节点</span>
           </div>
 
           <div class="summary-section">
             <span class="summary-label">Micdn</span>
-            <strong>{{ configOpsLoading ? '读取中…' : `${micdnComponentCount} 个组件` }}</strong>
-            <span class="summary-meta" :title="micdnHosts.join(', ')">
-              {{ micdnHosts.length }} 节点 · {{ micdnOnlineCount }} 在线
+            <strong class="summary-address" :title="micdnHosts.join(', ')">{{ micdnHosts.join(', ') || '未登记' }}</strong>
+            <span class="summary-meta">
+              {{ configOpsLoading ? '读取中…' : `${micdnComponentCount} 个组件` }} · {{ micdnOnlineCount }}/{{ micdnHosts.length }} 在线
             </span>
             <t-tag
               size="small"
@@ -107,7 +110,9 @@
           <div class="summary-section summary-section--proxy">
             <span class="summary-label">Proxy</span>
             <strong class="summary-address" :title="proxyHosts.join(', ')">{{ proxyHosts.join(', ') || '未登记' }}</strong>
-            <span class="summary-meta">{{ proxyEngine || '未配置' }} · {{ proxyOnlineCount }}/{{ proxyHosts.length }} 在线</span>
+            <span class="summary-meta">
+              {{ proxyEngineLabel }}{{ proxyVersionText ? ` ${proxyVersionText}` : '' }} · {{ proxyOnlineCount }}/{{ proxyHosts.length }} 在线
+            </span>
             <t-button
               size="small"
               variant="outline"
@@ -572,6 +577,22 @@ const proxyAllOnline = computed(() =>
 )
 const micdnOnlineCount = computed(() => micdnHosts.value.filter((host) => onlineIps.value.has(host)).length)
 const proxyOnlineCount = computed(() => proxyHosts.value.filter((host) => onlineIps.value.has(host)).length)
+const proxyEngineLabel = computed(() => {
+  if (proxyEngine.value === 'haproxy') return 'HAProxy'
+  if (proxyEngine.value === 'nginx') return 'nginx'
+  return proxyEngine.value || '未配置'
+})
+const proxyVersionText = computed(() => {
+  if (!proxyEngineValid.value) return ''
+  const versions = new Set<string>()
+  const targets = new Set(proxyHosts.value)
+  for (const agent of activeGroup.value?.agents ?? []) {
+    if (!targets.has(agent.ip ?? '') && !targets.has(agent.host ?? '')) continue
+    const version = agent.os?.proxy?.[proxyEngine.value as 'haproxy' | 'nginx']
+    if (version) versions.add(version)
+  }
+  return versions.size > 0 ? [...versions].join(' / ') : '版本未上报'
+})
 const proxyEngineValid = computed(() => proxyEngine.value === 'haproxy' || proxyEngine.value === 'nginx')
 
 function hostList(value: unknown): string[] {

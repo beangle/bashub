@@ -25,11 +25,17 @@ export interface AgentDiskInfo {
   available?: number
 }
 
+export interface AgentProxySnapshot {
+  haproxy?: string
+  nginx?: string
+}
+
 export interface AgentOsSnapshot {
   os?: AgentOsInfo
   cpu?: AgentCpuInfo
   mem?: AgentMemInfo
   disk?: AgentDiskInfo[]
+  proxy?: AgentProxySnapshot
 }
 
 export interface AgentWebapp {
