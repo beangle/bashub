@@ -418,7 +418,7 @@ ems 根目录固定为 `/var/lib/bas/.ems`，实际 project 是 `/var/lib/bas/.e
   SPA 的 `/monitor/agents` 页面展示在线节点、系统/实例快照与能力，并支持刷新节点快照、区间读实例或
   agent 日志、SSE 跟随，以及实例的重启 / 停止（带二次确认）。启停失败时错误文档的
   `errors[0].meta` 会带上 agent 返回的限长 `detail` / `logTail` / `truncated`。
-- **节点配置通道**：`/monitor/agents` 顶部按当前 Project 展示 Micdn / 代理登记节点及其在线状态；
+- **节点配置通道**：`/monitor/agents` 的 Project 标题下方按当前 Project 展示 BAS 统计、Micdn 组件与节点状态、代理 IP/状态；
   目标节点全部在线时提供 `Reload micdn` 和 `应用到节点`，否则按钮禁用并显示离线节点。
 - **节点快照与运行历史**：SPA 每 30 秒读取 `GET /api/bashub/monitor/agents/status`（实例表要显示 pid、
   端口与 webapps），页面上的节点“刷新”会先让 agent 重报再取一次；`GET /api/bashub/monitor/agents/summary`

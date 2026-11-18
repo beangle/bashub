@@ -17,75 +17,6 @@
 
     <t-alert v-if="error" theme="error" :message="error" class="agent-alert" />
 
-    <section v-if="activeGroup" class="config-ops">
-      <header class="config-ops__head">
-        <div>
-          <h3>配置通道</h3>
-          <p>当前 Project 的 Micdn 与代理节点连接状态；目标节点全部在线才可操作。</p>
-        </div>
-        <t-button v-if="configProjectId" size="small" variant="text" @click="goProject(configProjectId)">
-          配置详情
-        </t-button>
-      </header>
-      <p v-if="configOpsLoading" class="agent-muted">正在读取 Micdn / 代理节点…</p>
-      <t-alert v-if="configOpsError" theme="warning" :message="configOpsError" class="config-ops__alert" />
-      <div v-if="!configOpsLoading" class="config-ops__grid">
-        <article class="config-ops__item">
-          <header class="config-ops__item-head">
-            <div>
-              <strong>Micdn</strong>
-              <span>{{ micdnHosts.length }} 个登记节点</span>
-            </div>
-            <t-button
-              size="small"
-              variant="outline"
-              :loading="micdnReloading"
-              :disabled="!micdnHosts.length || !micdnAllOnline"
-              @click="reloadMicdnFromMonitor"
-            >
-              Reload micdn
-            </t-button>
-          </header>
-          <div v-if="micdnHosts.length === 0" class="agent-muted">未登记 Micdn 节点</div>
-          <div v-else class="config-ops__hosts">
-            <span v-for="host in micdnHosts" :key="host" class="config-ops__host">
-              <code>{{ host }}</code>
-              <t-tag size="small" :theme="onlineIps.has(host) ? 'success' : 'default'" variant="light">
-                {{ onlineIps.has(host) ? '在线' : '离线' }}
-              </t-tag>
-            </span>
-          </div>
-        </article>
-
-        <article class="config-ops__item">
-          <header class="config-ops__item-head">
-            <div>
-              <strong>代理</strong>
-              <span>{{ proxyEngine || '未配置' }} · {{ proxyEndpoint || '未登记 endpoint' }}</span>
-            </div>
-            <t-button
-              size="small"
-              variant="outline"
-              :loading="proxyApplying"
-              :disabled="!proxyHosts.length || !proxyAllOnline || !proxyEngineValid"
-              @click="confirmApplyProxy"
-            >
-              应用到节点
-            </t-button>
-          </header>
-          <div v-if="proxyHosts.length === 0" class="agent-muted">未登记代理节点</div>
-          <div v-else class="config-ops__hosts">
-            <span v-for="host in proxyHosts" :key="host" class="config-ops__host">
-              <code>{{ host }}</code>
-              <t-tag size="small" :theme="onlineIps.has(host) ? 'success' : 'default'" variant="light">
-                {{ onlineIps.has(host) ? '在线' : '离线' }}
-              </t-tag>
-            </span>
-          </div>
-        </article>
-      </div>
-    </section>
-
     <section v-if="topology.length" class="topology-compact">
       <span class="topology-compact__title">组网中继</span>
       <div v-for="item in topology" :key="item.group" class="topology-compact__row">
@@ -116,10 +47,7 @@
                 />
                 <h3>{{ groupHeading(group) }}</h3>
                 <t-tag theme="success" variant="light">{{ group.agents.length }} 个 agent</t-tag>
-                <span class="agent-project">
-                  <template v-if="groupQualifiedName(group)">{{ groupQualifiedName(group) }} · </template>
-                  {{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止
-                </span>
+                <span v-if="groupQualifiedName(group)" class="agent-project">{{ groupQualifiedName(group) }}</span>
               </div>
               <div class="agent-actions">
                 <t-button
@@ -144,6 +72,54 @@
             </div>
           </div>
         </div>
+
+        <div class="agent-summary">
+          <div class="summary-section">
+            <span class="summary-label">BAS</span>
+            <strong>{{ agentGroupRunning(group) }} 运行 / {{ agentGroupStopped(group) }} 停止</strong>
+            <span class="summary-meta">{{ group.agents.length }} 个节点</span>
+          </div>
+
+          <div class="summary-section">
+            <span class="summary-label">Micdn</span>
+            <strong>{{ configOpsLoading ? '读取中…' : `${micdnComponentCount} 个组件` }}</strong>
+            <span class="summary-meta" :title="micdnHosts.join(', ')">
+              {{ micdnHosts.length }} 节点 · {{ micdnOnlineCount }} 在线
+            </span>
+            <t-tag
+              size="small"
+              :theme="micdnHosts.length === 0 ? 'default' : micdnAllOnline ? 'success' : 'warning'"
+              variant="light"
+            >
+              {{ micdnHosts.length === 0 ? '未登记' : micdnAllOnline ? '在线' : '部分离线' }}
+            </t-tag>
+            <t-button
+              size="small"
+              variant="outline"
+              :loading="micdnReloading"
+              :disabled="!micdnHosts.length || !micdnAllOnline"
+              @click="reloadMicdnFromMonitor"
+            >
+              Reload
+            </t-button>
+          </div>
+
+          <div class="summary-section summary-section--proxy">
+            <span class="summary-label">Proxy</span>
+            <strong class="summary-address" :title="proxyHosts.join(', ')">{{ proxyHosts.join(', ') || '未登记' }}</strong>
+            <span class="summary-meta">{{ proxyEngine || '未配置' }} · {{ proxyOnlineCount }}/{{ proxyHosts.length }} 在线</span>
+            <t-button
+              size="small"
+              variant="outline"
+              :loading="proxyApplying"
+              :disabled="!proxyHosts.length || !proxyAllOnline || !proxyEngineValid"
+              @click="confirmApplyProxy"
+            >
+              应用
+            </t-button>
+          </div>
+        </div>
+        <p v-if="configOpsError" class="summary-error">{{ configOpsError }}</p>
 
         <div class="ip-cards">
           <article v-for="agent in group.agents" :key="agentKey(agent)" class="ip-card">
@@ -407,6 +383,7 @@ const error = ref('')
 const configOpsLoading = ref(false)
 const configOpsError = ref('')
 const micdnHosts = ref<string[]>([])
+const micdnComponentCount = ref(0)
 const proxyHosts = ref<string[]>([])
 const proxyEndpoint = ref('')
 const proxyEngine = ref('')
@@ -583,7 +560,9 @@ watch(
 const configProjectId = computed(() => activeGroup.value?.agents[0]?.projectId)
 
 const onlineIps = computed(() => new Set(
-  agents.value.map((agent) => agent.ip).filter((ip): ip is string => Boolean(ip)),
+  (activeGroup.value?.agents ?? [])
+    .flatMap((agent) => [agent.ip, agent.host])
+    .filter((host): host is string => Boolean(host)),
 ))
 const micdnAllOnline = computed(() =>
   micdnHosts.value.length > 0 && micdnHosts.value.every((host) => onlineIps.value.has(host)),
@@ -591,6 +570,8 @@ const micdnAllOnline = computed(() =>
 const proxyAllOnline = computed(() =>
   proxyHosts.value.length > 0 && proxyHosts.value.every((host) => onlineIps.value.has(host)),
 )
+const micdnOnlineCount = computed(() => micdnHosts.value.filter((host) => onlineIps.value.has(host)).length)
+const proxyOnlineCount = computed(() => proxyHosts.value.filter((host) => onlineIps.value.has(host)).length)
 const proxyEngineValid = computed(() => proxyEngine.value === 'haproxy' || proxyEngine.value === 'nginx')
 
 function hostList(value: unknown): string[] {
@@ -607,6 +588,7 @@ async function loadConfigOps(projectId?: string) {
   proxyHosts.value = []
   proxyEndpoint.value = ''
   proxyEngine.value = ''
+  micdnComponentCount.value = 0
   if (!projectId) {
     configOpsLoading.value = false
     configOpsError.value = '节点尚未上报 Project ID，无法读取配置节点'
@@ -627,6 +609,7 @@ async function loadConfigOps(projectId?: string) {
     micdnHosts.value = [...new Set(
       micdnResult.value.config.servers.map((server) => server.host.trim()).filter(Boolean),
     )]
+    micdnComponentCount.value = micdnResult.value.components.length
   } else {
     errors.push('Micdn 配置加载失败')
   }
@@ -1952,90 +1935,87 @@ onBeforeUnmount(() => {
 }
 
 
-.config-ops {
-  margin-bottom: 18px;
-  padding: 16px 18px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  background: var(--td-bg-color-container);
-}
-
-.config-ops__head,
-.config-ops__item-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.config-ops__head h3 {
-  margin: 0 0 4px;
-  font-size: 16px;
-}
-
-.config-ops__head p {
-  margin: 0;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-}
-
-.config-ops__alert {
-  margin-top: 10px;
-}
-
-.config-ops__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.config-ops__item {
-  padding: 12px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
-}
-
-.config-ops__item-head {
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.config-ops__item-head span {
-  margin-left: 8px;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-}
-
-.config-ops__hosts {
+.agent-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px 0;
+  margin: 0 0 12px;
+  padding: 9px 14px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+  background: var(--td-bg-color-container-hover);
 }
 
-.config-ops__host {
-  display: inline-flex;
+.summary-section {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: var(--td-bg-color-container-hover);
+  min-width: 0;
+  gap: 8px;
+  padding: 2px 16px;
+  border-left: 1px solid var(--td-component-stroke);
+}
+
+.summary-section:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.summary-label {
+  color: var(--td-text-color-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.summary-section strong {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.summary-meta {
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.summary-address {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-section .t-button {
+  margin-left: 2px;
+}
+
+.summary-error {
+  margin: -4px 0 12px;
+  color: var(--td-error-color);
   font-size: 12px;
 }
 
 @media (max-width: 760px) {
-  .config-ops__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .config-ops__head,
-  .config-ops__item-head {
+  .agent-summary {
     align-items: flex-start;
     flex-direction: column;
+    gap: 8px;
   }
 
-  .config-ops__item-head .t-button {
-    align-self: flex-start;
+  .summary-section {
+    width: 100%;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .summary-section strong,
+  .summary-meta {
+    white-space: normal;
+  }
+
+  .summary-address {
+    max-width: none;
   }
 
   .ip-card__body {
