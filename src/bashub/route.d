@@ -782,6 +782,72 @@ class HubService {
     }
   }
 
+  /// `POST /api/bashub/config/projects/{id}/proxy/apply`：让代理节点的 agent 应用 bundle。
+  ///
+  /// 管理台只发 engine/endpoint；目标 IP 取 endpoint 的 `ips`，agent 自己下载、校验，
+  /// 再触发本机受 polkit 限制的 root helper。返回逐 IP 结果，失败不影响其他节点。
+  void applyProjectProxy(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found"), HTTPStatus.notFound);
+      return;
+    }
+    auto body = requestJson(req, res);
+    if (body.type == Json.Type.undefined)
+      return;
+    auto engine = jsonText(jsonGet(body, "engine")).strip;
+    auto endpointName = jsonText(jsonGet(body, "endpoint")).strip;
+    if (endpointName.length == 0)
+      endpointName = defaultEndpointName(project);
+    Json endpoint;
+    if (endpointName.length == 0 || !findEndpointJson(project, endpointName, endpoint)) {
+      writeJsonApi(res, errorDocument(404, "代理点不存在", endpointName), HTTPStatus.notFound);
+      return;
+    }
+    auto endpointEngine = attributeText(endpoint, "engine").strip;
+    if (endpointEngine != "haproxy" && endpointEngine != "nginx") {
+      writeJsonApi(res, errorDocument(400, "引擎非法", "endpoint engine must be haproxy or nginx", "engine"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    if (engine.length == 0)
+      engine = endpointEngine;
+    if (engine != endpointEngine) {
+      writeJsonApi(res, errorDocument(400, "引擎不匹配",
+          "endpoint " ~ endpointName ~ " uses " ~ endpointEngine, "engine"), HTTPStatus.badRequest);
+      return;
+    }
+
+    string[] ips;
+    foreach (part; attributeText(endpoint, "ips").split(",")) {
+      auto ip = part.strip;
+      if (ip.length > 0 && !ips.canFind(ip))
+        ips ~= ip;
+    }
+    if (ips.length == 0) {
+      writeJsonApi(res, errorDocument(400, "代理点没有节点", "endpoint.ips is empty", "ips"),
+          HTTPStatus.badRequest);
+      return;
+    }
+
+    auto projectName = attributeText(project.data, "name").strip;
+    Json[] entries;
+    foreach (ip; ips) {
+      auto reply = agents.proxyApply(projectName, ip, engine, endpointName);
+      Json entry = ["host": Json(ip), "ok": Json(reply.outcome == RequestOutcome.ok)];
+      if (reply.data.type == Json.Type.object)
+        entry["data"] = reply.data;
+      if (reply.error.length > 0)
+        entry["error"] = Json(reply.error);
+      entries ~= entry;
+    }
+    Json doc = Json.emptyObject;
+    doc["data"] = Json(entries);
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
   /// `GET /api/bashub/config/projects/{id}/proxy-bundle`：管理台直接下载 ZIP bundle。
   /// 只按登录会话鉴权，不要求 Project key。
   void projectProxyBundleView(HTTPServerRequest req, HTTPServerResponse res) {
@@ -2659,6 +2725,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);
   router.get(api.config ~ "/projects/:id/proxy", &hub.projectProxyView);
   router.get(api.config ~ "/projects/:id/proxy-bundle", &hub.projectProxyBundleView);
+  router.post(api.config ~ "/projects/:id/proxy/apply", &hub.applyProjectProxy);
 
   // micdn：下载配置、管理台聚合视图与组件目录
   router.get(api.micdn ~ "/:project/micdn.xml", &hub.projectMicdnXml);

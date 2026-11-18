@@ -973,6 +973,20 @@ final class AgentRegistry {
     return session.request("micdn:reload", Json.emptyObject, timeout);
   }
 
+  /// 让某台代理节点应用 bashub 生成的代理 bundle；固定 engine/endpoint，不接受任意路径。
+  AgentReply proxyApply(string project, string ip, string engine, string endpoint = "",
+      Duration timeout = 300.seconds) {
+    auto session = resolve(project, ip);
+    if (session is null)
+      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project ~ "@" ~ ip);
+    if (!session.supportsPrimitive("proxy:apply"))
+      return AgentReply.failure(RequestOutcome.failed, "unsupported:proxy:apply");
+    Json body = Json.emptyObject;
+    body["engine"] = Json(engine);
+    body["endpoint"] = Json(endpoint);
+    return session.request("proxy:apply", body, timeout);
+  }
+
   /// 下发 `service:start|stop|restart` 并等待 agent 的 `result`。
   AgentReply service(string project, string action, string instance,
       Duration timeout = 120.seconds, string ip = "") {

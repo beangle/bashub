@@ -129,6 +129,15 @@
                   </t-button>
                   <t-button
                     size="small"
+                    variant="outline"
+                    :loading="proxyApplying"
+                    :disabled="!proxyEngine || !proxyConfig || !proxy || !ip"
+                    @click="applyProxy"
+                  >
+                    应用到节点
+                  </t-button>
+                  <t-button
+                    size="small"
                     theme="primary"
                     :loading="bundleDownloading"
                     :disabled="!proxyEngine || !proxyConfig"
@@ -485,12 +494,13 @@ import {
   LinkIcon,
   ServerIcon,
 } from 'tdesign-icons-vue-next'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listAgents, type AgentInstance, type AgentStatus } from '@/api/agents'
 import { getMicdnProject, type MicdnBinding, type MicdnProjectDocument } from '@/api/micdn'
 import {
+  applyProjectProxy,
   downloadProjectProxyBundle,
   readEndpointCertificate,
   readProjectConfig,
@@ -569,6 +579,7 @@ const webapps = ref<ResourceRow[]>([])
 const agents = ref<AgentStatus[]>([])
 const proxyConfig = ref('')
 const bundleDownloading = ref(false)
+const proxyApplying = ref(false)
 const serverConfig = ref('')
 const micdn = ref<MicdnProjectDocument>()
 const loading = ref(false)
@@ -845,6 +856,36 @@ function editProxyEndpoint() {
   router.push({
     path: '/config/org-config',
     query: { tab: 'endpoints', project: projectId },
+  })
+}
+
+function applyProxy() {
+  if (!proxy.value || !proxyEngine.value) return
+  const endpoint = attributeText(proxy.value.attributes.name)
+  const dialog = DialogPlugin.confirm({
+    header: '应用到代理节点',
+    body: `将在 ${attributeText(proxy.value.attributes.ips) || '登记的节点'} 上应用代理配置并 reload，期间可能有短暂中断。`,
+    onConfirm: async () => {
+      proxyApplying.value = true
+      try {
+        const results = await applyProjectProxy(
+          projectId,
+          proxyEngine.value as 'haproxy' | 'nginx',
+          endpoint,
+        )
+        const failed = results.filter((item) => !item.ok)
+        if (failed.length > 0) {
+          MessagePlugin.error(`应用失败: ${failed.map((item) => item.host).join(', ')}`)
+        } else {
+          MessagePlugin.success('代理已应用到节点')
+        }
+        dialog.destroy()
+      } catch (error) {
+        MessagePlugin.error(error instanceof Error ? error.message : '应用代理失败')
+      } finally {
+        proxyApplying.value = false
+      }
+    },
   })
 }
 

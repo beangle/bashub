@@ -502,3 +502,17 @@ unittest {
   assert(answer.outcome == RequestOutcome.failed);
   assert(answer.error.canFind("unsupported:micdn:reload"));
 }
+
+@("proxyApply requires an online agent that advertises the primitive")
+unittest {
+  auto registry = new AgentRegistry();
+  auto answer = registry.proxyApply("demo", "10.0.0.1", "haproxy", "default");
+  assert(answer.outcome == RequestOutcome.offline);
+
+  auto session = registry.attach("demo");
+  session.accept(envelope("hello", "2026-10-16T10:00:01+08:00",
+      `{"host":"app1","supports":["hello","pong","report:os","report:bas"]}`));
+  answer = registry.proxyApply("demo", "", "haproxy", "default");
+  assert(answer.outcome == RequestOutcome.failed);
+  assert(answer.error.canFind("unsupported:proxy:apply"));
+}

@@ -52,6 +52,26 @@ export async function saveEndpointCertificate(
   )
   return document as unknown as EndpointCertificateInfo
 }
+export interface ProxyApplyResult {
+  host: string
+  ok: boolean
+  error?: string
+  data?: unknown
+}
+
+/** 让代理节点的 agent 应用 bundle；返回逐 IP 结果。 */
+export async function applyProjectProxy(
+  projectId: string,
+  engine: 'haproxy' | 'nginx',
+  endpoint: string,
+): Promise<ProxyApplyResult[]> {
+  const document = (await apiClient.post(
+    apiPath('config', `/projects/${encodeURIComponent(projectId)}/proxy/apply`),
+    { engine, endpoint },
+  )) as { data?: ProxyApplyResult[] }
+  return document.data || []
+}
+
 /** 管理台按登录会话下载代理 ZIP；不需要 Project key。 */
 export async function downloadProjectProxyBundle(
   projectId: string,
