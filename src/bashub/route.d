@@ -833,7 +833,13 @@ class HubService {
       return;
     }
 
-    auto projectName = attributeText(project.data, "name").strip;
+    // 与 agent 会话登记、监控和 reload 使用同一个 Project 身份。
+    auto projectName = attributeText(project.data, "qualifiedName").strip;
+    if (projectName.length == 0) {
+      writeJsonApi(res, errorDocument(500, "Project 缺少 qualifiedName",
+          "project.qualifiedName is empty"), HTTPStatus.internalServerError);
+      return;
+    }
     Json[] entries;
     foreach (ip; ips) {
       auto reply = agents.proxyApply(projectName, ip, engine, endpointName);
@@ -1006,7 +1012,14 @@ class HubService {
       writeMicdnError(res, e);
       return;
     }
-    auto projectName = jsonText(view.project["name"]).strip;
+    // agent 会话按 Project 的 qualifiedName（BAS_PRINCIPAL 的 project 部分）登记；
+    // 不使用显示名称，也不做回退：两者不是同一身份。
+    auto projectName = jsonText(view.project["qualifiedName"]).strip;
+    if (projectName.length == 0) {
+      writeJsonApi(res, errorDocument(500, "Project 缺少 qualifiedName",
+          "project.qualifiedName is empty"), HTTPStatus.internalServerError);
+      return;
+    }
     auto servers = jsonGet(view.state.config, "servers");
     string[] hosts;
     if (servers.type == Json.Type.array)

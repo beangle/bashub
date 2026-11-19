@@ -54,7 +54,7 @@
   `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
   节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
 - **Micdn 基础页合并**：Maven / NPM / Native 合并为基础页里的一个紧凑「仓库」区块，
-  移除独立页签；Native 仅保留启用开关，上游输入区压缩为两行。
+  移除独立页签；Native 保留启用开关和只读中心上游，上游输入区压缩为两行。
 - **NPM 开发版上游固定**：Micdn 配置页把当前 origin 的 `/npm` 保存到 `npm.devRemote`，与
   Maven SNAPSHOT 一样只读展示，渲染直接使用存储值；不再自定义开发版上游。
 - **Micdn 仓库目录固定**：maven/npm/native 的 `base` 不再可配置，始终使用
@@ -76,6 +76,8 @@
 - **监控摘要**：Project 标题行保留刷新上报/运行历史/配置，标题下方合一展示 BAS 统计、Micdn
   节点 IP/组件/在线状态与 Reload、代理 IP/引擎版本/状态与 Apply；目标节点未全部在线时禁用操作。
 - **代理版本**：节点 `report:os` 上报 `haproxy -v` / `nginx -v`，监控摘要显示对应引擎版本。
+- **修复 reload 误判节点离线**：reload 现在按 Project 的 `qualifiedName` 查找 agent
+  （与 `BAS_PRINCIPAL` 和监控登记一致），不再误用显示名称；offline 错误会带上 `@host`。
 - **测试**：`dub test` 通过 35 个模块；新增 ZIP bundle、Micdn 路由、最长前缀回归测试，
   并在本机存在 `haproxy` 时用 `haproxy -c` 校验生成的完整配置。
 

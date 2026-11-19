@@ -6,6 +6,8 @@
 
 本版本把代理下发收敛为 **ZIP bundle**，并让管理台可以直接下载同一份 bundle；
 HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点常驻 setline agent。
+同时把 Project 的 Maven/NPM/Native 上游收敛到本地 micdn：server.xml 指向节点本地仓库，
+micdn.xml 负责中心上游、SNAPSHOT/NPM dev 和 native 回源。
 
 ## 版本范围
 
@@ -121,8 +123,8 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 ### Micdn 配置页合并
 
 Maven / NPM / Native 合并到「基础」页的一个紧凑「仓库」区块：每行一个仓库，Maven 保留正式版
-上游和只读 SNAPSHOT 上游，NPM 保留正式版/开发版上游，Native 只保留启用开关；输入区压缩为两行，
-单独的「Maven / NPM / Native」页签移除。
+上游和只读 SNAPSHOT 上游，NPM 保留正式版/开发版上游，Native 保留启用开关和只读中心 `/native`
+上游；输入区压缩为两行，单独的「Maven / NPM / Native」页签移除。
 
 ### 默认上游恢复
 
@@ -204,10 +206,14 @@ maven/npm/native/www/static 的 `base` 固定为 `{micdn.home}/maven`、`{micdn.
   只在到期前 30 天于入口列显示 `⚠ 到期日期`。无法解析时支持手工填写。新增
   `cfg_endpoints.certificate_not_after` 迁移。
 - 延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- 修复 reload 误判节点离线：现在按 Project 的 `qualifiedName` 查找 agent，与 `BAS_PRINCIPAL`
+  和监控登记一致；offline 错误会带 `@host`。
 
 ## 升级
 
 - 数据库无迁移。
+- 本地 micdn 需要 **micdn 0.4.2** 及以上，才能使用 native `<remote>` 和 SNAPSHOT 上传自动 metadata；
+  旧 micdn 会忽略这些新配置，native 缺失仍 404。
 - `basctl proxy` 应升级到 0.0.3 及以上，使用 ZIP bundle；`proxy:apply` 还需要对应版本的
   basagent、`basproxy-apply@.service`、root helper 和 polkit 规则（安装包已带）。
 - `micdn.xml` 的清理策略与共享 token 由 bashub 生成；修改 bashub.xml 后重启 bashub，

@@ -935,7 +935,8 @@ final class AgentRegistry {
       Duration timeout = 5.seconds, long tail = 0, string ip = "") {
     auto session = resolve(project, ip);
     if (session is null)
-      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project);
+      return AgentReply.failure(RequestOutcome.offline,
+          "agent offline: " ~ project ~ (ip.length > 0 ? "@" ~ ip : ""));
     if (!session.supportsPrimitive("log:read"))
       return AgentReply.failure(RequestOutcome.failed, "unsupported:log:read");
     auto body = Json.emptyObject;
@@ -967,7 +968,8 @@ final class AgentRegistry {
   AgentReply micdnReload(string project, string ip = "", Duration timeout = 90.seconds) {
     auto session = resolve(project, ip);
     if (session is null)
-      return AgentReply.failure(RequestOutcome.offline, "agent offline: " ~ project);
+      return AgentReply.failure(RequestOutcome.offline,
+          "agent offline: " ~ project ~ (ip.length > 0 ? "@" ~ ip : ""));
     if (!session.supportsPrimitive("micdn:reload"))
       return AgentReply.failure(RequestOutcome.failed, "unsupported:micdn:reload");
     return session.request("micdn:reload", Json.emptyObject, timeout);
