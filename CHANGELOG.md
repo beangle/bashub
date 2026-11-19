@@ -54,7 +54,7 @@
   `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
   节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
 - **Micdn 默认上游**：bashub 下发的 micdn.xml 在正式版 remotes 为空时写 central + aliyun，
-  SNAPSHOT 默认指向 bashub 中心 `/maven`。
+  SNAPSHOT 由 Micdn 配置页按当前 origin 保存为 `maven.snapshotRemote`，下发时直接使用存储值。
 - **Server 开机自启**：`cfg_servers` 增加 `auto_start`、`wait_for`；server.xml 输出
   `<auto-start>` / `<wait-for>`，管理台服务表单可配置，供 basagent 自动启动本机节点。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。

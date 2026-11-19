@@ -109,7 +109,8 @@
               </label>
               <label class="form-field">
                 <span>SNAPSHOT 上游</span>
-                <t-input v-model="config.maven.snapshotRemote" placeholder="可选，完整 URL" />
+                <t-input v-model="config.maven.snapshotRemote" readonly />
+                <span class="form-hint">保存当前访问地址的 <code>{origin}/maven</code></span>
               </label>
               <label class="form-field form-field--wide">
                 <span>正式版上游</span>
@@ -305,6 +306,7 @@ watch(activeTab, (value) => {
 function applyDocument(payload: MicdnProjectDocument) {
   doc.value = payload
   config.value = structuredClone(payload.config)
+  config.value.maven.snapshotRemote = `${window.location.origin}/maven`
   bindings.value = payload.bindings.map((binding) => ({ ...binding }))
   components.value = payload.components
   mavenRemotesText.value = (payload.config.maven.remotes || []).join('\n')

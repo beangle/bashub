@@ -1269,13 +1269,9 @@ class HubService {
     if (!loadMicdnState(store, reg, projectId, state))
       return "";
     auto remoteUrl = origin.length > 0 ? projectMicdnUrl(origin, qualifiedName) : "";
-    auto snapshotBase = origin.strip;
-    while (snapshotBase.length > 1 && snapshotBase.endsWith("/"))
-      snapshotBase = snapshotBase[0 .. $ - 1];
-    auto snapshotRemote = snapshotBase.length > 0 ? snapshotBase ~ "/maven" : "";
     return renderMicdnXml(state.config, state.components, attributeText(data, "name"),
         attributeText(data, "key"), maskSecrets, remoteUrl,
-        cfg.mavenDownloadToken, cfg.mavenDownloadToken, snapshotRemote);
+        cfg.mavenDownloadToken, cfg.mavenDownloadToken);
   }
 
   private string projectMicdnUrl(string origin, string qualifiedName) {

@@ -131,8 +131,9 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 - 下载 key 缺失时生成 `qualifiedName.<随机串>`，保存到 Project 的 Micdn `<auth download-key>`，
   同时下发到 `micdn.xml` 和 server.xml；Micdn 配置页的下载密钥旁提供「生成/重新生成」按钮，
   重新生成旧 key 会失效。
-- 下发的 micdn.xml 在正式版 remotes 为空时默认 central + aliyun；SNAPSHOT 默认指向 bashub
-  中心 `/maven`，使用现有中心下载 token。
+- 下发的 micdn.xml 在正式版 remotes 为空时默认 central + aliyun；Micdn 配置页把当前 origin 的
+  `/maven` 保存到 `maven.snapshotRemote`，下发时直接使用存储值并带中心下载 token，不再在请求时
+  猜测代理地址。
 - Project 的 `remoteRepo` 字段、表单和数据库列移除。
 
 ### Server 开机自启

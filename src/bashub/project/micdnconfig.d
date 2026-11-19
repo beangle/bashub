@@ -397,8 +397,7 @@ void readMicdnConfig(Store store, Registry reg, string projectId, out Json confi
 /// 中心读令牌发给外部。
 string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectName,
     string projectKey, bool maskSecrets = false, string remoteUrl = "",
-    string upstreamDevToken = "", string upstreamSnapshotToken = "",
-    string snapshotRemoteDefault = "") {
+    string upstreamDevToken = "", string upstreamSnapshotToken = "") {
   auto config = normalizeMicdnConfig(rawConfig);
   validateMicdnConfig(config);
   validateBlobIdentity(projectName, projectKey);
@@ -447,9 +446,8 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
       putAttr(xml, "url", url);
       xml.put("/>\n");
     }
-    auto snapshot = field(maven, "snapshotRemote");
-    if (snapshot.length == 0)
-      snapshot = snapshotRemoteDefault;
+    // SNAPSHOT 上游由管理台按当前 origin 写入配置，渲染时直接使用，不在请求时猜测代理地址。
+    auto snapshot = field(maven, "snapshotRemote").strip;
     if (snapshot.length > 0) {
       xml.put("    <snapshot");
       putAttr(xml, "remote", snapshot);
