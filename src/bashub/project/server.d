@@ -25,9 +25,47 @@ import beangle.jsonapi.store : Store;
 import vibe.data.json : Json;
 
 import std.algorithm : sort;
-import std.array : appender, join, split;
+import std.array : Appender, appender, join, split;
 import std.conv : to;
+import std.json : JSONType, JSONValue, parseJSON;
 import std.string : strip;
+
+/** 解析并渲染 server 的 wait_for JSON 数组；格式错误直接拒绝生成。 */
+private void renderWaitFors(ref Appender!string xml, string text, string serverName) {
+  JSONValue doc;
+  try
+    doc = parseJSON(text);
+  catch (Exception)
+    throw new Exception("server " ~ serverName ~ " waitFor is not valid JSON");
+  if (doc.type != JSONType.array)
+    throw new Exception("server " ~ serverName ~ " waitFor must be an array");
+  foreach (item; doc.array) {
+    if (item.type != JSONType.object)
+      throw new Exception("server " ~ serverName ~ " waitFor entries must be objects");
+    auto fields = item.object;
+    auto refValue = ("ref" in fields) ? fields["ref"] : JSONValue("");
+    auto urlValue = ("url" in fields) ? fields["url"] : JSONValue("");
+    auto tcpValue = ("tcp" in fields) ? fields["tcp"] : JSONValue("");
+    auto refName = refValue.type == JSONType.string ? refValue.str : "";
+    auto url = urlValue.type == JSONType.string ? urlValue.str : "";
+    auto tcp = tcpValue.type == JSONType.string ? tcpValue.str : "";
+    auto count = (refName.length ? 1 : 0) + (url.length ? 1 : 0) + (tcp.length ? 1 : 0);
+    if (count != 1)
+      throw new Exception("server " ~ serverName ~ " waitFor requires exactly one of ref/url/tcp");
+    xml.put("          <wait-for");
+    if (refName.length)
+      putAttr(xml, "ref", refName);
+    if (url.length)
+      putAttr(xml, "url", url);
+    if (tcp.length)
+      putAttr(xml, "tcp", tcp);
+    if ("timeout" in fields && fields["timeout"].type == JSONType.integer)
+      putAttr(xml, "timeout", fields["timeout"].integer.to!string);
+    if ("interval" in fields && fields["interval"].type == JSONType.integer)
+      putAttr(xml, "interval", fields["interval"].integer.to!string);
+    xml.put("/>\n");
+  }
+}
 
 /// 渲染 server.xml；返回内容只依赖数据库，不读请求上下文。
 ///
@@ -181,7 +219,24 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
         putAttr(xml, "proxy-http-port", numberText(server, "proxyHttpPort"));
       if (hasAttribute(server, "proxyOptions"))
         putAttr(xml, "proxy-options", attributeText(server, "proxyOptions"));
-      xml.put("/>\n");
+      auto autoStart = attributeBool(server, "autoStart");
+      auto waitForText = attributeText(server, "waitFor").strip;
+      if (!autoStart && waitForText.length)
+        throw new Exception("server " ~ attributeText(server, "name") ~
+            " has waitFor but autoStart is false");
+      if (!autoStart) {
+        xml.put("/>\n");
+        continue;
+      }
+      xml.put(">\n");
+      if (waitForText.length == 0) {
+        xml.put("        <auto-start/>\n");
+      } else {
+        xml.put("        <auto-start>\n");
+        renderWaitFors(xml, waitForText, attributeText(server, "name"));
+        xml.put("        </auto-start>\n");
+      }
+      xml.put("      </server>\n");
     }
     xml.put("    </farm>\n");
   }

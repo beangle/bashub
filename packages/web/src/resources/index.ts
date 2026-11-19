@@ -216,6 +216,11 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', help: '0 表示与群集一致' },
       { key: 'proxyHttpPort', label: '代理端口', type: 'number' },
       { key: 'proxyOptions', label: '代理', type: 'textarea', column: true },
+      { key: 'autoStart', label: '开机自启', type: 'boolean', column: false, help: '存在 auto-start 才由 basagent 自动启动' },
+      {
+        key: 'waitFor', label: '启动等待', type: 'textarea', column: false,
+        help: 'JSON 数组；元素为 {ref}、{url} 或 {tcp}，可带 timeout/interval 秒',
+      },
     ],
   },
   {

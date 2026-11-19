@@ -118,6 +118,18 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 
 - CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
 
+### Server 开机自启
+
+- 服务资源增加「开机自启」和「启动等待」；后者是 JSON 数组：
+
+```json
+[{"ref":"prod-farm.db"},{"url":"https://db.example/health","timeout":300},{"tcp":"db.example:5432","timeout":60}]
+```
+
+- 只有开启开机自启的 server 才在 server.xml 中生成 `<auto-start>`；
+  `ref` 指向本机受管节点，`url`/`tcp` 是外部就绪条件。
+- basagent 拉取到 server.xml 后调用 `basctl autostart`，逐个启动，不并发。
+
 ### 管理台
 
 - Project 详情页增加“下载 ZIP”，使用登录会话。

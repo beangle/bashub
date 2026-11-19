@@ -130,6 +130,9 @@ unittest {
   assert(xml.canFind(`<host name="host02" ip="10.0.0.12" agent-group="default_group"/>`));
   assert(xml.canFind(`<farm name="prod-farm" engine="tomcat" max-heap-size="2048M">`));
   assert(xml.canFind(`<server name="app1" host="host01" http="8080" proxy-http-port="9080"`));
+  assert(xml.canFind(`<auto-start>`));
+  assert(xml.canFind(`<wait-for ref="prod-farm.app2"/>`));
+  assert(xml.canFind(`<wait-for url="https://db.example/health" timeout="30"/>`));
 
   assert(xml.canFind(`uri="gav://org.beangle.bashub:bas-web:war:0.0.8"`));
   assert(xml.canFind(`path="/bas" run-at="prod-farm.app1,prod-farm.app2"`));
