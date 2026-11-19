@@ -567,11 +567,14 @@ unittest {
   auto config = defaultMicdnConfig();
   config["maven"]["declared"] = Json(true);
   config["maven"]["snapshotRemote"] = Json("https://hub.example/maven");
+  config["npm"]["declared"] = Json(true);
   auto xml = renderMicdnXml(config, [], "prod", "key", false, "",
       "", "snap-token");
   assert(xml.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
   assert(xml.canFind(`<remote url="https://maven.aliyun.com/nexus/content/groups/public"/>`));
   assert(xml.canFind(`<snapshot remote="https://hub.example/maven" token="snap-token"/>`));
+  assert(xml.canFind(`<remote url="https://registry.npmmirror.com"/>`));
+  assert(xml.canFind(`<remote url="https://registry.npmjs.org"/>`));
 }
 
 

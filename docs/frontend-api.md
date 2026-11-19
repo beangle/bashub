@@ -185,7 +185,7 @@ Freemarker 模板运行时，不属于 JSON:API。
 | `GET /api/bashub/config/{project}/certificate-key` | Project 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
 
 | `GET /api/bashub/ems/{project}/menus/{appName}` | 应用菜单 |
-| `GET /api/bashub/micdn/{project}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；maven/npm/native/www/static 的 base 固定为 `{micdn.home}/maven`、`/npm`、`/native`、`/www`、`/asset`；正式版默认 central + aliyun，SNAPSHOT 上游由 Micdn 配置页把当前 origin 的 `/maven` 写入 `maven.snapshotRemote`，下发时直接使用存储值，不在请求时猜测代理地址；`X-Micdn-Token` 或 `Authorization: Bearer <project.key>` 鉴权 |
+| `GET /api/bashub/micdn/{project}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；maven/npm/native/www/static 的 base 固定为 `{micdn.home}/maven`、`/npm`、`/native`、`/www`、`/asset`；Maven 正式版默认 central + aliyun，NPM 正式版默认 npmmirror + npmjs，SNAPSHOT / NPM 开发版上游由 Micdn 配置页分别把当前 origin 的 `/maven`、`/npm` 写入 `maven.snapshotRemote`、`npm.devRemote`，下发时直接使用存储值，不在请求时猜测代理地址；`X-Micdn-Token` 或 `Authorization: Bearer <project.key>` 鉴权 |
 | `GET /api/bashub/config/{project}/script/{host}` | 主机脚本（按依赖排序） |
 | `WS /api/bashub/monitor/agents/{project}/channel` | 节点通道：basctl 主动连上来的 WebSocket（**不是** HTTP 接口，握手用 `Authorization: Bearer <project>:<Project.key>`，兼容只发 key），见下 |
 | `GET /api/bashub/config/projects/{id}/server` | 管理台查看最终 server.xml；登录会话鉴权 |

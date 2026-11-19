@@ -95,52 +95,68 @@
           <section class="config-card">
             <header class="config-card__head">
               <div>
-                <h3>Maven</h3>
-                <p>固定挂载 <code>{home}/maven</code>；上游按顺序回源。</p>
+                <h3>仓库</h3>
+                <p>固定挂载 <code>{home}/maven</code>、<code>/npm</code>、<code>/native</code>；只需配置上游。</p>
               </div>
-              <t-switch v-model="config.maven.declared" />
             </header>
-            <div class="form-grid" :class="{ 'form-grid--muted': !config.maven.declared }">
-              <label class="form-field">
-                <span>SNAPSHOT 上游</span>
-                <t-input v-model="config.maven.snapshotRemote" readonly />
-                <span class="form-hint">保存当前访问地址的 <code>{origin}/maven</code></span>
-              </label>
-              <label class="form-field form-field--wide">
-                <span>正式版上游</span>
-                <t-textarea v-model="mavenRemotesText" :autosize="{ minRows: 3 }" placeholder="一行一个 URL，按优先级排序" />
-              </label>
-            </div>
-          </section>
+            <div class="repo-config">
+              <div class="repo-config__row">
+                <div class="repo-config__head">
+                  <strong>Maven</strong>
+                  <t-switch v-model="config.maven.declared" size="small" />
+                </div>
+                <div class="repo-config__body">
+                  <label class="form-field">
+                    <span>SNAPSHOT 上游</span>
+                    <t-input v-model="config.maven.snapshotRemote" readonly size="small" />
+                  </label>
+                  <label class="form-field repo-config__wide">
+                    <span>
+                      正式版上游
+                      <t-button size="small" variant="text" @click="resetMavenRemotes">恢复默认</t-button>
+                    </span>
+                    <t-textarea
+                      v-model="mavenRemotesText"
+                      :autosize="{ minRows: 2, maxRows: 4 }"
+                      placeholder="一行一个 URL，按优先级排序"
+                    />
+                  </label>
+                </div>
+              </div>
 
-          <section class="config-card">
-            <header class="config-card__head">
-              <div>
-                <h3>NPM</h3>
-                <p>固定挂载 <code>{home}/npm</code>；dev/预发布版本可走独立 registry。</p>
+              <div class="repo-config__row">
+                <div class="repo-config__head">
+                  <strong>NPM</strong>
+                  <t-switch v-model="config.npm.declared" size="small" />
+                </div>
+                <div class="repo-config__body">
+                  <label class="form-field">
+                    <span>开发版上游</span>
+                    <t-input v-model="config.npm.devRemote" readonly size="small" />
+                    <span class="form-hint">保存当前访问地址的 <code>{origin}/npm</code></span>
+                  </label>
+                  <label class="form-field repo-config__wide">
+                    <span>
+                      正式版上游
+                      <t-button size="small" variant="text" @click="resetNpmRemotes">恢复默认</t-button>
+                    </span>
+                    <t-textarea
+                      v-model="npmRemotesText"
+                      :autosize="{ minRows: 2, maxRows: 4 }"
+                      placeholder="留空使用 npmmirror + npmjs；一行一个 URL"
+                    />
+                  </label>
+                </div>
               </div>
-              <t-switch v-model="config.npm.declared" />
-            </header>
-            <div class="form-grid" :class="{ 'form-grid--muted': !config.npm.declared }">
-              <label class="form-field">
-                <span>开发版上游</span>
-                <t-input v-model="config.npm.devRemote" placeholder="可选，完整 URL" />
-              </label>
-              <label class="form-field form-field--wide">
-                <span>正式版上游</span>
-                <t-textarea v-model="npmRemotesText" :autosize="{ minRows: 3 }" placeholder="一行一个 URL，按优先级排序" />
-              </label>
-            </div>
-          </section>
 
-          <section class="config-card">
-            <header class="config-card__head">
-              <div>
-                <h3>Native</h3>
-                <p>固定挂载 <code>{home}/native</code>，用于分发 tar.gz 与增量补丁。</p>
+              <div class="repo-config__row repo-config__row--native">
+                <div class="repo-config__head">
+                  <strong>Native</strong>
+                  <t-switch v-model="config.native.declared" size="small" />
+                </div>
+                <span class="form-hint">固定使用 <code>{home}/native</code>，无额外配置</span>
               </div>
-              <t-switch v-model="config.native.declared" />
-            </header>
+            </div>
           </section>
         </template>
 
@@ -274,6 +290,7 @@ function applyDocument(payload: MicdnProjectDocument) {
   doc.value = payload
   config.value = structuredClone(payload.config)
   config.value.maven.snapshotRemote = `${window.location.origin}/maven`
+  config.value.npm.devRemote = `${window.location.origin}/npm`
   bindings.value = payload.bindings.map((binding) => ({ ...binding }))
   components.value = payload.components
   mavenRemotesText.value = (payload.config.maven.remotes || []).join('\n')
@@ -330,6 +347,25 @@ function invalidServerHost(host: string): boolean {
   if (value.length === 0) return true
   const first = value.indexOf(':')
   return first >= 0 && first === value.lastIndexOf(':')
+}
+
+const defaultMavenRemotes = [
+  'https://repo1.maven.org/maven2',
+  'https://maven.aliyun.com/nexus/content/groups/public',
+]
+const defaultNpmRemotes = [
+  'https://registry.npmmirror.com',
+  'https://registry.npmjs.org',
+]
+
+function resetMavenRemotes() {
+  mavenRemotesText.value = defaultMavenRemotes.join('\n')
+  MessagePlugin.success('已填入 Maven 默认上游')
+}
+
+function resetNpmRemotes() {
+  npmRemotesText.value = defaultNpmRemotes.join('\n')
+  MessagePlugin.success('已填入 NPM 默认上游')
 }
 
 function randomDownloadSuffix(): string {
@@ -550,7 +586,60 @@ onMounted(load)
   line-height: 1.6;
 }
 
+.repo-config {
+  display: grid;
+  gap: 10px;
+}
+
+.repo-config__row {
+  padding: 10px 12px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+}
+
+.repo-config__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.repo-config__body {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.repo-config__wide {
+  min-width: 0;
+}
+
+.repo-config__row--native {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.repo-config .form-field {
+  gap: 4px;
+}
+
+.repo-config :deep(.t-textarea__inner) {
+  min-height: 54px;
+}
+
 @media (max-width: 860px) {
+  .repo-config__body {
+    grid-template-columns: 1fr;
+  }
+  .repo-config__row--native {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .form-grid,
   .form-grid--base {
     grid-template-columns: 1fr;

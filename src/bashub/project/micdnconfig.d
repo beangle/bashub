@@ -307,6 +307,12 @@ immutable string[] defaultMicdnMavenRemotes = [
   "https://maven.aliyun.com/nexus/content/groups/public"
 ];
 
+/// NPM 正式版默认上游；第一个是国内镜像，第二个是官方 registry。
+immutable string[] defaultMicdnNpmRemotes = [
+  "https://registry.npmmirror.com",
+  "https://registry.npmjs.org"
+];
+
 /// Project 的本地 micdn 节点基地址（`http://host:port`），用于下发给 bas 节点的 repo。
 /// 没有 `servers[].host` 时返回空，表示 server.xml 不生成 repo 元素。
 string[] micdnServerBases(Json config) {
@@ -454,7 +460,10 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     xml.put("  <npm");
     putAttr(xml, "base", defaultRepoBase(config, "/npm"));
     xml.put(">\n");
-    foreach (url; textList(jsonGet(npm, "remotes"))) {
+    auto remotes = textList(jsonGet(npm, "remotes"));
+    if (remotes.length == 0)
+      remotes = defaultMicdnNpmRemotes.dup;
+    foreach (url; remotes) {
       xml.put("    <remote");
       putAttr(xml, "url", url);
       xml.put("/>\n");

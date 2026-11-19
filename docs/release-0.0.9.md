@@ -120,8 +120,25 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 
 ### Micdn 配置页合并
 
-Maven / NPM / Native 的配置合并到「基础」页：Maven 保留正式版上游和只读 SNAPSHOT 上游，
-NPM 保留正式版/开发版上游，Native 只保留启用开关；单独的「Maven / NPM / Native」页签移除。
+Maven / NPM / Native 合并到「基础」页的一个紧凑「仓库」区块：每行一个仓库，Maven 保留正式版
+上游和只读 SNAPSHOT 上游，NPM 保留正式版/开发版上游，Native 只保留启用开关；输入区压缩为两行，
+单独的「Maven / NPM / Native」页签移除。
+
+### 默认上游恢复
+
+Maven/NPM 正式版上游 label 旁提供「恢复默认」按钮，分别填入 central + aliyun 和
+npmmirror + npmjs；仍需保存后生效。
+
+### NPM 正式版默认上游
+
+NPM 正式版 remotes 为空时默认写 `https://registry.npmmirror.com` 和
+`https://registry.npmjs.org` 两个上游；配置了 remotes 则按配置下发。
+
+### NPM 开发版上游
+
+NPM 开发版上游与 Maven SNAPSHOT 一致：Micdn 配置页只读展示当前 origin 的 `/npm`，保存到
+`npm.devRemote`；下发 `micdn.xml` 时直接使用该存储值，并继续带中心下载 token，不再允许自定义
+开发版上游。
 
 ### Micdn 仓库目录
 
