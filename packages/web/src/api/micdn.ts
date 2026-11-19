@@ -49,7 +49,6 @@ export interface CdnComponentDetail {
 
 export interface MicdnRepoConfig {
   declared: boolean
-  base: string
   remotes: string[]
   snapshotRemote?: string
   devRemote?: string
@@ -74,10 +73,10 @@ export interface MicdnConfig {
   logLevel: string
   maven: MicdnRepoConfig
   npm: MicdnRepoConfig
-  native: { declared: boolean; base: string }
+  native: { declared: boolean }
   auth: MicdnAuthConfig
-  static: { base: string }
-  www: { base: string }
+  static: Record<string, never>
+  www: Record<string, never>
   blob: { base: string; maxSize: string; publicImages: boolean }
   servers: MicdnServer[]
 }
@@ -127,12 +126,12 @@ export function defaultMicdnConfig(): MicdnConfig {
     listen: '0.0.0.0:8888',
     logFile: 'console',
     logLevel: 'info',
-    maven: { declared: false, base: '', remotes: [], snapshotRemote: '' },
-    npm: { declared: false, base: '', remotes: [], devRemote: '' },
-    native: { declared: false, base: '' },
+    maven: { declared: false, remotes: [], snapshotRemote: '' },
+    npm: { declared: false, remotes: [], devRemote: '' },
+    native: { declared: false },
     auth: { maxSize: '64M' },
-    static: { base: '' },
-    www: { base: '' },
+    static: {},
+    www: {},
     blob: { base: '', maxSize: '100M', publicImages: true },
     servers: [],
   }

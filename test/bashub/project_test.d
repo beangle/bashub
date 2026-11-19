@@ -297,12 +297,15 @@ unittest {
 
   MicdnState state;
   assert(loadMicdnState(store, reg, project.id, state));
+  // maven/npm/native 的 base 不可配置，即使旧配置塞了值也必须落回 home 下的默认目录。
+  state.config["maven"]["base"] = Json("/tmp/not-micdn");
   auto xml = renderMicdnXml(state.config, state.components,
       attributeText(project.data, "name"), attributeText(project.data, "key"));
   assert(xml.canFind(`<maven base="/var/lib/micdn/maven">`));
-  assert(xml.canFind(`<static base="/var/cache/micdn/asset">`));
+  assert(!xml.canFind("/tmp/not-micdn"));
+  assert(xml.canFind(`<static base="/var/lib/micdn/asset">`));
   assert(xml.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
-  assert(xml.canFind(`<www base="/var/cache/micdn/www">`));
+  assert(xml.canFind(`<www base="/var/lib/micdn/www">`));
   assert(xml.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
   assert(xml.canFind(`<blob base="/var/lib/micdn/blob" max-size="50M">`));
   assert(xml.canFind(`<bucket name="prod" key="fedcba9876543210fedcba9876543210"/>`));
@@ -585,4 +588,20 @@ unittest {
   assert(bases == ["http://10.0.0.31:8888", "http://10.0.0.32:8888"]);
   config["servers"] = Json.emptyArray;
   assert(micdnServerBases(config).length == 0);
+}
+
+
+@("micdn normalize drops legacy maven/npm/native/www/static base fields") unittest {
+  auto raw = defaultMicdnConfig();
+  raw["maven"]["base"] = Json("/legacy/maven");
+  raw["npm"]["base"] = Json("/legacy/npm");
+  raw["native"]["base"] = Json("/legacy/native");
+  raw["www"]["base"] = Json("/legacy/www");
+  raw["static"]["base"] = Json("/legacy/static");
+  auto config = normalizeMicdnConfig(raw);
+  assert(jsonGet(jsonGet(config, "maven"), "base").type == Json.Type.undefined);
+  assert(jsonGet(jsonGet(config, "npm"), "base").type == Json.Type.undefined);
+  assert(jsonGet(jsonGet(config, "native"), "base").type == Json.Type.undefined);
+  assert(jsonGet(jsonGet(config, "www"), "base").type == Json.Type.undefined);
+  assert(jsonGet(jsonGet(config, "static"), "base").type == Json.Type.undefined);
 }

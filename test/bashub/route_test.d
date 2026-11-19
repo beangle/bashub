@@ -798,10 +798,10 @@ unittest {
   assert(ex.body.canFind(`<auth publish-key="publish-secret" download-key="download-secret" max-size="64M"/>`));
   assert(ex.body.canFind(`<blob base="/var/lib/micdn/blob" max-size="50M">`));
   assert(ex.body.canFind(`<bucket name="prod" key="fedcba9876543210fedcba9876543210"/>`));
-  assert(ex.body.canFind(`<static base="/var/cache/micdn/asset">`));
+  assert(ex.body.canFind(`<static base="/var/lib/micdn/asset">`));
   assert(ex.body.canFind(`<bundle name="bas">`));
   assert(ex.body.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
-  assert(ex.body.canFind(`<www base="/var/cache/micdn/www">`));
+  assert(ex.body.canFind(`<www base="/var/lib/micdn/www">`));
   assert(ex.body.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
 
   ex = callWithHeaders(router, HTTPMethod.GET,

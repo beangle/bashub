@@ -91,22 +91,16 @@
               </label>
             </div>
           </section>
-        </template>
 
-        <template v-else-if="activeTab === 'repos'">
           <section class="config-card">
             <header class="config-card__head">
               <div>
                 <h3>Maven</h3>
-                <p>声明后挂载 <code>/maven</code>；上游按顺序回源，SNAPSHOT 可单独指定。</p>
+                <p>固定挂载 <code>{home}/maven</code>；上游按顺序回源。</p>
               </div>
               <t-switch v-model="config.maven.declared" />
             </header>
             <div class="form-grid" :class="{ 'form-grid--muted': !config.maven.declared }">
-              <label class="form-field">
-                <span>本地目录</span>
-                <t-input v-model="config.maven.base" placeholder="留空使用 {home}/maven" />
-              </label>
               <label class="form-field">
                 <span>SNAPSHOT 上游</span>
                 <t-input v-model="config.maven.snapshotRemote" readonly />
@@ -123,15 +117,11 @@
             <header class="config-card__head">
               <div>
                 <h3>NPM</h3>
-                <p>声明后挂载 <code>/npm</code>；dev/预发布版本可走独立 registry。</p>
+                <p>固定挂载 <code>{home}/npm</code>；dev/预发布版本可走独立 registry。</p>
               </div>
               <t-switch v-model="config.npm.declared" />
             </header>
             <div class="form-grid" :class="{ 'form-grid--muted': !config.npm.declared }">
-              <label class="form-field">
-                <span>本地目录</span>
-                <t-input v-model="config.npm.base" placeholder="留空使用 {home}/npm" />
-              </label>
               <label class="form-field">
                 <span>开发版上游</span>
                 <t-input v-model="config.npm.devRemote" placeholder="可选，完整 URL" />
@@ -147,40 +137,18 @@
             <header class="config-card__head">
               <div>
                 <h3>Native</h3>
-                <p>声明后挂载 <code>/native</code>，用于分发 tar.gz 与增量补丁。</p>
+                <p>固定挂载 <code>{home}/native</code>，用于分发 tar.gz 与增量补丁。</p>
               </div>
               <t-switch v-model="config.native.declared" />
             </header>
-            <div class="form-grid" :class="{ 'form-grid--muted': !config.native.declared }">
-              <label class="form-field form-field--wide">
-                <span>本地目录</span>
-                <t-input v-model="config.native.base" placeholder="留空使用 {home}/native" />
-              </label>
-            </div>
           </section>
         </template>
 
         <template v-else-if="activeTab === 'static'">
-          <section class="config-card config-card--compact">
-            <div class="form-grid">
-              <label class="form-field form-field--wide">
-                <span>Static 本地目录</span>
-                <t-input v-model="config.static.base" placeholder="留空使用 {home}/asset" />
-              </label>
-            </div>
-          </section>
           <MicdnBindingEditor v-model="bindings" kind="static_bundle" :components="components" />
         </template>
 
         <template v-else-if="activeTab === 'www'">
-          <section class="config-card config-card--compact">
-            <div class="form-grid">
-              <label class="form-field form-field--wide">
-                <span>WWW 本地目录</span>
-                <t-input v-model="config.www.base" placeholder="留空使用 {home}/www" />
-              </label>
-            </div>
-          </section>
           <MicdnBindingEditor v-model="bindings" kind="www_doc" :components="components" />
         </template>
 
@@ -264,7 +232,6 @@ const projectId = String(route.params.id || '')
 
 const tabs: UnderlineTabItem[] = [
   { value: 'base', label: '基础' },
-  { value: 'repos', label: 'Maven / NPM / Native' },
   { value: 'static', label: 'Static' },
   { value: 'www', label: 'WWW' },
   { value: 'blob', label: 'Blob' },

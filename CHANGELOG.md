@@ -53,6 +53,12 @@
   的本地 micdn（`servers[].host` + `listen`），没有 host 时三个元素都不生成；不再使用 Project 的
   `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
   节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
+- **Micdn 基础页合并**：Maven / NPM / Native 配置移到「基础」页，移除独立的
+  「Maven / NPM / Native」页签；Native 仅保留启用开关。
+- **Micdn 仓库目录固定**：maven/npm/native 的 `base` 不再可配置，始终使用
+  `{micdn.home}/maven`、`/npm`、`/native`；`www`/`static` 也固定为 `{micdn.home}/www`、
+  `{micdn.home}/asset`。五个本地目录字段和输入框都已移除，旧配置里的 `base` 在下一次保存时被
+  归一化丢弃。
 - **Micdn 默认上游**：bashub 下发的 micdn.xml 在正式版 remotes 为空时写 central + aliyun，
   SNAPSHOT 由 Micdn 配置页按当前 origin 保存为 `maven.snapshotRemote`，下发时直接使用存储值。
 - **Server 开机自启**：`cfg_servers` 增加 `auto_start`、`wait_for`；server.xml 输出

@@ -335,21 +335,18 @@ private Row[] projectMicdnRows() {
 
   auto maven = Json.emptyObject;
   maven["declared"] = Json(true);
-  maven["base"] = Json("/var/lib/micdn/maven");
   maven["remotes"] = Json([Json("https://repo1.maven.org/maven2")]);
   maven["snapshotRemote"] = Json("");
   config["maven"] = maven;
 
   auto npm = Json.emptyObject;
   npm["declared"] = Json(true);
-  npm["base"] = Json("/var/lib/micdn/npm");
   npm["remotes"] = Json([Json("https://registry.npmmirror.com")]);
   npm["devRemote"] = Json("");
   config["npm"] = npm;
 
   auto nativeCfg = Json.emptyObject;
   nativeCfg["declared"] = Json(false);
-  nativeCfg["base"] = Json("");
   config["native"] = nativeCfg;
 
   auto auth = Json.emptyObject;
@@ -358,8 +355,8 @@ private Row[] projectMicdnRows() {
   auth["maxSize"] = Json("64M");
   config["auth"] = auth;
 
-  config["static"] = Json(["base": Json("/var/cache/micdn/asset")]);
-  config["www"] = Json(["base": Json("/var/cache/micdn/www")]);
+  config["static"] = Json.emptyObject;
+  config["www"] = Json.emptyObject;
   config["blob"] = Json([
     "base": Json("/var/lib/micdn/blob"), "maxSize": Json("50M"),
     "publicImages": Json(true),

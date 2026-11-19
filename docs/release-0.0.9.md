@@ -118,6 +118,18 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 
 - CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
 
+### Micdn 配置页合并
+
+Maven / NPM / Native 的配置合并到「基础」页：Maven 保留正式版上游和只读 SNAPSHOT 上游，
+NPM 保留正式版/开发版上游，Native 只保留启用开关；单独的「Maven / NPM / Native」页签移除。
+
+### Micdn 仓库目录
+
+maven/npm/native/www/static 的 `base` 固定为 `{micdn.home}/maven`、`{micdn.home}/npm`、
+`{micdn.home}/native`、`{micdn.home}/www`、`{micdn.home}/asset`，不再读取 Project 配置里的
+`base`；配置字段、API 类型和本地目录输入框都已移除；旧配置里的 `base` 会在下一次保存时被归一化丢弃。
+静态资源、www、blob 的目录配置仍保留。
+
 ### 本地 Micdn 仓库
 
 - server.xml 不再写 Project 的公网远程仓库；`repository` / `snapshot-repo` / `native-repo`

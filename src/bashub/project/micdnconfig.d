@@ -78,21 +78,18 @@ Json defaultMicdnConfig() {
 
   auto maven = Json.emptyObject;
   maven["declared"] = Json(false);
-  maven["base"] = Json("");
   maven["remotes"] = Json.emptyArray;
   maven["snapshotRemote"] = Json("");
   root["maven"] = maven;
 
   auto npm = Json.emptyObject;
   npm["declared"] = Json(false);
-  npm["base"] = Json("");
   npm["remotes"] = Json.emptyArray;
   npm["devRemote"] = Json("");
   root["npm"] = npm;
 
   auto native = Json.emptyObject;
   native["declared"] = Json(false);
-  native["base"] = Json("");
   root["native"] = native;
 
   auto auth = Json.emptyObject;
@@ -101,12 +98,9 @@ Json defaultMicdnConfig() {
   auth["maxSize"] = Json("64M");
   root["auth"] = auth;
 
-  auto staticCfg = Json.emptyObject;
-  staticCfg["base"] = Json("");
-  root["static"] = staticCfg;
+  root["static"] = Json.emptyObject;
 
   auto www = Json.emptyObject;
-  www["base"] = Json("");
   root["www"] = www;
 
   auto blob = Json.emptyObject;
@@ -142,8 +136,6 @@ Json normalizeMicdnConfig(Json input) {
   normalizeNpm(source, result);
   normalizeNative(source, result);
   normalizeAuth(source, result);
-  normalizeRepoSection(source, result, "static");
-  normalizeRepoSection(source, result, "www");
   normalizeBlob(source, result);
   normalizePrune(source, result);
   normalizeServers(source, result);
@@ -436,7 +428,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   auto maven = jsonGet(config, "maven");
   if (flag(maven, "declared", false)) {
     xml.put("  <maven");
-    putAttr(xml, "base", effectiveBase(config, "maven", "/maven"));
+    putAttr(xml, "base", defaultRepoBase(config, "/maven"));
     xml.put(">\n");
     auto remotes = textList(jsonGet(maven, "remotes"));
     if (remotes.length == 0)
@@ -460,7 +452,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   auto npm = jsonGet(config, "npm");
   if (flag(npm, "declared", false)) {
     xml.put("  <npm");
-    putAttr(xml, "base", effectiveBase(config, "npm", "/npm"));
+    putAttr(xml, "base", defaultRepoBase(config, "/npm"));
     xml.put(">\n");
     foreach (url; textList(jsonGet(npm, "remotes"))) {
       xml.put("    <remote");
@@ -480,7 +472,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   auto nativeCfg = jsonGet(config, "native");
   if (flag(nativeCfg, "declared", false)) {
     xml.put("  <native");
-    putAttr(xml, "base", effectiveBase(config, "native", "/native"));
+    putAttr(xml, "base", defaultRepoBase(config, "/native"));
     xml.put("/>\n");
   }
 
@@ -518,7 +510,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   auto staticCfg = jsonGet(config, "static");
   if (staticBundles.length > 0) {
     xml.put("  <static");
-    putAttr(xml, "base", effectiveBase(config, "static", "/asset"));
+    putAttr(xml, "base", defaultRepoBase(config, "/asset"));
     xml.put(">\n");
     foreach (ref bundle; staticBundles) {
       xml.put("    <bundle");
@@ -551,7 +543,7 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   auto www = jsonGet(config, "www");
   if (wwwDocs.length > 0) {
     xml.put("  <www");
-    putAttr(xml, "base", effectiveBase(config, "www", "/www"));
+    putAttr(xml, "base", defaultRepoBase(config, "/www"));
     xml.put(">\n");
     foreach (ref doc; wwwDocs) {
       auto source = jsonGet(doc.spec, "source");
@@ -708,7 +700,6 @@ private void normalizeMaven(Json source, ref Json result) {
   auto section = objectAt(source, "maven");
   auto target = jsonGet(result, "maven");
   target["declared"] = Json(flag(section, "declared", false));
-  target["base"] = Json(field(section, "base"));
   target["remotes"] = stringArrayJson(normalizeRemotes(jsonGet(section, "remotes")));
   target["snapshotRemote"] = Json(stripTrailingSlash(field(section, "snapshotRemote")));
   result["maven"] = target;
@@ -718,7 +709,6 @@ private void normalizeNpm(Json source, ref Json result) {
   auto section = objectAt(source, "npm");
   auto target = jsonGet(result, "npm");
   target["declared"] = Json(flag(section, "declared", false));
-  target["base"] = Json(field(section, "base"));
   target["remotes"] = stringArrayJson(normalizeRemotes(jsonGet(section, "remotes")));
   target["devRemote"] = Json(stripTrailingSlash(field(section, "devRemote")));
   result["npm"] = target;
@@ -728,7 +718,6 @@ private void normalizeNative(Json source, ref Json result) {
   auto section = objectAt(source, "native");
   auto target = jsonGet(result, "native");
   target["declared"] = Json(flag(section, "declared", false));
-  target["base"] = Json(field(section, "base"));
   result["native"] = target;
 }
 
@@ -857,16 +846,16 @@ private void validateMicdnConfig(Json config) {
 
   auto maven = jsonGet(config, "maven");
   if (flag(maven, "declared", false)) {
-    effectiveBase(config, "maven", "/maven");
+    defaultRepoBase(config, "/maven");
     validateRemotes(jsonGet(maven, "remotes"), "maven.remotes");
   }
   auto npm = jsonGet(config, "npm");
   if (flag(npm, "declared", false)) {
-    effectiveBase(config, "npm", "/npm");
+    defaultRepoBase(config, "/npm");
     validateRemotes(jsonGet(npm, "remotes"), "npm.remotes");
   }
   if (flag(jsonGet(config, "native"), "declared", false))
-    effectiveBase(config, "native", "/native");
+    defaultRepoBase(config, "/native");
 
   auto auth = jsonGet(config, "auth");
   validateSize(field(auth, "maxSize"), "auth.maxSize");
@@ -880,6 +869,12 @@ private void validateBlobIdentity(string projectName, string projectKey) {
   if (projectKey.strip.length == 0)
     return;
   validateSingleName(projectName.strip, "project.name");
+}
+
+/** maven/npm/native 的存储目录固定为 `{home}/<sub>`，不读取配置里的 base。 */
+private string defaultRepoBase(Json config, string defaultSubDir) {
+  auto home = field(config, "home");
+  return home.length > 0 ? home ~ defaultSubDir : defaultSubDir;
 }
 
 private string effectiveBase(Json config, string sectionName, string defaultSubDir) {
