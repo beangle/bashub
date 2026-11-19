@@ -26,7 +26,8 @@ import vibe.data.json : Json, parseJson;
 import std.algorithm : canFind, sort;
 import std.array : appender, split;
 import std.conv : ConvException, to;
-import std.string : endsWith, indexOf, lastIndexOf, startsWith, strip, toLower;
+import std.string : endsWith, indexOf, lastIndexOf, replace, startsWith, strip, toLower;
+import std.uuid : randomUUID;
 
 /// 配置或组件不合法。`field` 供 API 的 400 响应定位到具体属性。
 class MicdnConfigException : Exception {
@@ -308,6 +309,66 @@ bool loadMicdnState(Store store, Registry reg, string projectId, out MicdnState 
   return true;
 }
 
+/// 本地 micdn 的正式版默认上游；由 bashub 写入下发的 micdn.xml，不修改 micdn 代码。
+immutable string[] defaultMicdnMavenRemotes = [
+  "https://repo1.maven.org/maven2",
+  "https://maven.aliyun.com/nexus/content/groups/public"
+];
+
+/// Project 的本地 micdn 节点基地址（`http://host:port`），用于下发给 bas 节点的 repo。
+/// 没有 `servers[].host` 时返回空，表示 server.xml 不生成 repo 元素。
+string[] micdnServerBases(Json config) {
+  auto listen = field(config, "listen");
+  if (listen.length == 0)
+    listen = "0.0.0.0:8888";
+  auto colon = listen.lastIndexOf(':');
+  auto port = colon >= 0 ? listen[colon + 1 .. $].strip : "8888";
+  if (port.length == 0)
+    port = "8888";
+
+  string[] bases;
+  auto servers = jsonGet(config, "servers");
+  if (servers.type != Json.Type.array)
+    return bases;
+  foreach (ref server; servers) {
+    auto host = field(server, "host").strip;
+    if (host.length == 0 || host == "0.0.0.0" || host == "::")
+      continue;
+    auto urlHost = host.canFind(':') ? "[" ~ host ~ "]" : host;
+    auto base = "http://" ~ urlHost ~ ":" ~ port;
+    if (!bases.canFind(base))
+      bases ~= base;
+  }
+  return bases;
+}
+
+/// 确保 Project 有 micdn 下载 key；空 key 时生成 `qualifiedName.随机串` 并持久化。
+/// 同一 Project 的所有 micdn 节点共用这一个 key。
+string ensureMicdnDownloadKey(Store store, Registry reg, string projectId, string qualifiedName) {
+  Json config;
+  readMicdnConfig(store, reg, projectId, config);
+  auto key = field(jsonGet(config, "auth"), "downloadKey").strip;
+  if (key.length > 0)
+    return key;
+
+  auto prefix = qualifiedName.strip;
+  if (prefix.length == 0)
+    prefix = projectId;
+  auto random = randomUUID().toString.replace("-", "");
+  if (random.length > 16)
+    random = random[0 .. 16];
+  key = prefix ~ "." ~ random;
+  auto auth = jsonGet(config, "auth");
+  auth["downloadKey"] = Json(key);
+  config["auth"] = auth;
+  store.transaction({
+    Row values;
+    values["config"] = config;
+    store.upsertColumns(reg.find("project-micdn"), projectId, values);
+  });
+  return key;
+}
+
 /// Project 的 micdn 下载凭证（`<auth download-key>`）；未配置或读取失败时为空。
 string micdnDownloadKey(Store store, Registry reg, string projectId) {
   Json config;
@@ -336,7 +397,8 @@ void readMicdnConfig(Store store, Registry reg, string projectId, out Json confi
 /// 中心读令牌发给外部。
 string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectName,
     string projectKey, bool maskSecrets = false, string remoteUrl = "",
-    string upstreamDevToken = "", string upstreamSnapshotToken = "") {
+    string upstreamDevToken = "", string upstreamSnapshotToken = "",
+    string snapshotRemoteDefault = "") {
   auto config = normalizeMicdnConfig(rawConfig);
   validateMicdnConfig(config);
   validateBlobIdentity(projectName, projectKey);
@@ -377,12 +439,17 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     xml.put("  <maven");
     putAttr(xml, "base", effectiveBase(config, "maven", "/maven"));
     xml.put(">\n");
-    foreach (url; textList(jsonGet(maven, "remotes"))) {
+    auto remotes = textList(jsonGet(maven, "remotes"));
+    if (remotes.length == 0)
+      remotes = defaultMicdnMavenRemotes.dup;
+    foreach (url; remotes) {
       xml.put("    <remote");
       putAttr(xml, "url", url);
       xml.put("/>\n");
     }
     auto snapshot = field(maven, "snapshotRemote");
+    if (snapshot.length == 0)
+      snapshot = snapshotRemoteDefault;
     if (snapshot.length > 0) {
       xml.put("    <snapshot");
       putAttr(xml, "remote", snapshot);

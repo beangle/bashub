@@ -12,7 +12,7 @@ module bashub.project.server;
 /// 但输出结构保持一致。
 
 import bashub.project.distribution : ProjectData, artifactGav, loadProjectData, webappGav;
-import bashub.project.micdnconfig : micdnDownloadKey;
+import bashub.project.micdnconfig : ensureMicdnDownloadKey, micdnServerBases, readMicdnConfig;
 import bashub.project.resolver : ProjectContext;
 
 import beangle.commons.xml : escapeXml;
@@ -24,7 +24,7 @@ import beangle.jsonapi.store : Store;
 
 import vibe.data.json : Json;
 
-import std.algorithm : sort;
+import std.algorithm : map, sort;
 import std.array : Appender, appender, join, split;
 import std.conv : to;
 import std.json : JSONType, JSONValue, parseJSON;
@@ -67,13 +67,21 @@ private void renderWaitFors(ref Appender!string xml, string text, string serverN
   }
 }
 
+/** 重复 token，与多个 micdn remote 按位置对齐。 */
+private string[] replicate(string value, size_t count) {
+  string[] result;
+  foreach (i; 0 .. count)
+    result ~= value;
+  return result;
+}
+
 /// 渲染 server.xml；返回内容只依赖数据库，不读请求上下文。
 ///
-/// SNAPSHOT 上游的令牌优先取 Project 的 micdn `<auth download-key>`，为空时回退 `fallbackToken`
-/// （hub.xml 的 `maven-download-token`）：有值才写 `token`，空值即匿名下载。`maskSecrets` 只用于
-/// SPA 预览，机器下载端点必须传 false。
+/// 本地 micdn 的地址来自 Project 的 `servers[].host` + `listen`；没有 host 时三个 repo 元素都不生成。
+/// 下载 key 由 Project 的 micdn `<auth download-key>` 提供，缺失时自动生成并持久化。
+/// `maskSecrets` 只用于 SPA 预览，机器下载端点必须传 false。
 string renderServerXml(Store store, Registry reg, const ProjectContext context,
-    bool maskSecrets = false, string fallbackToken = "") {
+    bool maskSecrets = false) {
   auto data = loadProjectData(store, reg, context);
   auto farms = data.farms.dup;
   auto hosts = data.hosts.dup;
@@ -92,20 +100,37 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
   xml.put("\"");
   putAttr(xml, "agent-listen-port", attributeText(context.data, "agentListenPort"));
   xml.put(">\n");
-  xml.put("  <repository remote=\"");
-  xml.put(escapeXml(attributeText(context.data, "remoteRepo")));
-  xml.put("\"/>\n");
-  xml.put("  <snapshot-repo remote=\"${bas_remote_url}/maven\"");
-  auto downloadKey = micdnDownloadKey(store, reg, context.id);
-  if (downloadKey.length == 0)
-    downloadKey = fallbackToken.strip;
-  if (downloadKey.length > 0)
-    putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
-  xml.put("/>\n");
-  xml.put("  <native-repo remote=\"${bas_remote_url}/native\"");
-  if (downloadKey.length > 0)
-    putAttr(xml, "token", maskSecrets ? "********" : downloadKey);
-  xml.put("/>\n");
+  auto projectName = attributeText(context.data, "qualifiedName");
+  if (projectName.length == 0)
+    projectName = attributeText(context.data, "name");
+  auto downloadKey = ensureMicdnDownloadKey(store, reg, context.id, projectName);
+  Json micdnConfig;
+  readMicdnConfig(store, reg, context.id, micdnConfig);
+  auto bases = micdnServerBases(micdnConfig);
+  if (bases.length > 0) {
+    auto mavenRemotes = bases.map!(base => base ~ "/maven").join(",");
+    auto nativeRemotes = bases.map!(base => base ~ "/native").join(",");
+    auto tokens = bases.length > 0 && downloadKey.length > 0
+        ? replicate(downloadKey, bases.length).join(",") : "";
+    xml.put("  <repository remote=\"");
+    xml.put(escapeXml(mavenRemotes));
+    xml.put("\"");
+    if (tokens.length > 0)
+      putAttr(xml, "token", maskSecrets ? replicate("********", bases.length).join(",") : tokens);
+    xml.put("/>\n");
+    xml.put("  <snapshot-repo remote=\"");
+    xml.put(escapeXml(mavenRemotes));
+    xml.put("\"");
+    if (tokens.length > 0)
+      putAttr(xml, "token", maskSecrets ? replicate("********", bases.length).join(",") : tokens);
+    xml.put("/>\n");
+    xml.put("  <native-repo remote=\"");
+    xml.put(escapeXml(nativeRemotes));
+    xml.put("\"");
+    if (tokens.length > 0)
+      putAttr(xml, "token", maskSecrets ? replicate("********", bases.length).join(",") : tokens);
+    xml.put("/>\n");
+  }
 
   auto endpoints = data.endpoints.dup;
   sort!((a, b) => attributeText(a, "name") < attributeText(b, "name"))(endpoints);

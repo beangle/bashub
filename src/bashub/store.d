@@ -84,7 +84,6 @@ void fillHubDefaults(const Resource res, ref Row values) {
     values["key"] = Json(projectKey());
   // 行键是列名（`local_repo`），不是 JSON:API 属性名（`localRepo`）
   setDefault(values, "local_repo", "~/.m2/repository");
-  setDefault(values, "remote_repo", "https://maven.aliyun.com/nexus/content/groups/public");
 }
 
 /// 写入前的 BAS 特化：白名单枚举、唯一性、脚本文本规范化。

@@ -179,13 +179,13 @@ Freemarker 模板运行时，不属于 JSON:API。
 
 | URL | 说明 |
 |---|---|
-| `GET /api/bashub/config/{project}/server` | 服务器/集群配置；`Authorization: Bearer <project>:<project.key>` 鉴权。`<snapshot-repo>` 的 `token` 取 Project 的 micdn `<auth download-key>`，为空时回退 hub.xml 的 `<snapshot download-token>`（兼容 `maven-download-token` 属性）；都没有则不写 `token`。不再生成 `<host>` 的 setline 端口、`<setline>` 或 `setline-hostname`。setline 进程自己的 listen/adminListen 配置仍归节点管理。不输出通道凭证，地址与 token 由客户端 `conf/basctl.conf` 保存 |
+| `GET /api/bashub/config/{project}/server` | 服务器/集群配置；`Authorization: Bearer <project>:<project.key>` 鉴权。`repository` / `snapshot-repo` / `native-repo` 指向该 Project 的本地 micdn（`servers[].host` + `listen` 端口）；没有 host 时三个元素都不生成。所有 repo 的 `token` 取 Project 的 micdn `<auth download-key>`，缺失时生成 `qualifiedName.<随机串>`；多个 micdn 地址按位置重复同一个 token。不再生成 `<host>` 的 setline 端口、`<setline>` 或 `setline-hostname`。不输出通道凭证 |
 | `GET /api/bashub/config/{project}/proxy` | 反向代理配置（haproxy/nginx，按 endpoint 的 engine 选择模板）；使用同样的 Project 令牌。输出完整配置：HAProxy 内联 backend 和 `use_backend`，Nginx 内联 upstream/location，并包含 Micdn 路径。新客户端应优先使用 `proxy-bundle` |
 | `GET /api/bashub/config/{project}/certificate` | Project 的 PEM 公钥证书（可含完整证书链）；使用同样的 Project 令牌。未配置时返回空 Body |
 | `GET /api/bashub/config/{project}/certificate-key` | Project 的 PEM 私钥；只允许机器令牌下载，`Cache-Control: no-store`。未配置时返回空 Body。管理台永远只返回固定掩码 |
 
 | `GET /api/bashub/ems/{project}/menus/{appName}` | 应用菜单 |
-| `GET /api/bashub/micdn/{project}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；`X-Micdn-Token` 或 `Authorization: Bearer <project.key>` 鉴权 |
+| `GET /api/bashub/micdn/{project}/micdn.xml` | 完整 micdn 配置（包含 maven/npm/native/auth/static/www/blob）；正式版默认 central + aliyun，SNAPSHOT 上游默认 bashub 中心 `/maven`；`X-Micdn-Token` 或 `Authorization: Bearer <project.key>` 鉴权 |
 | `GET /api/bashub/config/{project}/script/{host}` | 主机脚本（按依赖排序） |
 | `WS /api/bashub/monitor/agents/{project}/channel` | 节点通道：basctl 主动连上来的 WebSocket（**不是** HTTP 接口，握手用 `Authorization: Bearer <project>:<Project.key>`，兼容只发 key），见下 |
 | `GET /api/bashub/config/projects/{id}/server` | 管理台查看最终 server.xml；登录会话鉴权 |

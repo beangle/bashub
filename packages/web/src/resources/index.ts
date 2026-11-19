@@ -100,7 +100,6 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'basVersion', label: '版本', required: true, width: '8%' },
       { key: 'key', label: 'Key', column: false, wide: true },
       { key: 'localRepo', label: '本地仓库', column: false, help: '默认 ~/.m2/repository' },
-      { key: 'remoteRepo', label: '远程仓库', column: false, width: 260 },
     ],
     drawerLinks: [
       { label: '配置详情', to: resourceApiPath('/projects/{id}') },

@@ -223,7 +223,6 @@
             <column name="local_repo" type="varchar(255)" nullable="false" comment="localRepo?"/>
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
             <column name="org_id" type="integer" nullable="false" comment="Organization?ID"/>
-            <column name="remote_repo" type="varchar(255)" nullable="false" comment="remoteRepo?"/>
             <column name="bas_version" type="varchar(255)" nullable="false" comment="basVersion?"/>
             <column name="agent_listen_port" type="integer" nullable="false" defaultValue="19080" comment="agent 统一监听端口"/>
             <column name="title" type="varchar(255)" nullable="false" comment="title?"/>

@@ -560,7 +560,7 @@ unittest {
   assert(ex.contentType == "application/xml");
   assert(!ex.body.canFind("<hub"));
   assert(ex.body.canFind(`<webapp uri="gav://org.beangle.bashub:bas-web:war:0.0.8"`));
-  assert(ex.body.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
+  assert(ex.body.canFind(`<snapshot-repo remote="http://10.0.0.31:8888/maven" token="download-secret"/>`));
   assert(!ex.body.canFind("undertow"));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
@@ -586,7 +586,7 @@ unittest {
   assert(ex.contentType == "application/xml");
   assert(!ex.body.canFind("<hub"));
   assert(!ex.body.canFind("download-secret"));
-  assert(ex.body.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="********"/>`));
+  assert(ex.body.canFind(`<snapshot-repo remote="http://10.0.0.31:8888/maven" token="********"/>`));
 
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/projects/1002/proxy?endpoint=edge-web");
   assert(ex.status == 200, ex.body);
@@ -890,7 +890,10 @@ unittest {
       "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
-  assert(!ex.body.canFind("<auth"));
+  // 下载 key 由 bashub 自动生成；清空后下次下发会重新生成，但不恢复 publish key。
+  assert(ex.body.canFind("<auth"));
+  assert(ex.body.canFind("download-key=\"openurp.prod."));
+  assert(!ex.body.canFind("publish-key="));
 }
 
 @("project micdn returns 404 for missing projects")

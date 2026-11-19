@@ -13,7 +13,7 @@ import test.bashub.fixture : testDao;
 import bashub.project.distribution : loadProjectData;
 import bashub.project.micdnconfig : BoundComponent, MicdnConfigException, MicdnState, defaultMicdnConfig,
   loadMicdnState, maskSecret, normalizeComponentSpec,
-  normalizeMicdnConfig, renderMicdnXml;
+  normalizeMicdnConfig, micdnServerBases, renderMicdnXml;
 import bashub.project.proxy : ProxyBackend, ProxyModel, ProxyServer, ProxyWebapp, renderHaproxy, renderHaproxyMap, renderHaproxyMapForEndpoint, renderNginx, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, findProject, ipHeaderAddresses, matchHostIp,
   resolveHostProject, resolveSetlineProject;
@@ -112,9 +112,10 @@ unittest {
   auto xml = renderServerXml(store, reg, project);
   assert(xml.canFind(`version="6.0.0"`));
   // Project 自己的 micdn 下载凭证优先于 hub.xml 的全局 token
-  assert(renderServerXml(store, reg, project, false, "hub-secret").canFind(`token="download-secret"`));
-  assert(xml.canFind(`<repository remote="https://repo.openurp.net/maven2"/>`));
-  assert(xml.canFind(`<snapshot-repo remote="${bas_remote_url}/maven" token="download-secret"/>`));
+  assert(renderServerXml(store, reg, project, false).canFind(`token="download-secret"`));
+  assert(xml.canFind(`<repository remote="http://10.0.0.31:8888/maven" token="download-secret"/>`));
+  assert(xml.canFind(`<snapshot-repo remote="http://10.0.0.31:8888/maven" token="download-secret"/>`));
+  assert(xml.canFind(`<native-repo remote="http://10.0.0.31:8888/native" token="download-secret"/>`));
   assert(xml.canFind(`<proxy name="edge-web" ip="10.0.0.20" domain="www.openurp.net"/>`));
   assert(xml.canFind(`<proxy name="edge-ip" ip="10.0.0.30,10.0.0.10"/>`));
   assert(xml.canFind(`endpoints="edge-web,edge-ip"`));
@@ -140,19 +141,24 @@ unittest {
 
   ProjectContext demo;
   assert(findProject(reg, store, "beangle.demo", demo));
-  assert(!renderServerXml(store, reg, demo).canFind("setline-"));
+  auto demoXml = renderServerXml(store, reg, demo);
+  assert(!demoXml.canFind("setline-"));
+  // demo 没有 micdn server host：server.xml 不生成 repo 元素。
+  assert(!demoXml.canFind("<repository"));
+  assert(!demoXml.canFind("<snapshot-repo"));
+  assert(!demoXml.canFind("<native-repo"));
 }
 
-@("server.xml falls back to the hub maven token") unittest {
+@("server.xml omits repos when the project has no micdn host") unittest {
   Registry reg;
   auto store = newStore(reg);
   ProjectContext demo;
   assert(findProject(reg, store, "beangle.demo", demo));
-  // 该 project 没有 micdn auth；用 hub.xml 的 maven-download-token 兜底
-  auto xml = renderServerXml(store, reg, demo, false, "hub-secret");
-  assert(xml.canFind(`token="hub-secret"`));
-  // 预览遮掉令牌
-  assert(renderServerXml(store, reg, demo, true, "hub-secret").canFind(`token="********"`));
+  // 没有 micdn server host：三个 repo 元素都不生成，也不使用 hub token 兜底。
+  auto xml = renderServerXml(store, reg, demo, false);
+  assert(!xml.canFind("<repository"));
+  assert(!xml.canFind("<snapshot-repo"));
+  assert(!xml.canFind("<native-repo"));
 }
 
 @("micdn server registrations normalize host and stay out of micdn.xml")
@@ -551,4 +557,31 @@ unittest {
   assert(masked.canFind(`token="********"`));
   assert(!masked.canFind("dev-token"));
   assert(!masked.canFind("snap-token"));
+}
+
+
+@("micdn render defaults formal remotes and snapshot center") unittest {
+  auto config = defaultMicdnConfig();
+  config["maven"]["declared"] = Json(true);
+  auto xml = renderMicdnXml(config, [], "prod", "key", false, "",
+      "", "snap-token", "https://hub.example/maven");
+  assert(xml.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
+  assert(xml.canFind(`<remote url="https://maven.aliyun.com/nexus/content/groups/public"/>`));
+  assert(xml.canFind(`<snapshot remote="https://hub.example/maven" token="snap-token"/>`));
+}
+
+
+@("micdn server bases use host and listen port once each") unittest {
+  auto config = defaultMicdnConfig();
+  config["listen"] = Json("0.0.0.0:8888");
+  config["servers"] = Json([
+    Json(["host": Json("10.0.0.31")]),
+    Json(["host": Json("10.0.0.31")]),
+    Json(["host": Json("10.0.0.32")]),
+    Json(["host": Json("0.0.0.0")]),
+  ]);
+  auto bases = micdnServerBases(config);
+  assert(bases == ["http://10.0.0.31:8888", "http://10.0.0.32:8888"]);
+  config["servers"] = Json.emptyArray;
+  assert(micdnServerBases(config).length == 0);
 }

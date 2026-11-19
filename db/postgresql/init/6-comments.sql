@@ -73,7 +73,6 @@ comment on column bas.cfg_projects.id is '非业务主键:datetime';
 comment on column bas.cfg_projects.local_repo is 'localRepo?';
 comment on column bas.cfg_projects.name is '名称';
 comment on column bas.cfg_projects.org_id is 'Organization?ID';
-comment on column bas.cfg_projects.remote_repo is 'remoteRepo?';
 comment on column bas.cfg_projects.bas_version is 'basVersion?';
 comment on column bas.cfg_projects.agent_listen_port is 'agent 统一监听端口';
 comment on column bas.cfg_projects.title is 'title?';

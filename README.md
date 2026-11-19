@@ -166,9 +166,10 @@ src/bashub/                 业务：BAS 控制台这一份
   `GET /api/bashub/config/{project}/proxy` 按 endpoint 的 engine 输出 haproxy / nginx；
   HAProxy 主配置内联 backend 和按最长前缀排序的 `use_backend` 规则，只有带 targets 的
   webapp 参与，按 farm + server 集合分组。proxy 下载使用同样的 Bearer 凭证。server.xml 里的
-  `<snapshot-repo remote=".../maven" token="...">` 优先取该 Project 的 micdn
-  `<auth download-key>`；为空时回退 `hub.xml` 的 `maven-download-token`，用于多个 Project
-  共用同一个 micdn `/maven` 的场景。
+  server.xml 的 `repository` / `snapshot-repo` / `native-repo` 不再使用 Project 的公网远程仓库，
+  而是按该 Project 的 Micdn `servers[].host` 和 `listen` 端口生成**本地 Micdn 地址**；没有 host
+  时三个元素都不生成。三个仓库的 `token` 都是 Project 的 Micdn `<auth download-key>`；key 缺失时
+  bashub 生成 `qualifiedName.<随机串>` 并保存，同一 Project 的所有 Micdn 节点共用。
   PEM 公钥证书与私钥单独存放在 `cfg_project_certificates`，管理台只回显公钥，私钥保存后不再回显。
   `GET /api/bashub/config/{project}/proxy-bundle?engine=haproxy|nginx` 按 endpoint 的引擎返回
   `application/zip`：`manifest.json`、`config/haproxy.cfg` 或 `config/nginx.conf`、HAProxy 的路由 map、证书和私钥。manifest 中记录每个文件的 role、相对路径和
@@ -287,9 +288,9 @@ JVM 的 `-Dkey=value` 不兼容：`std.getopt` 会把它当成未知选项并报
 ```
 
 监听地址优先级为：命令行 `--listen` > `hub.xml` 的 `<app listen>` > 内置 `127.0.0.1:8080`。
-`<snapshot download-token>` 是共享 micdn 的读令牌（也兼容 `<app maven-download-token="...">`）：
-原本用于 server.xml 的 `<snapshot-repo token>` 兜底；现在同一个值也写成客户 `micdn.xml` 的
-`<maven><snapshot token>` 和 `<npm><dev token>`（maven/npm 共用，不新增配置项、不动 bashub.xml）。
+`<snapshot download-token>` 是中心 micdn 的读令牌（也兼容 `<app maven-download-token="...">`）：
+写进客户 `micdn.xml` 的 `<maven><snapshot token>` 和 `<npm><dev token>`，用于本地 Micdn 从
+中心拉取 SNAPSHOT/dev；不进入 Project 配置、不在界面展示。
 令牌不落数据库、界面不展示/不可编辑，全局对所有 Project 的下发生效。
 Project 详情页 Micdn 卡片上的 **Reload micdn** 按钮走 `POST /api/bashub/micdn/projects/{id}/reload`：
 按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`；agent 用 Project token 拉取

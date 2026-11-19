@@ -34,7 +34,8 @@ import bashub.project.menus : renderEmsMenus;
 import bashub.project.certificate : certificateNotAfter;
 import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
-  micdnProjectDocument, normalizeComponentSpec, plainComponent, renderMicdnXml, saveMicdnProject,
+  ensureMicdnDownloadKey, micdnProjectDocument, normalizeComponentSpec, plainComponent,
+  renderMicdnXml, saveMicdnProject,
   validateComponentName, validateMountName;
 import bashub.project.proxy : renderHaproxyMapForEndpoint, renderProxy, renderProxyForEndpoint;
 import bashub.project.resolver : ProjectContext, dataOf, findProject, findProjectById, ipHeaderAddresses,
@@ -207,7 +208,7 @@ class HubService {
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, project, false, cfg.mavenDownloadToken),
+      res.writeBody(renderServerXml(store, reg, project, false),
           HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
@@ -229,7 +230,7 @@ class HubService {
     }
     try {
       res.headers["Cache-Control"] = "no-store";
-      res.writeBody(renderServerXml(store, reg, project, true, cfg.mavenDownloadToken),
+      res.writeBody(renderServerXml(store, reg, project, true),
           HTTPStatus.ok, "application/xml");
     } catch (Exception e) {
       logError("Render server.xml failed: %s", e.msg);
@@ -1262,10 +1263,19 @@ class HubService {
     if (!loadMicdnState(store, reg, projectId, state))
       return "";
     auto data = project["data"];
-    auto remoteUrl = origin.length > 0 ? projectMicdnUrl(origin, attributeText(data, "qualifiedName")) : "";
+    auto qualifiedName = attributeText(data, "qualifiedName");
+    ensureMicdnDownloadKey(store, reg, projectId, qualifiedName);
+    // 重新读取，确保刚生成的下载 key 进入本份 micdn.xml。
+    if (!loadMicdnState(store, reg, projectId, state))
+      return "";
+    auto remoteUrl = origin.length > 0 ? projectMicdnUrl(origin, qualifiedName) : "";
+    auto snapshotBase = origin.strip;
+    while (snapshotBase.length > 1 && snapshotBase.endsWith("/"))
+      snapshotBase = snapshotBase[0 .. $ - 1];
+    auto snapshotRemote = snapshotBase.length > 0 ? snapshotBase ~ "/maven" : "";
     return renderMicdnXml(state.config, state.components, attributeText(data, "name"),
         attributeText(data, "key"), maskSecrets, remoteUrl,
-        cfg.mavenDownloadToken, cfg.mavenDownloadToken);
+        cfg.mavenDownloadToken, cfg.mavenDownloadToken, snapshotRemote);
   }
 
   private string projectMicdnUrl(string origin, string qualifiedName) {
