@@ -149,12 +149,18 @@
                 </div>
               </div>
 
-              <div class="repo-config__row repo-config__row--native">
+              <div class="repo-config__row">
                 <div class="repo-config__head">
                   <strong>Native</strong>
                   <t-switch v-model="config.native.declared" size="small" />
                 </div>
-                <span class="form-hint">固定使用 <code>{home}/native</code>，无额外配置</span>
+                <div class="repo-config__body">
+                  <label class="form-field">
+                    <span>中心上游</span>
+                    <t-input :model-value="nativeUpstream" readonly size="small" />
+                    <span class="form-hint">本地 <code>{home}/native</code> 缺失时自动回源，无需保存</span>
+                  </label>
+                </div>
               </div>
             </div>
           </section>
@@ -280,6 +286,7 @@ function initialTab(): string {
 const activeTab = ref(initialTab())
 const projectTitle = computed(() => doc.value?.project.qualifiedName || doc.value?.project.name || 'Micdn 配置')
 const downloadUrl = computed(() => (projectId ? micdnXmlUrl(projectId) : '#'))
+const nativeUpstream = computed(() => `${window.location.origin}/native`)
 
 watch(activeTab, (value) => {
   if (route.query.tab === value) return

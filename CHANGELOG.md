@@ -63,6 +63,7 @@
   归一化丢弃。
 - **默认上游恢复**：Maven/NPM 正式版上游 label 旁提供「恢复默认」，填入 central+aliyun /
   npmmirror+npmjs。
+- **Native 上游展示**：Micdn 配置页 Native 行显示只读中心 `/native` 上游，提示本地缺失时回源。
 - **Native 上游**：下发的 micdn.xml 在启用 native 时写中心 `{origin}/native` 上游和下载 token，
   本地 micdn 缺失 native 文件时按路径回源；目录列表仍来自本地。
 - **NPM 默认上游**：正式版 remotes 为空时默认 `registry.npmmirror.com` + `registry.npmjs.org`，

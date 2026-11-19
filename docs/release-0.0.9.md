@@ -139,7 +139,8 @@ npmmirror + npmjs；仍需保存后生效。
 </native>
 ```
 
-本地 micdn 缺失 native 文件时按完整路径回源并缓存；目录列表仍来自本地。
+本地 micdn 缺失 native 文件时按完整路径回源并缓存；目录列表仍来自本地。Micdn 配置页的
+Native 行显示只读中心 `/native` 上游。
 
 ### NPM 正式版默认上游
 
