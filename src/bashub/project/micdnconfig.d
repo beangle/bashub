@@ -395,7 +395,8 @@ void readMicdnConfig(Store store, Registry reg, string projectId, out Json confi
 /// 中心读令牌发给外部。
 string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectName,
     string projectKey, bool maskSecrets = false, string remoteUrl = "",
-    string upstreamDevToken = "", string upstreamSnapshotToken = "") {
+    string upstreamDevToken = "", string upstreamSnapshotToken = "",
+    string nativeRemoteDefault = "") {
   auto config = normalizeMicdnConfig(rawConfig);
   validateMicdnConfig(config);
   validateBlobIdentity(projectName, projectKey);
@@ -482,7 +483,17 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   if (flag(nativeCfg, "declared", false)) {
     xml.put("  <native");
     putAttr(xml, "base", defaultRepoBase(config, "/native"));
-    xml.put("/>\n");
+    if (nativeRemoteDefault.length == 0) {
+      xml.put("/>\n");
+    } else {
+      xml.put(">\n");
+      xml.put("    <remote");
+      putAttr(xml, "url", nativeRemoteDefault);
+      if (upstreamSnapshotToken.length > 0)
+        putAttr(xml, "token", maskSecrets ? "********" : upstreamSnapshotToken);
+      xml.put("/>\n");
+      xml.put("  </native>\n");
+    }
   }
 
   auto auth = jsonGet(config, "auth");

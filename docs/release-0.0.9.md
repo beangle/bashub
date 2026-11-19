@@ -129,6 +129,18 @@ Maven / NPM / Native 合并到「基础」页的一个紧凑「仓库」区块�
 Maven/NPM 正式版上游 label 旁提供「恢复默认」按钮，分别填入 central + aliyun 和
 npmmirror + npmjs；仍需保存后生效。
 
+### Native 上游
+
+启用 Native 时，下发的 `micdn.xml` 写入中心 `{origin}/native` 上游：
+
+```xml
+<native base="{micdn.home}/native">
+  <remote url="https://bashub.example.com/native" token="中心下载token"/>
+</native>
+```
+
+本地 micdn 缺失 native 文件时按完整路径回源并缓存；目录列表仍来自本地。
+
 ### NPM 正式版默认上游
 
 NPM 正式版 remotes 为空时默认写 `https://registry.npmmirror.com` 和
