@@ -67,7 +67,16 @@
                 <t-checkbox v-if="config.auth.publishKeySet" v-model="clearPublishKey">清空发布密钥</t-checkbox>
               </div>
               <div class="form-field">
-                <span>下载密钥 download-key</span>
+                <span>
+                  下载密钥 download-key
+                  <t-button
+                    size="small"
+                    variant="text"
+                    @click="generateDownloadKey"
+                  >
+                    {{ config.auth.downloadKeySet ? '重新生成' : '生成' }}
+                  </t-button>
+                </span>
                 <t-input
                   v-model="authDraft.downloadKey"
                   type="password"
@@ -232,7 +241,7 @@
 
 <script setup lang="ts">
 import { UnderlineTabs, type UnderlineTabItem } from '@beangle/bui-vue'
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, reactive, ref, toRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MicdnBindingEditor from '@/components/MicdnBindingEditor.vue'
@@ -352,6 +361,34 @@ function invalidServerHost(host: string): boolean {
   if (value.length === 0) return true
   const first = value.indexOf(':')
   return first >= 0 && first === value.lastIndexOf(':')
+}
+
+function randomDownloadSuffix(): string {
+  const bytes = new Uint8Array(8)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('')
+}
+
+function applyGeneratedDownloadKey() {
+  const qualifiedName = doc.value?.project.qualifiedName || doc.value?.project.name || projectId
+  authDraft.downloadKey = `${qualifiedName}.${randomDownloadSuffix()}`
+  clearDownloadKey.value = false
+  MessagePlugin.success('已生成下载密钥；保存后生效')
+}
+
+function generateDownloadKey() {
+  if (!config.value.auth.downloadKeySet || clearDownloadKey.value) {
+    applyGeneratedDownloadKey()
+    return
+  }
+  const dialog = DialogPlugin.confirm({
+    header: '重新生成下载密钥',
+    body: '旧密钥会立即失效，所有使用旧 server.xml 的节点需要重新拉取配置。确定继续？',
+    onConfirm: () => {
+      dialog.destroy()
+      applyGeneratedDownloadKey()
+    },
+  })
 }
 
 async function save() {

@@ -49,6 +49,12 @@
   到期前 30 天于入口列显示 `⚠ 到期日期`。
 - **组件目录**：管理台将静态包与文档拆成两个目录，分别搜索和新建，并增加序号、
   自动部署说明。
+- **本地 Micdn 仓库**：server.xml 的 `repository` / `snapshot-repo` / `native-repo` 改指 Project
+  的本地 micdn（`servers[].host` + `listen`），没有 host 时三个元素都不生成；不再使用 Project 的
+  `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
+  节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
+- **Micdn 默认上游**：bashub 下发的 micdn.xml 在正式版 remotes 为空时写 central + aliyun，
+  SNAPSHOT 默认指向 bashub 中心 `/maven`。
 - **Server 开机自启**：`cfg_servers` 增加 `auto_start`、`wait_for`；server.xml 输出
   `<auto-start>` / `<wait-for>`，管理台服务表单可配置，供 basagent 自动启动本机节点。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。

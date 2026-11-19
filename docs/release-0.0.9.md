@@ -118,6 +118,23 @@ HAProxy/Nginx 配置、证书和 Micdn 路径一次生成，不再要求节点�
 
 - CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
 
+### 本地 Micdn 仓库
+
+- server.xml 不再写 Project 的公网远程仓库；`repository` / `snapshot-repo` / `native-repo`
+  改为 Project 的本地 Micdn 地址：
+  ```xml
+  <repository remote="http://10.0.0.31:8888/maven" token="org.proj.a1b2c3"/>
+  <snapshot-repo remote="http://10.0.0.31:8888/maven" token="org.proj.a1b2c3"/>
+  <native-repo remote="http://10.0.0.31:8888/native" token="org.proj.a1b2c3"/>
+  ```
+  多个 Micdn 节点会把地址和同一个 token 按位置重复；没有 Micdn host 时三个元素都不生成。
+- 下载 key 缺失时生成 `qualifiedName.<随机串>`，保存到 Project 的 Micdn `<auth download-key>`，
+  同时下发到 `micdn.xml` 和 server.xml；Micdn 配置页的下载密钥旁提供「生成/重新生成」按钮，
+  重新生成旧 key 会失效。
+- 下发的 micdn.xml 在正式版 remotes 为空时默认 central + aliyun；SNAPSHOT 默认指向 bashub
+  中心 `/maven`，使用现有中心下载 token。
+- Project 的 `remoteRepo` 字段、表单和数据库列移除。
+
 ### Server 开机自启
 
 - 服务资源增加「开机自启」和「启动等待」；后者是 JSON 数组：
