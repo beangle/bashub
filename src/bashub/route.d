@@ -1251,16 +1251,47 @@ class HubService {
     }
   }
 
-  /// `DELETE /api/bashub/micdn/components/{id}`：仍被 Project 引用时由外键拒绝。
+  /// `DELETE /api/bashub/micdn/components/{id}`：删除组件，并从所有 Project 的
+  /// `project-micdn.components` 绑定中移除；组件与绑定在同一事务里完成。
   void deleteCdnComponent(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
     auto id = req.params.get("id", "");
     try {
-      if (!store.remove(reg.find("cdn-components"), id)) {
+      auto componentRes = reg.find("cdn-components");
+      Json component;
+      if (!store.fetch(componentRes, id, Query.init, component)) {
         writeJsonApi(res, errorDocument(404, "记录不存在", "no cdn-components with id " ~ id), HTTPStatus.notFound);
         return;
       }
+      auto projectRes = reg.find("project-micdn");
+      store.transaction({
+        Query q;
+        q.pageSize = 100000;
+        foreach (ref project; dataOf(store.search(projectRes, q))) {
+          auto attrs = jsonGet(project, "attributes");
+          auto components = jsonGet(attrs, "components");
+          if (components.type != Json.Type.array)
+            continue;
+          Json[] kept;
+          bool changed;
+          foreach (ref item; components) {
+            auto boundId = item.type == Json.Type.string
+              ? item.get!string : jsonText(jsonGet(item, "componentId"));
+            if (boundId == id)
+              changed = true;
+            else
+              kept ~= item;
+          }
+          if (!changed)
+            continue;
+          Row values;
+          values["components"] = Json(kept);
+          store.updateColumns(projectRes, jsonText(project["id"]), values);
+        }
+        if (!store.removeColumns(componentRes, id))
+          throw new StoreException(null, "cdn component disappeared during delete: " ~ id);
+      });
       writeJsonApi(res, okDocument(), HTTPStatus.ok);
     } catch (Exception e) {
       writeMicdnError(res, e);

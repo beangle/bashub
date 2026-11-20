@@ -76,6 +76,8 @@
 - **监控摘要**：Project 标题行保留刷新上报/运行历史/配置，标题下方合一展示 BAS 统计、Micdn
   节点 IP/组件/在线状态与 Reload、代理 IP/引擎版本/状态与 Apply；目标节点未全部在线时禁用操作。
 - **代理版本**：节点 `report:os` 上报 `haproxy -v` / `nginx -v`，监控摘要显示对应引擎版本。
+- **删除组件清理绑定**：删除 `cdn-components` 时在同一事务里从所有 Project 的
+  `project-micdn.components` 中移除该组件，不再留下悬空绑定。
 - **修复 reload 误判节点离线**：reload 现在按 Project 的 `qualifiedName` 查找 agent
   （与 `BAS_PRINCIPAL` 和监控登记一致），不再误用显示名称；offline 错误会带上 `@host`。
 - **测试**：`dub test` 通过 35 个模块；新增 ZIP bundle、Micdn 路由、最长前缀回归测试，

@@ -206,6 +206,7 @@ maven/npm/native/www/static 的 `base` 固定为 `{micdn.home}/maven`、`{micdn.
   只在到期前 30 天于入口列显示 `⚠ 到期日期`。无法解析时支持手工填写。新增
   `cfg_endpoints.certificate_not_after` 迁移。
 - 延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- 删除静态组件时同步清理所有 Project 的 Micdn 组件绑定，组件与绑定在同一事务内完成。
 - 修复 reload 误判节点离线：现在按 Project 的 `qualifiedName` 查找 agent，与 `BAS_PRINCIPAL`
   和监控登记一致；offline 错误会带 `@host`。
 

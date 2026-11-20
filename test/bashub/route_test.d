@@ -1068,8 +1068,22 @@ unittest {
   assert(bound["data"]["name"].get!string == "bas-static");
   assert(bound["deployments"].get!(Json[]).length > 0);
 
+  // 绑定到 Project 后再删除组件：删除组件必须同时清掉 Project 的绑定。
+  auto projectDoc = parseJson(call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/micdn/projects/1002").body);
+  auto bindBody = Json.emptyObject;
+  bindBody["config"] = projectDoc["config"];
+  bindBody["bindings"] = Json([Json(["componentId": Json(bundleId)])]);
+  ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/projects/1002",
+      bindBody.toString);
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["bindings"].get!(Json[]).length == 1);
+
   ex = call(router, HTTPMethod.DELETE, "http://localhost/api/bashub/micdn/components/" ~ bundleId);
   assert(ex.status == 200, ex.body);
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/projects/1002");
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["bindings"].get!(Json[]).length == 0);
   ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/micdn/components");
   assert(ex.status == 200, ex.body);
   foreach (component; parseJson(ex.body)["data"].get!(Json[]))
