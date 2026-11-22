@@ -87,7 +87,7 @@
             <span class="summary-label">Micdn</span>
             <strong class="summary-address" :title="micdnHosts.join(', ')">{{ micdnHosts.join(', ') || '未登记' }}</strong>
             <span class="summary-meta">
-              {{ configOpsLoading ? '读取中…' : `${micdnComponentCount} 个组件` }} · {{ micdnOnlineCount }}/{{ micdnHosts.length }} 在线
+              {{ configOpsLoading ? '读取中…' : `${micdnComponentCount} 个组件` }}
             </span>
             <t-tag
               size="small"
@@ -575,7 +575,6 @@ const micdnAllOnline = computed(() =>
 const proxyAllOnline = computed(() =>
   proxyHosts.value.length > 0 && proxyHosts.value.every((host) => onlineIps.value.has(host)),
 )
-const micdnOnlineCount = computed(() => micdnHosts.value.filter((host) => onlineIps.value.has(host)).length)
 const proxyOnlineCount = computed(() => proxyHosts.value.filter((host) => onlineIps.value.has(host)).length)
 const proxyEngineLabel = computed(() => {
   if (proxyEngine.value === 'haproxy') return 'HAProxy'

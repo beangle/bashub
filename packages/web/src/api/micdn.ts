@@ -124,7 +124,7 @@ export function defaultMicdnConfig(): MicdnConfig {
   return {
     home: '',
     listen: '0.0.0.0:8888',
-    logFile: 'console',
+    logFile: '/var/log/micdn/micdn.log',
     logLevel: 'info',
     maven: { declared: false, remotes: [], snapshotRemote: '' },
     npm: { declared: false, remotes: [], devRemote: '' },

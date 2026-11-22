@@ -314,7 +314,7 @@ unittest {
 @("micdn render omits every optional section when nothing is configured")
 unittest {
   auto xml = renderMicdnXml(defaultMicdnConfig(), [], "", "");
-  assert(xml.canFind(`<micdn listen="0.0.0.0:8888">`));
+  assert(xml.canFind(`<micdn listen="0.0.0.0:8888" log-file="/var/log/micdn/micdn.log">`));
   assert(xml.canFind(`<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`));
   foreach (section; ["maven", "npm", "native", "auth", "static", "www", "blob"])
     assert(!xml.canFind("<" ~ section), section ~ "\n" ~ xml);

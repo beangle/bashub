@@ -53,6 +53,9 @@
   的本地 micdn（`servers[].host` + `listen`），没有 host 时三个元素都不生成；不再使用 Project 的
   `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
   节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
+- **Micdn 默认日志文件**：新建/空配置的 `logFile` 默认写
+  `/var/log/micdn/micdn.log`，下发的 `micdn.xml` 带 `log-file`；仍可在配置页显式改成
+  `console`。
 - **Micdn 基础页合并**：Maven / NPM / Native 合并为基础页里的一个紧凑「仓库」区块，
   移除独立页签；Native 保留启用开关和只读中心上游，上游输入区压缩为两行。
 - **NPM 开发版上游固定**：Micdn 配置页把当前 origin 的 `/npm` 保存到 `npm.devRemote`，与
@@ -73,6 +76,7 @@
 - **Server 开机自启**：`cfg_servers` 增加 `auto_start`、`wait_for`；server.xml 输出
   `<auto-start>` / `<wait-for>`，管理台服务表单可配置，供 basagent 自动启动本机节点。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- **监控 Micdn 摘要**：去掉 Micdn 的 `1/1 在线` 重复提示，仅保留状态标签。
 - **监控摘要**：Project 标题行保留刷新上报/运行历史/配置，标题下方合一展示 BAS 统计、Micdn
   节点 IP/组件/在线状态与 Reload、代理 IP/引擎版本/状态与 Apply；目标节点未全部在线时禁用操作。
 - **代理版本**：节点 `report:os` 上报 `haproxy -v` / `nginx -v`，监控摘要显示对应引擎版本。

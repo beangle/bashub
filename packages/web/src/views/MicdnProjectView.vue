@@ -37,7 +37,7 @@
               </label>
               <label class="form-field">
                 <span>日志文件</span>
-                <t-input v-model="config.logFile" placeholder="console" />
+                <t-input v-model="config.logFile" placeholder="/var/log/micdn/micdn.log" />
               </label>
               <label class="form-field">
                 <span>日志级别</span>

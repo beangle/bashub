@@ -73,7 +73,7 @@ Json defaultMicdnConfig() {
   auto root = Json.emptyObject;
   root["home"] = Json("");
   root["listen"] = Json("0.0.0.0:8888");
-  root["logFile"] = Json("console");
+  root["logFile"] = Json("/var/log/micdn/micdn.log");
   root["logLevel"] = Json("info");
 
   auto maven = Json.emptyObject;
@@ -128,7 +128,7 @@ Json normalizeMicdnConfig(Json input) {
   if (field(result, "listen").length == 0)
     result["listen"] = Json("0.0.0.0:8888");
   if (field(result, "logFile").length == 0)
-    result["logFile"] = Json("console");
+    result["logFile"] = Json("/var/log/micdn/micdn.log");
   if (field(result, "logLevel").length == 0)
     result["logLevel"] = Json("info");
 

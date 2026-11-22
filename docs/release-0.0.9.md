@@ -115,10 +115,15 @@ micdn.xml 负责中心上游、SNAPSHOT/NPM dev 和 native 回源。
 - Project 详情页代理卡片增加「应用到节点」按钮，带确认和失败节点提示；目标节点未全部在线时按钮禁用。
 - Project 详情页 Micdn 卡片增加「Reload micdn」；登记节点未全部在线时禁用。
 - Project 详情页 BAS 服务卡片增加「打开监控」，带当前 Project 跳到在线节点页。
-- 在线节点页在 Project 标题下方增加紧凑摘要，展示 BAS 统计（0 停止时省略）、Micdn 节点 IP/组件状态、代理 IP/引擎版本/状态；
+- 在线节点页在 Project 标题下方增加紧凑摘要，展示 BAS 统计（0 停止时省略）、Micdn 节点 IP/组件状态、代理 IP/引擎版本/状态；Micdn 不再重复显示 `1/1 在线`；
   全部在线时提供 Reload micdn 和「应用到节点」，否则禁用。
 
 - CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
+
+### Micdn 默认日志文件
+
+Micdn 配置的日志文件默认值改为 `/var/log/micdn/micdn.log`，下发的 `micdn.xml` 显式写
+`log-file="/var/log/micdn/micdn.log"`；需要走 journal 时仍可手工改为 `console`。
 
 ### Micdn 配置页合并
 
