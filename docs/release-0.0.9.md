@@ -95,9 +95,9 @@ micdn.xml 负责中心上游、SNAPSHOT/NPM dev 和 native 回源。
   POST /api/bashub/micdn/projects/{id}/reload
   ```
 
-  按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`；agent 用 Project token 拉取
-  `micdn.xml`，POST 到本机 `http://127.0.0.1:8888/admin/config`，由 micdn 自己校验/落盘/reload。
-  不自动执行。
+  按 `config.servers[].host` 找在线 agent，下发 `micdn:reload`；agent 用 Project key 拉取
+  `micdn.xml`，交给本机 root oneshot 校验、原子安装并 restart micdn。不依赖管理端口，因此
+  micdn 停止时也能应用。不自动执行。
 
 ### 代理应用
 

@@ -964,7 +964,7 @@ final class AgentRegistry {
     return session.request("agent:log", body, timeout);
   }
 
-  /// 让某台 agent 拉取 micdn.xml 并投递给本机 `/admin/config`。
+  /// 让某台 agent 拉取 micdn.xml 并触发本机 root oneshot 安装。
   AgentReply micdnReload(string project, string ip = "", Duration timeout = 90.seconds) {
     auto session = resolve(project, ip);
     if (session is null)
