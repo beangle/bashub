@@ -1,12 +1,13 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
-        <router-link class="detail-back" to="/micdn/components">← 返回组件目录</router-link>
-        <h2 class="page-title">{{ component?.name || '组件详情' }}</h2>
-        <p class="page-subtitle">{{ kindLabel(component?.kind) }}</p>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">{{ component?.name || '组件详情' }}</h2>
+          <p class="page-subtitle">{{ kindLabel(component?.kind) }}</p>
+          <router-link class="title-back" to="/micdn/components">← 返回组件目录</router-link>
+        </div>
       </div>
-      <t-button variant="outline" @click="router.push('/micdn/components')">返回目录</t-button>
     </div>
 
     <t-loading :loading="loading" show-overlay>
@@ -49,21 +50,25 @@
           <header class="detail-card__head">
             <div>
               <h4>部署情况</h4>
-              <p>引用该组件的 Project；版本和路径取各自实际绑定的组件。</p>
+              <p>引用该组件的 Project；路径取各自实际绑定的组件。</p>
             </div>
             <t-tag variant="light">{{ deployments.length }} 个 Project</t-tag>
           </header>
-          <table v-if="deployments.length > 0" class="deployment-table">
+          <table v-if="deployments.length > 0" class="detail-table">
             <thead>
-              <tr><th>Project</th><th>版本</th><th>Context Path</th></tr>
+              <tr><th>Logo</th><th>Project</th><th>标题</th><th>部署路径</th></tr>
             </thead>
             <tbody>
               <tr v-for="item in deployments" :key="item.projectId">
                 <td>
-                  <strong>{{ item.projectTitle || item.projectName }}</strong>
+                  <img v-if="item.logoUrl" class="project-logo" :src="item.logoUrl" :alt="item.projectName" />
+                  <span v-else class="empty-logo">—</span>
+                </td>
+                <td>
+                  <strong>{{ item.projectName }}</strong>
                   <small>{{ item.qualifiedName }}</small>
                 </td>
-                <td><code>{{ item.version || '—' }}</code></td>
+                <td>{{ item.projectTitle }}</td>
                 <td><code>{{ item.contextPath }}</code></td>
               </tr>
             </tbody>
@@ -110,9 +115,20 @@ function kindLabel(kind?: string): string {
 }
 
 function version(value: CdnComponent): string {
-  const ref = sources.value[0]?.ref || ''
-  const parts = ref.split(':')
-  return parts.length > 1 ? parts[parts.length - 1] : ref
+  const spec = value.spec
+  const source = value.kind === 'www_doc'
+    ? (spec as { source?: { kind: string; ref: string } }).source
+    : (spec as { sources?: { kind: string; ref: string }[] }).sources?.[0]
+  if (!source) return ''
+  if (source.kind === 'npm') {
+    const at = source.ref.lastIndexOf('@')
+    return at > 0 ? source.ref.slice(at + 1) : ''
+  }
+  if (source.kind === 'jar') {
+    const parts = source.ref.split(':')
+    return parts.length >= 3 ? parts[parts.length - 1] : ''
+  }
+  return ''
 }
 
 function contextPath(value: CdnComponent): string {
@@ -140,16 +156,6 @@ onMounted(load)
   gap: 16px;
 }
 
-.detail-back {
-  display: inline-block;
-  margin-bottom: 4px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-}
-
-.detail-back:hover {
-  text-decoration: underline;
-}
 
 .detail-card {
   overflow: hidden;
@@ -167,13 +173,21 @@ onMounted(load)
   border-bottom: 1px solid var(--td-component-stroke);
 }
 
+.detail-card__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
 .detail-card__head h4 {
   margin: 0;
   font-size: 15px;
 }
 
 .detail-card__head p {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--td-text-color-secondary);
   font-size: 13px;
 }
@@ -188,17 +202,20 @@ onMounted(load)
 .fact {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 3px;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .fact span {
+  flex: none;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
 
 .fact strong,
 .fact code {
+  min-width: 0;
+  flex: 1;
   overflow-wrap: anywhere;
   color: var(--td-text-color-primary);
   font-size: 13px;
@@ -225,32 +242,43 @@ onMounted(load)
   color: var(--td-text-color-placeholder);
 }
 
-.deployment-table {
+.detail-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12px;
 }
 
-.deployment-table th,
-.deployment-table td {
-  padding: 10px 16px;
+.detail-table th,
+.detail-table td {
+  padding: 9px 14px;
   border-bottom: 1px solid var(--td-component-stroke);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
-.deployment-table th {
-  color: var(--td-text-color-secondary);
+.detail-table th {
+  color: var(--td-text-color-placeholder);
   font-weight: 500;
+  white-space: nowrap;
 }
 
-.deployment-table tr:last-child td {
+.detail-table tr:last-child td {
   border-bottom: 0;
 }
 
-.deployment-table td small {
+.detail-table td small {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
+  color: var(--td-text-color-placeholder);
+}
+
+.project-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.empty-logo {
   color: var(--td-text-color-placeholder);
 }
 

@@ -1,12 +1,14 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
-        <router-link class="detail-back" :to="listPath">← 返回平台功能</router-link>
-        <h2 class="page-title">
-          {{ featureName || '平台功能' }}
-          <span v-if="featureVersion" class="detail-version">{{ featureVersion }}</span>
-        </h2>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">
+            {{ featureName || '平台功能' }}
+            <span v-if="featureVersion" class="detail-version">{{ featureVersion }}</span>
+          </h2>
+          <router-link class="title-back" :to="listPath">← 返回平台功能</router-link>
+        </div>
       </div>
       <div class="page-actions">
         <template v-if="editingFeature">
@@ -356,16 +358,6 @@ function removeScript(id: string) {
 </script>
 
 <style scoped>
-.detail-back {
-  display: inline-block;
-  margin-bottom: 4px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-}
-
-.detail-back:hover {
-  color: var(--td-brand-color);
-}
 
 .detail-version {
   margin-left: 8px;

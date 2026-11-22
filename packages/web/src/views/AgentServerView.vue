@@ -1,13 +1,15 @@
 <template>
   <section class="page-panel server-detail-page">
     <div class="page-head">
-      <div>
-        <t-button size="small" variant="text" @click="goBack">← 返回</t-button>
-        <h2 class="page-title">{{ instance?.id || 'Server 详情' }}</h2>
-        <p v-if="agent" class="page-subtitle">
-          {{ agent.project }}<template v-if="agent.ip"> · {{ agent.ip }}</template>
-          <template v-if="agent.host"> / {{ agent.host }}</template>
-        </p>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">{{ instance?.id || 'Server 详情' }}</h2>
+          <p v-if="agent" class="page-subtitle">
+            {{ agent.project }}<template v-if="agent.ip"> · {{ agent.ip }}</template>
+            <template v-if="agent.host"> / {{ agent.host }}</template>
+          </p>
+          <t-button class="title-back" size="small" variant="text" @click="goBack">← 返回</t-button>
+        </div>
       </div>
       <div class="page-actions">
         <t-button size="small" variant="outline" :loading="loading" @click="load">刷新</t-button>
@@ -438,8 +440,9 @@ onBeforeUnmount(stopFollow)
 
 .detail-card { padding: 14px 16px; border: 1px solid var(--td-component-stroke); border-radius: 8px; background: var(--td-bg-color-container); }
 .detail-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.detail-card__head > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; min-width: 0; }
 .detail-card__head h3 { margin: 0; font-size: 16px; }
-.detail-card__head p { margin: 3px 0 0; color: var(--td-text-color-placeholder); font-size: 12px; }
+.detail-card__head p { margin: 0; color: var(--td-text-color-placeholder); font-size: 12px; }
 .detail-actions { display: flex; gap: 6px; }
 .detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 18px; margin: 14px 0 0; }
 .detail-facts div { min-width: 0; }

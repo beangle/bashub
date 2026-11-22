@@ -327,26 +327,21 @@ private Row[] componentRows() {
 
 private Row[] projectMicdnRows() {
   auto config = Json.emptyObject;
-  config["home"] = Json("/var/lib/micdn");
   config["listen"] = Json("0.0.0.0:8888");
   config["logFile"] = Json("console");
-  config["logLevel"] = Json("info");
   config["servers"] = Json([Json(["host": Json("10.0.0.31")])]);
 
   auto maven = Json.emptyObject;
-  maven["declared"] = Json(true);
   maven["remotes"] = Json([Json("https://repo1.maven.org/maven2")]);
   maven["snapshotRemote"] = Json("");
   config["maven"] = maven;
 
   auto npm = Json.emptyObject;
-  npm["declared"] = Json(true);
   npm["remotes"] = Json([Json("https://registry.npmmirror.com")]);
   npm["devRemote"] = Json("");
   config["npm"] = npm;
 
   auto nativeCfg = Json.emptyObject;
-  nativeCfg["declared"] = Json(false);
   config["native"] = nativeCfg;
 
   auto auth = Json.emptyObject;
@@ -359,7 +354,6 @@ private Row[] projectMicdnRows() {
   config["www"] = Json.emptyObject;
   config["blob"] = Json([
     "base": Json("/var/lib/micdn/blob"), "maxSize": Json("50M"),
-    "publicImages": Json(true),
   ]);
   auto item = row("1002", [
     "config": config,

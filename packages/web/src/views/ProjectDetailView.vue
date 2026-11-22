@@ -2,14 +2,14 @@
   <section class="page-panel">
     <div class="page-head">
       <div class="detail-heading">
-        <div class="detail-heading__title">
+        <div class="detail-heading__title title-row">
           <h2 class="page-title">{{ projectName || '配置详情' }}</h2>
           <p class="page-subtitle">
             <span v-if="projectTitle">{{ projectTitle }} · </span>
             <code v-if="qualifiedName">{{ qualifiedName }}</code>
             <span v-if="basVersion"> · BAS {{ basVersion }}</span>
           </p>
-          <router-link class="detail-back" to="/config/org-config?tab=projects">← 返回配置管理</router-link>
+          <router-link class="title-back" to="/config/org-config?tab=projects">← 返回配置管理</router-link>
         </div>
       </div>
     </div>
@@ -272,50 +272,42 @@
                 <router-link class="card-link" to="/monitor/agents">在线节点</router-link>
               </header>
               <p v-if="warnings.servers" class="load-error">{{ warnings.servers }}</p>
-              <template v-else-if="ipGroups.length > 0">
+              <template v-else-if="serviceRows.length > 0">
                 <p v-if="warnings.agents" class="load-error">{{ warnings.agents }}（以下只显示配置中的服务）</p>
-                <div class="ip-groups">
-                  <section v-for="group in ipGroups" :key="group.ip" class="ip-group">
-                    <header class="ip-group__head">
-                      <div class="ip-group__id">
-                        <strong class="ip-group__ip">{{ group.ip }}</strong>
-                        <span v-if="group.hostName" class="ip-group__host">{{ group.hostName }}</span>
-                        <t-tag size="small" :theme="group.online ? 'success' : 'default'" variant="light">
-                          {{ group.online ? '在线' : '离线' }}
+                <table class="detail-table service-table">
+                  <thead>
+                    <tr>
+                      <th>节点</th>
+                      <th>群集</th>
+                      <th>服务</th>
+                      <th>HTTP</th>
+                      <th>代理</th>
+                      <th>堆</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in serviceRows" :key="item.key">
+                      <td class="service-table__node">
+                        <strong>{{ item.ip }}</strong>
+                        <small v-if="item.hostName">{{ item.hostName }}</small>
+                        <t-tag size="small" :theme="item.online ? 'success' : 'default'" variant="light">
+                          {{ item.online ? '在线' : '离线' }}
                         </t-tag>
-                      </div>
-                      <span class="ip-group__count">{{ group.running }} 运行 / {{ group.stopped }} 停止</span>
-                    </header>
-
-                    <div v-for="farm in group.farms" :key="farm.name" class="farm-group">
-                      <div class="farm-group__head">
-                        <span class="farm-group__name">{{ farm.name }}</span>
-                        <span class="farm-group__count">{{ farm.servers.length }} 个服务</span>
-                      </div>
-                      <div class="server-grid">
-                        <div
-                          v-for="item in farm.servers"
-                          :key="item.key"
-                          class="server-chip"
-                          :class="{ 'server-chip--offline': !item.running }"
-                        >
-                          <div class="server-chip__head">
-                            <strong :title="item.name">{{ item.name }}</strong>
-                            <t-tag size="small" :theme="item.running ? 'success' : 'warning'" variant="light">
-                              {{ item.running ? '运行中' : '已停止' }}
-                            </t-tag>
-                          </div>
-                          <div class="server-chip__meta">
-                            <span>HTTP {{ item.httpPort || '—' }}</span>
-                            <span>代理 {{ item.proxyPort || '—' }}</span>
-                            <span>堆 {{ item.heap || '—' }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <p v-if="group.farms.length === 0" class="empty-text">该节点没有已声明的服务。</p>
-                  </section>
-                </div>
+                      </td>
+                      <td>{{ item.farmName }}</td>
+                      <td class="service-table__name" :title="item.name">{{ item.name }}</td>
+                      <td>{{ item.httpPort || '—' }}</td>
+                      <td>{{ item.proxyPort || '—' }}</td>
+                      <td>{{ item.heap || '—' }}</td>
+                      <td>
+                        <t-tag size="small" :theme="item.running ? 'success' : 'warning'" variant="light">
+                          {{ item.running ? '运行中' : '已停止' }}
+                        </t-tag>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </template>
               <p v-else class="empty-text">当前 Project 还没有服务或在线节点。</p>
             </article>
@@ -386,8 +378,8 @@
               <p v-if="warnings.micdn" class="load-error">{{ warnings.micdn }}</p>
               <div v-else-if="micdn" class="fact-grid">
                 <div class="fact"><span>监听地址</span><strong>{{ micdn.config.listen || '—' }}</strong></div>
-                <div class="fact"><span>Home</span><strong>{{ micdn.config.home || 'XML 所在目录' }}</strong></div>
-                <div class="fact"><span>日志</span><strong>{{ micdn.config.logFile || 'console' }} · {{ micdn.config.logLevel || 'info' }}</strong></div>
+                <div class="fact"><span>Home</span><strong>~</strong></div>
+                <div class="fact"><span>日志</span><strong>/var/log/micdn/micdn.log · info</strong></div>
                 <div class="fact"><span>Micdn 服务器</span><strong>{{ micdnServers.length }}</strong></div>
                 <div class="fact"><span>Static 绑定</span><strong>{{ staticBindings.length }}</strong></div>
                 <div class="fact"><span>WWW 绑定</span><strong>{{ wwwBindings.length }}</strong></div>
@@ -445,13 +437,13 @@
               <header class="detail-card__head">
                 <div>
                   <h4>仓库与 Blob</h4>
-                  <p>仓库是否声明，以及 Blob 的 bucket 归属。</p>
+                  <p>仓库固定启用，以及 Blob 的 bucket 归属。</p>
                 </div>
               </header>
               <div class="fact-grid">
-                <div class="fact"><span>Maven</span><strong>{{ micdn.config.maven.declared ? '已启用' : '未启用' }}</strong></div>
-                <div class="fact"><span>NPM</span><strong>{{ micdn.config.npm.declared ? '已启用' : '未启用' }}</strong></div>
-                <div class="fact"><span>Native</span><strong>{{ micdn.config.native.declared ? '已启用' : '未启用' }}</strong></div>
+                <div class="fact"><span>Maven</span><strong>已启用</strong></div>
+                <div class="fact"><span>NPM</span><strong>已启用</strong></div>
+                <div class="fact"><span>Native</span><strong>已启用</strong></div>
                 <div class="fact"><span>Blob</span><strong>{{ micdn.project.keySet ? '已启用' : '未启用' }}</strong></div>
                 <div class="fact"><span>Bucket</span><strong>{{ micdn.project.qualifiedName || '—' }}</strong></div>
                 <div class="fact"><span>Bucket Key</span><strong>{{ micdn.project.keySet ? micdn.project.keyMasked : '未设置' }}</strong></div>
@@ -568,29 +560,18 @@ interface InstanceRow {
   running: boolean
 }
 
-/** 一台机器（IP）下按群集归拢的服务；在线状态来自该 IP 的 agent。 */
+/** 节点上的一个服务；在线状态来自该 IP 的 agent。 */
 interface ServerRunEntry {
   key: string
+  ip: string
+  hostName: string
+  online: boolean
   name: string
   farmName: string
   httpPort: string
   proxyPort: string
   heap: string
   running: boolean
-}
-
-interface FarmGroup {
-  name: string
-  servers: ServerRunEntry[]
-}
-
-interface IpGroup {
-  ip: string
-  hostName: string
-  online: boolean
-  running: number
-  stopped: number
-  farms: FarmGroup[]
 }
 
 const sectionItems: SectionItem[] = [
@@ -722,8 +703,8 @@ const instanceRows = computed<InstanceRow[]>(() =>
 const runningInstanceCount = computed(() => instanceRows.value.filter((row) => row.running).length)
 const stoppedInstanceCount = computed(() => instanceRows.value.filter((row) => !row.running).length)
 
-/** 群集与服务 + 在线实例：按主机 IP 分组，组内按群集名、服务名升序。 */
-const ipGroups = computed<IpGroup[]>(() => {
+/** 服务表：运行中的排在停止的上面，同组按节点、群集、服务名排序。 */
+const serviceRows = computed<ServerRunEntry[]>(() => {
   const agentsByIp = new Map<string, AgentStatus>()
   const instancesByAgent = new Map<AgentStatus, AgentInstance[]>()
   for (const agent of onlineAgents.value) {
@@ -733,20 +714,6 @@ const ipGroups = computed<IpGroup[]>(() => {
 
   const entries: ServerRunEntry[] = []
   const seen = new Set<string>()
-  const grouped = new Map<string, { ip: string; hostName: string; online: boolean; entries: ServerRunEntry[] }>()
-
-  const push = (ip: string, hostName: string, online: boolean, entry: ServerRunEntry) => {
-    let group = grouped.get(ip)
-    if (!group) {
-      group = { ip, hostName, online, entries: [] }
-      grouped.set(ip, group)
-    }
-    group.online ||= online
-    group.hostName ||= hostName
-    group.entries.push(entry)
-    entries.push(entry)
-  }
-
   for (const server of servers.value) {
     const host = related(server, 'host', 'hosts')
     const hostIp = attrOf(host, 'ip') || '未分配 IP'
@@ -760,8 +727,11 @@ const ipGroups = computed<IpGroup[]>(() => {
         )
       : undefined
     if (agent && instance?.id) seen.add(`${agent.ip}|${instance.id}`)
-    push(hostIp, hostName, Boolean(agent), {
+    entries.push({
       key: `server:${server.id}`,
+      ip: hostIp,
+      hostName,
+      online: Boolean(agent),
       name: serverName,
       farmName,
       httpPort: attrOf(server, 'httpPort'),
@@ -777,8 +747,11 @@ const ipGroups = computed<IpGroup[]>(() => {
       const id = instance.id ?? ''
       if (!id || seen.has(`${agent.ip}|${id}`)) continue
       const dot = id.indexOf('.')
-      push(agent.ip || '未分配 IP', agent.host || '', true, {
+      entries.push({
         key: `instance:${agent.ip}:${id}`,
+        ip: agent.ip || '未分配 IP',
+        hostName: agent.host || '',
+        online: true,
         name: id,
         farmName: dot > 0 ? id.slice(0, dot) : '未分组',
         httpPort: instance.httpPort ? String(instance.httpPort) : '',
@@ -789,32 +762,13 @@ const ipGroups = computed<IpGroup[]>(() => {
     }
   }
 
-  const groups: IpGroup[] = []
-  for (const group of grouped.values()) {
-    const farms = new Map<string, FarmGroup>()
-    for (const entry of group.entries) {
-      let farm = farms.get(entry.farmName)
-      if (!farm) {
-        farm = { name: entry.farmName, servers: [] }
-        farms.set(entry.farmName, farm)
-      }
-      farm.servers.push(entry)
-    }
-    const farmGroups = [...farms.values()]
-    for (const farm of farmGroups) {
-      farm.servers.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
-    }
-    farmGroups.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
-    groups.push({
-      ip: group.ip,
-      hostName: group.hostName,
-      online: group.online,
-      running: group.entries.filter((entry) => entry.running).length,
-      stopped: group.entries.filter((entry) => !entry.running).length,
-      farms: farmGroups,
-    })
-  }
-  return groups.sort((a, b) => a.ip.localeCompare(b.ip, 'zh-CN', { numeric: true }))
+  const byText = (a: string, b: string) => a.localeCompare(b, 'zh-CN', { numeric: true })
+  return entries.sort((a, b) =>
+    Number(b.running) - Number(a.running) ||
+    byText(a.ip, b.ip) ||
+    byText(a.farmName, b.farmName) ||
+    byText(a.name, b.name),
+  )
 })
 
 const webappRows = computed(() =>
@@ -1198,20 +1152,6 @@ onMounted(load)
   gap: 12px;
 }
 
-.detail-back {
-  flex: none;
-  margin-left: auto;
-  padding: 4px 8px;
-  border-radius: 4px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.detail-back:hover {
-  background: var(--td-bg-color-container-hover);
-  color: var(--td-brand-color);
-}
 
 .detail-card__actions,
 .tag-row {
@@ -1306,6 +1246,15 @@ onMounted(load)
   margin-bottom: 10px;
 }
 
+.section-head > div,
+.detail-card__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
 .section-head h3 {
   margin: 0;
   font-size: 16px;
@@ -1313,7 +1262,7 @@ onMounted(load)
 }
 
 .section-head p {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
@@ -1347,7 +1296,7 @@ onMounted(load)
 }
 
 .detail-card__head p {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
@@ -1400,11 +1349,12 @@ onMounted(load)
 .fact {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 3px;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .fact span {
+  flex: none;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
@@ -1460,122 +1410,34 @@ onMounted(load)
   line-height: 1.6;
 }
 
-.ip-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+.service-table {
+  margin: 0;
 }
 
-.ip-group {
-  overflow: hidden;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
+.service-table__node strong,
+.service-table__node small {
+  display: block;
 }
 
-.ip-group__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  background: var(--td-bg-color-container-hover);
-}
-
-.ip-group__id {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-}
-
-.ip-group__ip {
-  font-size: 14px;
-  font-weight: 600;
+.service-table__node strong {
   font-variant-numeric: tabular-nums;
 }
 
-.ip-group__host {
-  overflow: hidden;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ip-group__count {
-  flex: none;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.farm-group {
-  padding: 10px 12px;
-}
-
-.farm-group + .farm-group {
-  border-top: 1px dashed var(--td-component-stroke);
-}
-
-.farm-group__head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.farm-group__name {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.farm-group__count {
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-}
-
-/* 服务用紧凑卡片铺开，一行可以放多个，不强制一台一行。 */
-.server-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
-}
-
-.server-chip {
-  padding: 8px 10px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
-  background: var(--td-bg-color-container);
-}
-
-.server-chip--offline {
-  background: var(--td-bg-color-container-hover);
-}
-
-.server-chip__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.server-chip__head strong {
-  overflow: hidden;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.server-chip__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-top: 4px;
+.service-table__node small {
+  margin-top: 2px;
   color: var(--td-text-color-placeholder);
   font-size: 11px;
-  font-variant-numeric: tabular-nums;
+}
+
+.service-table__node .t-tag {
+  margin-top: 4px;
+}
+
+.service-table__name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail-table {

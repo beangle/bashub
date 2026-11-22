@@ -1,7 +1,7 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
+      <div class="title-row">
         <h2 class="page-title">BAS 配置中心</h2>
         <p class="page-subtitle">
           后端按 <code>ems</code> / <code>config</code> / <code>micdn</code> / <code>monitor</code>

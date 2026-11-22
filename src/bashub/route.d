@@ -62,7 +62,7 @@ import std.base64 : Base64;
 import std.conv : ConvException, to;
 import std.file : read;
 import std.functional : toDelegate;
-import std.string : indexOf, replace, split, startsWith, strip, toLower;
+import std.string : indexOf, lastIndexOf, replace, split, startsWith, strip, toLower;
 import std.zip : ArchiveMember, CompressionMethod, ZipArchive;
 
 /// `log/follow` 的轮询节拍与窗口。agent 侧仍是普通 `log:read`，SSE 只存在于 hub ↔ 浏览器之间。
@@ -1127,6 +1127,7 @@ class HubService {
       foreach (ref item; catalog)
         byId[jsonText(jsonGet(item, "id"))] = plainComponent(item);
 
+      auto orgs = organizationIndex();
       Json[] deployments;
       foreach (ref row; loadAll(store, reg.find("project-micdn"))) {
         auto projectId = jsonText(jsonGet(row, "id"));
@@ -1157,8 +1158,13 @@ class HubService {
         deployment["projectId"] = Json(projectId);
         deployment["projectName"] = Json(attributeText(project, "name"));
         deployment["projectTitle"] = Json(attributeText(project, "title"));
-        deployment["qualifiedName"] = Json(attributeText(project, "qualifiedName"));
+        auto qualifiedName = attributeText(project, "qualifiedName");
+        deployment["qualifiedName"] = Json(qualifiedName);
         deployment["componentId"] = Json(boundComponentId);
+        auto dot = qualifiedName.indexOf('.');
+        auto orgName = dot > 0 ? qualifiedName[0 .. dot] : "";
+        if (auto org = orgName in orgs)
+          deployment["logoUrl"] = Json(jsonText(jsonGet(*org, "logoUrl")));
         deployment["version"] = Json(componentVersion(bound));
         deployment["contextPath"] = Json(componentContextPath(bound));
         deployments ~= deployment;
@@ -1409,19 +1415,28 @@ class HubService {
         HTTPStatus.unauthorized, "text/plain; charset=utf-8");
   }
 
-  /// 组件版本来自来源坐标的最后一段；仅用于详情展示。
+  /// 组件版本取实际来源坐标：jar 的最后一段、npm 的最后一个 @ 之后；无法识别时为空。
   private string componentVersion(Json component) {
     auto spec = jsonGet(component, "spec");
-    string source;
+    Json source;
     if (jsonText(jsonGet(component, "kind")) == "www_doc")
-      source = jsonText(jsonGet(jsonGet(spec, "source"), "ref"));
+      source = jsonGet(spec, "source");
     else {
       auto sources = jsonGet(spec, "sources");
       if (sources.type == Json.Type.array && sources.length > 0)
-        source = jsonText(jsonGet(sources[0], "ref"));
+        source = sources[0];
     }
-    auto parts = source.split(":");
-    return parts.length > 0 ? parts[$ - 1] : source;
+    auto kind = jsonText(jsonGet(source, "kind"));
+    auto sourceRef = jsonText(jsonGet(source, "ref"));
+    if (kind == "npm") {
+      auto at = sourceRef.lastIndexOf('@');
+      return at > 0 ? sourceRef[(at + 1) .. $] : "";
+    }
+    if (kind == "jar") {
+      auto parts = sourceRef.split(":");
+      return parts.length >= 3 ? parts[$ - 1] : "";
+    }
+    return "";
   }
 
   private string componentContextPath(Json component) {

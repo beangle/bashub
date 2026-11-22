@@ -115,6 +115,8 @@ micdn.xml 负责中心上游、SNAPSHOT/NPM dev 和 native 回源。
 - Project 详情页代理卡片增加「应用到节点」按钮，带确认和失败节点提示；目标节点未全部在线时按钮禁用。
 - Project 详情页 Micdn 卡片增加「Reload micdn」；登记节点未全部在线时禁用。
 - Project 详情页 BAS 服务卡片增加「打开监控」，带当前 Project 跳到在线节点页。
+- 详情页统一为“标题 + 返回链接 + 右侧操作按钮”的单行标题结构，返回链接不再单独占用一行；组件/构件详情页移除重复返回按钮。
+- Project 详情页「节点与服务」改为表格，运行中在上、已停止在下；列包含节点、群集、服务、HTTP/代理端口、堆和状态。
 - 在线节点页在 Project 标题下方增加紧凑摘要，展示 BAS 统计（0 停止时省略）、Micdn 节点 IP/组件状态、代理 IP/引擎版本/状态；代理状态来自 agent 上报的 `proxyState`，服务停止时显示「已停止」；Micdn 不再重复显示 `1/1 在线`；Micdn 状态来自 agent 上报的 `micdn.active`，服务停止时显示「已停止」；
   全部在线时提供 Reload micdn 和「应用到节点」，否则禁用。
 
@@ -123,13 +125,42 @@ micdn.xml 负责中心上游、SNAPSHOT/NPM dev 和 native 回源。
 ### Blob 身份与目录
 
 Micdn `<bucket name>` 使用 Project 的 `qualifiedName`（例如 `openurp.prod`），不再使用显示名称；
-Blob 本地目录固定为 `~/blob`，配置页不再提供目录输入。旧配置里的 `blob.base` 会在下一次保存时
+Blob 本地目录固定为 `~/blob`，配置页不再提供目录输入；图片同站匿名读取固定开启，配置页不再提供开关。
+旧配置里的 `blob.base` / `publicImages` 会在下一次保存时
 被归一化丢弃。
 
-### Micdn 默认日志文件
+### 区块标题行合并
 
-Micdn 配置的日志文件默认值改为 `/var/log/micdn/micdn.log`，下发的 `micdn.xml` 显式写
-`log-file="/var/log/micdn/micdn.log"`；需要走 journal 时仍可手工改为 `console`。
+Project 详情的「概览」、各详情卡片的标题与说明，以及 Micdn 配置/组件目录/绑定编辑器的标题与说明合并到同一行，减少纵向占用。
+
+### 静态组件详情
+
+静态组件详情页的部署表增加 Project Logo，表格样式与构件详情统一；静态组件不显示版本列。
+
+### 标题行合并
+
+各列表/详情页把标题和灰色说明合并到同一行；返回链接与操作按钮仍在标题行内，减少页面纵向占用。
+
+### 详情页与组件列表
+
+组件、构件、Project 详情的事实项改为左侧标题、右侧内容；组件目录增加实际版本列，组件详情的部署表改用紧凑常规表格，jar/npm 版本取真实坐标而不是整段 ref。
+
+### 仓库固定启用
+
+Maven、NPM、Native 固定启用，配置页不再提供“是否启用”开关；旧 `declared` 字段会在下一次保存时被归一化丢弃。
+
+### Micdn 配置页布局
+
+Blob 存储并入「基础」页，不再单独占一个页签；不可修改的默认值（home、日志、bucket 身份、Blob 目录、公开读取）写在各自标题行中。仓库鉴权的「生成/重新生成」按钮移到下载密钥输入框下方。
+
+### Micdn home 固定
+
+Micdn 的 `home` 固定为 `~`，maven/npm/native/static/www 的 base 固定为 `~/...`；配置页不再提供 Home 输入，旧 `home` 会在下一次保存时被归一化丢弃。
+
+### Micdn 日志文件
+
+Micdn 的日志文件固定为 `/var/log/micdn/micdn.log`，日志级别固定为 `info`，下发的 `micdn.xml`
+始终写 `log-file="/var/log/micdn/micdn.log"`；配置页不再提供日志文件、console 或日志级别选项。
 
 ### Micdn 配置页合并
 

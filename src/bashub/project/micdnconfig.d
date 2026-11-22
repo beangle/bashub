@@ -63,33 +63,22 @@ struct MicdnProjectView {
   string projectKey;
 }
 
-private immutable string[] logLevels = [
-  "trace", "debugv", "debug-v", "debug", "diagnostic", "verbose",
-  "info", "warn", "warning", "error", "critical", "fatal",
-];
-
-/// 前端/接口使用的空配置。缺省不声明 maven/npm/native，也不挂任何组件。
+/// 前端/接口使用的空配置。maven/npm/native 固定启用，默认不绑定组件。
 Json defaultMicdnConfig() {
   auto root = Json.emptyObject;
-  root["home"] = Json("");
   root["listen"] = Json("0.0.0.0:8888");
-  root["logFile"] = Json("/var/log/micdn/micdn.log");
-  root["logLevel"] = Json("info");
 
   auto maven = Json.emptyObject;
-  maven["declared"] = Json(false);
   maven["remotes"] = Json.emptyArray;
   maven["snapshotRemote"] = Json("");
   root["maven"] = maven;
 
   auto npm = Json.emptyObject;
-  npm["declared"] = Json(false);
   npm["remotes"] = Json.emptyArray;
   npm["devRemote"] = Json("");
   root["npm"] = npm;
 
   auto native = Json.emptyObject;
-  native["declared"] = Json(false);
   root["native"] = native;
 
   auto auth = Json.emptyObject;
@@ -105,7 +94,6 @@ Json defaultMicdnConfig() {
 
   auto blob = Json.emptyObject;
   blob["maxSize"] = Json("100M");
-  blob["publicImages"] = Json(true);
   root["blob"] = blob;
   root["servers"] = Json.emptyArray;
   auto prune = Json.emptyObject;
@@ -120,16 +108,9 @@ Json defaultMicdnConfig() {
 Json normalizeMicdnConfig(Json input) {
   auto source = input.type == Json.Type.object ? input : Json.emptyObject;
   auto result = defaultMicdnConfig();
-  copyText(source, result, "home");
   copyText(source, result, "listen");
-  copyText(source, result, "logFile");
-  copyText(source, result, "logLevel");
   if (field(result, "listen").length == 0)
     result["listen"] = Json("0.0.0.0:8888");
-  if (field(result, "logFile").length == 0)
-    result["logFile"] = Json("/var/log/micdn/micdn.log");
-  if (field(result, "logLevel").length == 0)
-    result["logLevel"] = Json("info");
 
   normalizeMaven(source, result);
   normalizeNpm(source, result);
@@ -422,18 +403,12 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   xml.put(`<?xml version="1.0" encoding="UTF-8"?>`);
   xml.put("\n<micdn");
   putAttr(xml, "listen", field(config, "listen"));
-  putAttr(xml, "home", field(config, "home"));
-  auto logFile = field(config, "logFile");
-  if (logFile != "console")
-    putAttr(xml, "log-file", logFile);
-  auto logLevel = field(config, "logLevel");
-  if (logLevel != "info")
-    putAttr(xml, "log-level", logLevel);
+  putAttr(xml, "home", "~");
+  putAttr(xml, "log-file", "/var/log/micdn/micdn.log");
   xml.put(">\n");
 
   auto maven = jsonGet(config, "maven");
-  if (flag(maven, "declared", false)) {
-    xml.put("  <maven");
+  xml.put("  <maven");
     putAttr(xml, "base", defaultRepoBase(config, "/maven"));
     xml.put(">\n");
     auto remotes = textList(jsonGet(maven, "remotes"));
@@ -452,18 +427,16 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
       putAttr(xml, "token", maskSecrets && upstreamSnapshotToken.length > 0 ? "********" : upstreamSnapshotToken);
       xml.put("/>\n");
     }
-    xml.put("  </maven>\n");
-  }
+  xml.put("  </maven>\n");
 
   auto npm = jsonGet(config, "npm");
-  if (flag(npm, "declared", false)) {
-    xml.put("  <npm");
+  xml.put("  <npm");
     putAttr(xml, "base", defaultRepoBase(config, "/npm"));
     xml.put(">\n");
-    auto remotes = textList(jsonGet(npm, "remotes"));
-    if (remotes.length == 0)
-      remotes = defaultMicdnNpmRemotes.dup;
-    foreach (url; remotes) {
+    auto npmRemotes = textList(jsonGet(npm, "remotes"));
+    if (npmRemotes.length == 0)
+      npmRemotes = defaultMicdnNpmRemotes.dup;
+    foreach (url; npmRemotes) {
       xml.put("    <remote");
       putAttr(xml, "url", url);
       xml.put("/>\n");
@@ -475,12 +448,10 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
       putAttr(xml, "token", maskSecrets && upstreamDevToken.length > 0 ? "********" : upstreamDevToken);
       xml.put("/>\n");
     }
-    xml.put("  </npm>\n");
-  }
+  xml.put("  </npm>\n");
 
   auto nativeCfg = jsonGet(config, "native");
-  if (flag(nativeCfg, "declared", false)) {
-    xml.put("  <native");
+  xml.put("  <native");
     putAttr(xml, "base", defaultRepoBase(config, "/native"));
     if (nativeRemoteDefault.length == 0) {
       xml.put("/>\n");
@@ -493,7 +464,6 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
       xml.put("/>\n");
       xml.put("  </native>\n");
     }
-  }
 
   auto auth = jsonGet(config, "auth");
   auto publishKey = field(auth, "publishKey");
@@ -520,8 +490,6 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
     xml.put("    <bucket");
     putAttr(xml, "name", projectQualifiedName.strip);
     putAttr(xml, "key", maskSecrets ? maskSecret(key) : key);
-    if (!flag(blob, "publicImages", true))
-      putAttr(xml, "publicImages", "false");
     xml.put("/>\n");
     xml.put("  </blob>\n");
   }
@@ -718,7 +686,6 @@ Json plainComponent(Json resource) {
 private void normalizeMaven(Json source, ref Json result) {
   auto section = objectAt(source, "maven");
   auto target = jsonGet(result, "maven");
-  target["declared"] = Json(flag(section, "declared", false));
   target["remotes"] = stringArrayJson(normalizeRemotes(jsonGet(section, "remotes")));
   target["snapshotRemote"] = Json(stripTrailingSlash(field(section, "snapshotRemote")));
   result["maven"] = target;
@@ -727,7 +694,6 @@ private void normalizeMaven(Json source, ref Json result) {
 private void normalizeNpm(Json source, ref Json result) {
   auto section = objectAt(source, "npm");
   auto target = jsonGet(result, "npm");
-  target["declared"] = Json(flag(section, "declared", false));
   target["remotes"] = stringArrayJson(normalizeRemotes(jsonGet(section, "remotes")));
   target["devRemote"] = Json(stripTrailingSlash(field(section, "devRemote")));
   result["npm"] = target;
@@ -736,7 +702,6 @@ private void normalizeNpm(Json source, ref Json result) {
 private void normalizeNative(Json source, ref Json result) {
   auto section = objectAt(source, "native");
   auto target = jsonGet(result, "native");
-  target["declared"] = Json(flag(section, "declared", false));
   result["native"] = target;
 }
 
@@ -774,7 +739,6 @@ private void normalizeBlob(Json source, ref Json result) {
   auto target = jsonGet(result, "blob");
   auto maxSize = field(section, "maxSize");
   target["maxSize"] = Json(maxSize.length > 0 ? maxSize : "100M");
-  target["publicImages"] = Json(flag(section, "publicImages", true));
   result["blob"] = target;
 }
 
@@ -858,22 +822,13 @@ private void validateMicdnConfig(Json config) {
     throw new MicdnConfigException("listen", "listen 端口必须是数字");
   }
 
-  auto logLevel = field(config, "logLevel").toLower;
-  if (!logLevels.canFind(logLevel))
-    throw new MicdnConfigException("logLevel", "不支持的日志级别: " ~ logLevel);
-
   auto maven = jsonGet(config, "maven");
-  if (flag(maven, "declared", false)) {
-    defaultRepoBase(config, "/maven");
-    validateRemotes(jsonGet(maven, "remotes"), "maven.remotes");
-  }
+  defaultRepoBase(config, "/maven");
+  validateRemotes(jsonGet(maven, "remotes"), "maven.remotes");
   auto npm = jsonGet(config, "npm");
-  if (flag(npm, "declared", false)) {
-    defaultRepoBase(config, "/npm");
-    validateRemotes(jsonGet(npm, "remotes"), "npm.remotes");
-  }
-  if (flag(jsonGet(config, "native"), "declared", false))
-    defaultRepoBase(config, "/native");
+  defaultRepoBase(config, "/npm");
+  validateRemotes(jsonGet(npm, "remotes"), "npm.remotes");
+  defaultRepoBase(config, "/native");
 
   auto auth = jsonGet(config, "auth");
   validateSize(field(auth, "maxSize"), "auth.maxSize");
@@ -889,10 +844,9 @@ private void validateBlobIdentity(string projectQualifiedName, string projectKey
   validateSingleName(projectQualifiedName.strip, "project.qualifiedName");
 }
 
-/** maven/npm/native 的存储目录固定为 `{home}/<sub>`，不读取配置里的 base。 */
+/** maven/npm/native 的存储目录固定为 `~/<sub>`，不读取配置里的 base。 */
 private string defaultRepoBase(Json config, string defaultSubDir) {
-  auto home = field(config, "home");
-  return home.length > 0 ? home ~ defaultSubDir : defaultSubDir;
+  return "~" ~ defaultSubDir;
 }
 
 

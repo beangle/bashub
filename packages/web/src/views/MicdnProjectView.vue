@@ -1,10 +1,12 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
-        <router-link class="detail-back" to="/config/org-config?tab=projects">← 返回配置管理</router-link>
-        <h2 class="page-title">{{ projectTitle }}</h2>
-        <p class="page-subtitle">{{ doc?.project.title || 'Micdn 部署配置' }}</p>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">{{ projectTitle }}</h2>
+          <p class="page-subtitle">{{ doc?.project.title || 'Micdn 部署配置' }}</p>
+          <router-link class="title-back" to="/config/org-config?tab=projects">← 返回配置管理</router-link>
+        </div>
       </div>
       <div class="page-actions">
         <t-button variant="outline" @click="router.push('/micdn/components')">组件目录</t-button>
@@ -23,25 +25,16 @@
             <header class="config-card__head">
               <div>
                 <h3>运行参数</h3>
-                <p>对应 micdn.xml 根属性；home 为空时由 micdn 使用 XML 所在目录。</p>
+                <p>
+                  固定 <code>home=~</code>、<code>log-file=/var/log/micdn/micdn.log</code>、
+                  <code>log-level=info</code>；只需配置监听地址与节点 IP。
+                </p>
               </div>
             </header>
-            <div class="form-grid form-grid--base">
+            <div class="form-grid">
               <label class="form-field">
                 <span>监听地址</span>
                 <t-input v-model="config.listen" placeholder="0.0.0.0:8888" />
-              </label>
-              <label class="form-field">
-                <span>Home</span>
-                <t-input v-model="config.home" placeholder="/var/lib/micdn" />
-              </label>
-              <label class="form-field">
-                <span>日志文件</span>
-                <t-input v-model="config.logFile" placeholder="/var/log/micdn/micdn.log" />
-              </label>
-              <label class="form-field">
-                <span>日志级别</span>
-                <t-select v-model="config.logLevel" :options="logLevelOptions" />
               </label>
               <label class="form-field">
                 <span>Micdn 节点 IP</span>
@@ -67,23 +60,19 @@
                 <t-checkbox v-if="config.auth.publishKeySet" v-model="clearPublishKey">清空发布密钥</t-checkbox>
               </div>
               <div class="form-field">
-                <span>
-                  下载密钥 download-key
-                  <t-button
-                    size="small"
-                    variant="text"
-                    @click="generateDownloadKey"
-                  >
-                    {{ config.auth.downloadKeySet ? '重新生成' : '生成' }}
-                  </t-button>
-                </span>
+                <span>下载密钥 download-key</span>
                 <t-input
                   v-model="authDraft.downloadKey"
                   type="password"
                   :placeholder="config.auth.downloadKeySet ? '已设置，留空保持不变' : '未设置'"
                   clearable
                 />
-                <t-checkbox v-if="config.auth.downloadKeySet" v-model="clearDownloadKey">清空下载密钥</t-checkbox>
+                <div class="form-field__actions">
+                  <t-button size="small" variant="text" @click="generateDownloadKey">
+                    {{ config.auth.downloadKeySet ? '重新生成' : '生成' }}
+                  </t-button>
+                  <t-checkbox v-if="config.auth.downloadKeySet" v-model="clearDownloadKey">清空下载密钥</t-checkbox>
+                </div>
               </div>
               <label class="form-field">
                 <span>上传大小上限</span>
@@ -95,15 +84,42 @@
           <section class="config-card">
             <header class="config-card__head">
               <div>
+                <h3>Blob 存储</h3>
+                <p>
+                  bucket 名称固定为 Project <code>qualifiedName</code>，本地目录固定为 <code>~/blob</code>；
+                  图片同站匿名读取固定开启，只可调整上传大小上限。
+                </p>
+              </div>
+            </header>
+            <div class="form-grid form-grid--base">
+              <div class="form-field">
+                <span>Bucket 名称</span>
+                <code class="blob-readonly">{{ doc.project.qualifiedName }}</code>
+              </div>
+              <div class="form-field">
+                <span>Bucket Key</span>
+                <code class="blob-readonly">{{ doc.project.keyMasked || '未设置' }}</code>
+                <small v-if="doc.project.keySet">来自 Project key，仅显示首尾字符。</small>
+                <small v-else class="danger-text">当前 Project 没有 key，不会生成 Blob。</small>
+              </div>
+              <label class="form-field">
+                <span>上传大小上限</span>
+                <t-input v-model="config.blob.maxSize" placeholder="100M" />
+              </label>
+            </div>
+          </section>
+
+          <section class="config-card">
+            <header class="config-card__head">
+              <div>
                 <h3>仓库</h3>
-                <p>固定挂载 <code>{home}/maven</code>、<code>/npm</code>、<code>/native</code>；只需配置上游。</p>
+                <p>Maven、NPM、Native 固定启用；本地目录固定为 <code>~/maven</code>、<code>~/npm</code>、<code>~/native</code>，只需配置上游。</p>
               </div>
             </header>
             <div class="repo-config">
               <div class="repo-config__row">
                 <div class="repo-config__head">
                   <strong>Maven</strong>
-                  <t-switch v-model="config.maven.declared" size="small" />
                 </div>
                 <div class="repo-config__body">
                   <label class="form-field">
@@ -127,7 +143,6 @@
               <div class="repo-config__row">
                 <div class="repo-config__head">
                   <strong>NPM</strong>
-                  <t-switch v-model="config.npm.declared" size="small" />
                 </div>
                 <div class="repo-config__body">
                   <label class="form-field">
@@ -152,13 +167,12 @@
               <div class="repo-config__row">
                 <div class="repo-config__head">
                   <strong>Native</strong>
-                  <t-switch v-model="config.native.declared" size="small" />
                 </div>
                 <div class="repo-config__body">
                   <label class="form-field">
                     <span>中心上游</span>
                     <t-input :model-value="nativeUpstream" readonly size="small" />
-                    <span class="form-hint">本地 <code>{home}/native</code> 缺失时自动回源，无需保存</span>
+                    <span class="form-hint">本地 <code>~/native</code> 缺失时自动回源，无需保存</span>
                   </label>
                 </div>
               </div>
@@ -172,38 +186,6 @@
 
         <template v-else-if="activeTab === 'www'">
           <MicdnBindingEditor v-model="bindings" kind="www_doc" :components="components" />
-        </template>
-
-        <template v-else-if="activeTab === 'blob'">
-          <section class="config-card">
-            <header class="config-card__head">
-              <div>
-                <h3>Blob 存储</h3>
-                <p>Project 有 key 时自动生成唯一的 <code>&lt;bucket&gt;</code>；没有 key 时不生成 Blob。</p>
-              </div>
-            </header>
-            <div class="form-grid">
-              <div class="form-field">
-                <span>Bucket 名称</span>
-                <code class="readonly-value">{{ doc.project.qualifiedName }}</code>
-                <small>来自 Project qualifiedName，不能单独修改。</small>
-              </div>
-              <div class="form-field">
-                <span>Bucket Key</span>
-                <code class="readonly-value">{{ doc.project.keyMasked || '未设置' }}</code>
-                <small v-if="doc.project.keySet">来自 Project key，仅显示首尾字符。</small>
-                <small v-else class="danger-text">当前 Project 没有 key，不会生成 Blob。</small>
-              </div>
-              <label class="form-field">
-                <span>上传大小上限</span>
-                <t-input v-model="config.blob.maxSize" placeholder="100M" />
-              </label>
-              <div class="form-field form-field--switch">
-                <span>公开读取</span>
-                <t-switch v-model="config.blob.publicImages" />
-              </div>
-            </div>
-          </section>
         </template>
 
         <template v-else>
@@ -252,14 +234,8 @@ const tabs: UnderlineTabItem[] = [
   { value: 'base', label: '基础' },
   { value: 'static', label: 'Static' },
   { value: 'www', label: 'WWW' },
-  { value: 'blob', label: 'Blob' },
   { value: 'preview', label: '预览' },
 ]
-
-const logLevelOptions = [
-  'trace', 'debugv', 'debug-v', 'debug', 'diagnostic', 'verbose',
-  'info', 'warn', 'warning', 'error', 'critical', 'fatal',
-].map((value) => ({ value, label: value }))
 
 const doc = ref<MicdnProjectDocument>()
 const config = ref<MicdnConfig>(defaultMicdnConfig())
@@ -436,16 +412,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.detail-back {
-  display: inline-block;
-  margin-bottom: 4px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-}
-
-.detail-back:hover {
-  color: var(--td-brand-color);
-}
 
 .page-actions {
   display: flex;
@@ -477,6 +443,15 @@ onMounted(load)
   border-bottom: 1px solid var(--td-component-stroke);
 }
 
+.config-card__head > div,
+.preview-card__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
 .config-card__head h3,
 .preview-card__head h3 {
   margin: 0;
@@ -486,7 +461,7 @@ onMounted(load)
 
 .config-card__head p,
 .preview-card__head p {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
@@ -537,26 +512,26 @@ onMounted(load)
   font-size: 13px;
 }
 
-.form-field--switch {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
 .form-field small {
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
 
-.readonly-value {
+.form-field__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.blob-readonly {
   display: block;
-  min-height: 32px;
-  padding: 6px 10px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 4px;
-  background: var(--td-bg-color-container-hover);
+  min-width: 0;
   color: var(--td-text-color-primary);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .danger-text {

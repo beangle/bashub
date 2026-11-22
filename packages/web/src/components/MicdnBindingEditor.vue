@@ -103,9 +103,9 @@ const title = computed(() => `${kindLabel.value}绑定`)
 const description = computed(() => {
   switch (props.kind) {
     case 'static_bundle':
-      return '挂载名在组件目录维护，对应 /static/{mountName}/；bundle 按挂载名字母排序，来源按 provider 稳定排序。'
+      return '本地目录固定为 ~/asset，对应 /static/{mountName}/；挂载名在组件目录维护，bundle 按挂载名字母排序。'
     case 'www_doc':
-      return '文档路径在组件目录维护，对应 /www/{mountName}/；绑定按挂载名排序。'
+      return '本地目录固定为 ~/www，对应 /www/{mountName}/；文档路径在组件目录维护，绑定按挂载名排序。'
     default:
       return ''
   }
@@ -173,6 +173,14 @@ function specSummary(spec: MicdnBinding['spec']): string {
   border-bottom: 1px solid var(--td-component-stroke);
 }
 
+.binding-editor__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
 .binding-editor__head h3 {
   margin: 0;
   font-size: 14px;
@@ -180,7 +188,7 @@ function specSummary(spec: MicdnBinding['spec']): string {
 }
 
 .binding-editor__head p {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }

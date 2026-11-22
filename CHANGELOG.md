@@ -54,11 +54,19 @@
   的本地 micdn（`servers[].host` + `listen`），没有 host 时三个元素都不生成；不再使用 Project 的
   `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
   节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
+- **区块标题行合并**：Project 详情的「概览」说明、各详情卡片的标题与说明，以及 Micdn 配置/组件目录/绑定编辑器的标题与说明合并到同一行。
+- **静态组件详情**：部署表增加 Project Logo，表格样式与构件详情统一，静态组件不显示版本列。
+- **标题行合并**：各列表/详情页的标题与灰色说明合并到同一行，返回链接和右侧操作保持同一标题行，减少纵向占用。
+- **详情页事实行压缩**：组件、构件、Project 详情的事实项改为“标题在左、内容在右”的横向排列，减少三列卡片的垂直占用。
+- **组件版本列**：组件目录列表增加实际版本列；组件详情部署表改用紧凑常规表格并显示真实 jar/npm 版本。
+- **仓库固定启用**：Maven、NPM、Native 默认全部启用，移除“是否启用”开关；旧 `declared` 字段在保存时归一化丢弃。
+- **Blob 配置移到基础页**：Blob 存储卡片并入「基础」页，移除独立 Blob 页签；不可改的 bucket 身份/目录/公开读取规则写在卡片标题中，只保留上传大小上限。
+- **仓库鉴权操作位置**：下载密钥的「生成/重新生成」按钮移到输入框下方。
+- **Blob 公开读取固定**：图片同站匿名读取始终开启，移除配置页的开关和说明文案；旧 `publicImages` 字段在下一次保存时归一化丢弃。
 - **Blob 身份与目录固定**：Micdn 的 `<bucket name>` 改用 Project 的 `qualifiedName`，不再用显示名；
   Blob 本地目录固定为 `~/blob`，移除配置页的目录输入；旧 `blob.base` 在下一次保存时归一化丢弃。
-- **Micdn 默认日志文件**：新建/空配置的 `logFile` 默认写
-  `/var/log/micdn/micdn.log`，下发的 `micdn.xml` 带 `log-file`；仍可在配置页显式改成
-  `console`。
+- **Micdn home 固定**：`micdn.xml` 根属性 `home` 固定为 `~`，maven/npm/native/static/www 的 base 固定为 `~/...`；移除配置页 Home 输入，旧 `home` 在下一次保存时归一化丢弃。
+- **Micdn 日志固定**：`micdn.xml` 始终写 `log-file="/var/log/micdn/micdn.log"`，日志级别固定 `info`；移除配置页的日志文件、console 和日志级别选项。
 - **Micdn 基础页合并**：Maven / NPM / Native 合并为基础页里的一个紧凑「仓库」区块，
   移除独立页签；Native 保留启用开关和只读中心上游，上游输入区压缩为两行。
 - **NPM 开发版上游固定**：Micdn 配置页把当前 origin 的 `/npm` 保存到 `npm.devRemote`，与
@@ -79,6 +87,8 @@
 - **Server 开机自启**：`cfg_servers` 增加 `auto_start`、`wait_for`；server.xml 输出
   `<auto-start>` / `<wait-for>`，管理台服务表单可配置，供 basagent 自动启动本机节点。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- **详情页标题行统一**：返回链接移到标题/Project 名称之后，操作按钮保持在标题行最右侧；去掉单独占一行的返回链接，并清理组件/构件详情页重复的返回按钮。
+- **BAS 服务表**：Project 详情页的「节点与服务」由分组卡片改为表格，按节点、群集、服务、端口、堆和状态展示；运行中的服务排在前面，已停止的排在后面。
 - **监控代理服务状态**：agent 在 `report:health` 上报 `proxyState.haproxy/nginx`；监控摘要按实际服务状态显示「在线 / 已停止 / 节点离线」，不再用 agent 在线代替 haproxy/nginx 运行状态。
 - **监控 Micdn 服务状态**：agent 在 `report:os` / `report:health` 上报 `micdn.active`；
   监控摘要和 Project 详情按实际服务状态显示「在线 / 已停止 / 节点离线」，不再把 agent 在线当作

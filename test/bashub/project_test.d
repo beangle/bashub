@@ -301,34 +301,35 @@ unittest {
   state.config["maven"]["base"] = Json("/tmp/not-micdn");
   auto xml = renderMicdnXml(state.config, state.components,
       attributeText(project.data, "qualifiedName"), attributeText(project.data, "key"));
-  assert(xml.canFind(`<maven base="/var/lib/micdn/maven">`));
+  assert(xml.canFind(`<maven base="~/maven">`));
   assert(!xml.canFind("/tmp/not-micdn"));
-  assert(xml.canFind(`<static base="/var/lib/micdn/asset">`));
+  assert(xml.canFind(`<static base="~/asset">`));
   assert(xml.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
-  assert(xml.canFind(`<www base="/var/lib/micdn/www">`));
+  assert(xml.canFind(`<www base="~/www">`));
   assert(xml.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
   assert(xml.canFind(`<blob base="~/blob" max-size="50M">`));
   assert(xml.canFind(`<bucket name="openurp.prod" key="fedcba9876543210fedcba9876543210"/>`));
 }
 
-@("micdn render omits every optional section when nothing is configured")
+@("micdn render always includes the three repositories")
 unittest {
   auto xml = renderMicdnXml(defaultMicdnConfig(), [], "", "");
-  assert(xml.canFind(`<micdn listen="0.0.0.0:8888" log-file="/var/log/micdn/micdn.log">`));
+  assert(xml.canFind(`<micdn listen="0.0.0.0:8888" home="~" log-file="/var/log/micdn/micdn.log">`));
   assert(xml.canFind(`<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`));
-  foreach (section; ["maven", "npm", "native", "auth", "static", "www", "blob"])
+  assert(xml.canFind(`<maven base="~/maven">`));
+  assert(xml.canFind(`<npm base="~/npm">`));
+  assert(xml.canFind(`<native base="~/native"/>`));
+  foreach (section; ["auth", "static", "www", "blob"])
     assert(!xml.canFind("<" ~ section), section ~ "\n" ~ xml);
 }
-
-@("micdn render escapes XML attribute values")
+@("micdn ignores a legacy home and always uses ~")
 unittest {
   auto config = defaultMicdnConfig();
   config["home"] = Json(`/srv/a&b"<demo>`);
-  auto xml = renderMicdnXml(config, [], "", "", false, `https://example.test/a?x=1&y=2`);
-  assert(xml.canFind(`home="/srv/a&amp;b&quot;&lt;demo&gt;"`));
+  auto xml = renderMicdnXml(config, [], "", "");
+  assert(xml.canFind(`home="~"`));
   assert(!xml.canFind(`/srv/a&b"<demo>`));
 }
-
 @("micdn component specs reject mismatched providers")
 unittest {
   auto mixed = parseJsonString(`{"sources":[
@@ -354,7 +355,6 @@ unittest {
 @("micdn static bundles and providers use deterministic ordering")
 unittest {
   auto config = defaultMicdnConfig();
-  config["home"] = Json("/srv/micdn");
   auto zetaSpec = parseJsonString(`{"sources":[
     {"kind":"npm","ref":"z-npm@1","inner":""},
     {"kind":"jar","ref":"z:jar:1","inner":""},
@@ -547,9 +547,7 @@ unittest {
 @("micdn render writes global upstream tokens and masks them in preview")
 unittest {
   auto config = defaultMicdnConfig();
-  config["maven"]["declared"] = Json(true);
   config["maven"]["snapshotRemote"] = Json("https://hub.example/maven");
-  config["npm"]["declared"] = Json(true);
   config["npm"]["devRemote"] = Json("http://central/npm");
 
   auto xml = renderMicdnXml(config, [], "", "", false, "", "dev-token", "snap-token");
@@ -565,10 +563,7 @@ unittest {
 
 @("micdn render defaults formal remotes and uses stored snapshot") unittest {
   auto config = defaultMicdnConfig();
-  config["maven"]["declared"] = Json(true);
   config["maven"]["snapshotRemote"] = Json("https://hub.example/maven");
-  config["npm"]["declared"] = Json(true);
-  config["native"]["declared"] = Json(true);
   auto xml = renderMicdnXml(config, [], "prod", "key", false, "",
       "", "snap-token", "https://hub.example/native");
   assert(xml.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
@@ -576,7 +571,7 @@ unittest {
   assert(xml.canFind(`<snapshot remote="https://hub.example/maven" token="snap-token"/>`));
   assert(xml.canFind(`<remote url="https://registry.npmmirror.com"/>`));
   assert(xml.canFind(`<remote url="https://registry.npmjs.org"/>`));
-  assert(xml.canFind(`<native base="/native">`));
+  assert(xml.canFind(`<native base="~/native">`));
   assert(xml.canFind(`<remote url="https://hub.example/native" token="snap-token"/>`));
 }
 
@@ -597,7 +592,7 @@ unittest {
 }
 
 
-@("micdn normalize drops legacy maven/npm/native/www/static/blob base fields") unittest {
+@("micdn normalize drops legacy maven/npm/native/www/static/blob base and logFile fields") unittest {
   auto raw = defaultMicdnConfig();
   raw["maven"]["base"] = Json("/legacy/maven");
   raw["npm"]["base"] = Json("/legacy/npm");
@@ -605,6 +600,10 @@ unittest {
   raw["www"]["base"] = Json("/legacy/www");
   raw["static"]["base"] = Json("/legacy/static");
   raw["blob"]["base"] = Json("/legacy/blob");
+  raw["home"] = Json("/legacy/home");
+  raw["logFile"] = Json("console");
+  raw["logLevel"] = Json("debug");
+  raw["blob"]["publicImages"] = Json(false);
   auto config = normalizeMicdnConfig(raw);
   assert(jsonGet(jsonGet(config, "maven"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "npm"), "base").type == Json.Type.undefined);
@@ -612,4 +611,8 @@ unittest {
   assert(jsonGet(jsonGet(config, "www"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "static"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "blob"), "base").type == Json.Type.undefined);
+  assert(jsonGet(config, "home").type == Json.Type.undefined);
+  assert(jsonGet(config, "logFile").type == Json.Type.undefined);
+  assert(jsonGet(config, "logLevel").type == Json.Type.undefined);
+  assert(jsonGet(jsonGet(config, "blob"), "publicImages").type == Json.Type.undefined);
 }

@@ -1,12 +1,13 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
-        <router-link class="detail-back" :to="listPath">← 返回组件管理</router-link>
-        <h2 class="page-title">{{ artifactName || '组件详情' }}</h2>
-        <p class="page-subtitle">{{ artifactGav || '可部署的 jar/war 构件' }}</p>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">{{ artifactName || '组件详情' }}</h2>
+          <p class="page-subtitle">{{ artifactGav || '可部署的 jar/war 构件' }}</p>
+          <router-link class="title-back" :to="listPath">← 返回组件管理</router-link>
+        </div>
       </div>
-      <t-button variant="outline" @click="router.push(listPath)">返回列表</t-button>
     </div>
 
     <t-loading :loading="loading" show-overlay>
@@ -41,7 +42,7 @@
           </header>
           <table v-if="webapps.length > 0" class="detail-table">
             <thead>
-              <tr><th>Logo</th><th>Name</th><th>标题</th><th>部署路径</th></tr>
+              <tr><th>Logo</th><th>Project</th><th>标题</th><th>实际版本</th><th>部署路径</th></tr>
             </thead>
             <tbody>
               <tr v-for="webapp in webapps" :key="webapp.id">
@@ -51,6 +52,7 @@
                 </td>
                 <td>{{ projectName(webapp) }}</td>
                 <td>{{ projectTitle(webapp) }}</td>
+                <td><code>{{ attributeText(webapp.attributes.version) || '—' }}</code></td>
                 <td><code>{{ attributeText(webapp.attributes.contextPath) || '—' }}</code></td>
               </tr>
             </tbody>
@@ -156,16 +158,6 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.detail-back {
-  display: inline-block;
-  margin-bottom: 4px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-}
-
-.detail-back:hover {
-  text-decoration: underline;
-}
 
 .detail-card {
   overflow: hidden;
@@ -183,13 +175,21 @@ onMounted(async () => {
   border-bottom: 1px solid var(--td-component-stroke);
 }
 
+.detail-card__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
 .detail-card__head h4 {
   margin: 0;
   font-size: 15px;
 }
 
 .detail-card__head p {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--td-text-color-secondary);
   font-size: 13px;
 }
@@ -204,17 +204,20 @@ onMounted(async () => {
 .fact {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 3px;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .fact span {
+  flex: none;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
 
 .fact strong,
 .fact code {
+  min-width: 0;
+  flex: 1;
   overflow-wrap: anywhere;
   color: var(--td-text-color-primary);
   font-size: 13px;

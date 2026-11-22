@@ -1,7 +1,7 @@
 <template>
   <section class="page-panel page-panel--workbench">
     <div class="page-head">
-      <div>
+      <div class="title-row">
         <h2 class="page-title">{{ schema.title }}</h2>
         <p v-if="schema.description" class="page-subtitle">{{ schema.description }}</p>
       </div>

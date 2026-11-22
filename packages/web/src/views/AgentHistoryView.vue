@@ -1,13 +1,15 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
-        <router-link class="detail-back" to="/monitor/agents">← 在线节点</router-link>
-        <h2 class="page-title">运行历史</h2>
-        <p class="page-subtitle">
-          {{ project || '-' }} · 最近 {{ days }} 天；采样窗口与频率由 bashub 的
-          <code>&lt;agent health-interval&gt;</code> 配置决定。
-        </p>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">运行历史</h2>
+          <p class="page-subtitle">
+            {{ project || '-' }} · 最近 {{ days }} 天；采样窗口与频率由 bashub 的
+            <code>&lt;agent health-interval&gt;</code> 配置决定。
+          </p>
+          <router-link class="title-back" to="/monitor/agents">← 在线节点</router-link>
+        </div>
       </div>
       <div class="page-actions">
         <t-button v-if="projectId" variant="outline" @click="goProject">配置</t-button>
@@ -340,15 +342,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.detail-back {
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.detail-back:hover {
-  color: var(--td-brand-color);
-}
 
 .agent-muted {
   color: var(--td-text-color-placeholder);

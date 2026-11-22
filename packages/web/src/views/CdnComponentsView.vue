@@ -1,7 +1,7 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
+      <div class="title-row">
         <h2 class="page-title">Micdn 组件目录</h2>
         <p class="page-subtitle">可复用的静态包和文档</p>
       </div>
@@ -37,6 +37,7 @@
             <tr>
               <th class="component-table__index">序号</th>
               <th>名称</th>
+              <th>版本</th>
               <th>挂载名</th>
               <th>说明</th>
               <th>规格</th>
@@ -47,6 +48,7 @@
             <tr v-for="(component, index) in staticComponents" :key="component.id">
               <td class="component-table__index">{{ index + 1 }}</td>
               <td><router-link class="component-link" :to="`/micdn/components/${component.id}`">{{ component.name }}</router-link></td>
+              <td><code class="component-table__version">{{ componentVersion(component) || '—' }}</code></td>
               <td><code class="component-table__mount">{{ component.mountName }}</code></td>
               <td class="component-table__muted">{{ component.remark || '—' }}</td>
               <td><code class="component-table__spec">{{ specSummary(component) }}</code></td>
@@ -83,6 +85,7 @@
             <tr>
               <th class="component-table__index">序号</th>
               <th>名称</th>
+              <th>版本</th>
               <th>挂载名</th>
               <th>说明</th>
               <th>规格</th>
@@ -93,6 +96,7 @@
             <tr v-for="(component, index) in docComponents" :key="component.id">
               <td class="component-table__index">{{ index + 1 }}</td>
               <td><router-link class="component-link" :to="`/micdn/components/${component.id}`">{{ component.name }}</router-link></td>
+              <td><code class="component-table__version">{{ componentVersion(component) || '—' }}</code></td>
               <td><code class="component-table__mount">{{ component.mountName }}</code></td>
               <td class="component-table__muted">{{ component.remark || '—' }}</td>
               <td><code class="component-table__spec">{{ specSummary(component) }}</code></td>
@@ -480,6 +484,26 @@ function kindLabel(kind: MicdnComponentKind): string {
   }
 }
 
+/** 实际版本：jar 取最后一段，npm 取最后一个 @ 之后；无法识别返回空。 */
+function componentVersion(component: CdnComponent): string {
+  let source: MicdnSource | undefined
+  if (component.kind === 'www_doc') {
+    source = (component.spec as WwwDocSpec).source
+  } else {
+    source = (component.spec as StaticBundleSpec).sources?.[0]
+  }
+  if (!source) return ''
+  if (source.kind === 'npm') {
+    const at = source.ref.lastIndexOf('@')
+    return at > 0 ? source.ref.slice(at + 1) : ''
+  }
+  if (source.kind === 'jar') {
+    const parts = source.ref.split(':')
+    return parts.length >= 3 ? parts[parts.length - 1] : ''
+  }
+  return ''
+}
+
 function specSummary(component: CdnComponent): string {
   if (component.kind === 'static_bundle') {
     const spec = component.spec as StaticBundleSpec
@@ -527,13 +551,21 @@ onMounted(load)
   margin-bottom: 12px;
 }
 
+.catalog-card__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
 .catalog-card__head h3 {
   margin: 0;
   font-size: 16px;
 }
 
 .catalog-card__head p {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }
@@ -602,8 +634,14 @@ onMounted(load)
   color: var(--td-text-color-secondary);
 }
 
-.component-table__mount {
+.component-table__mount,
+.component-table__version {
   white-space: nowrap;
+}
+
+.component-table__version {
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
 }
 
 .component-table__spec {

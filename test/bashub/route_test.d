@@ -791,17 +791,17 @@ unittest {
   assert(ex.status == 200, ex.body);
   assert(ex.contentType == "application/xml");
   assert(ex.body.canFind(
-      `<micdn listen="0.0.0.0:8888" home="/var/lib/micdn">`));
+      `<micdn listen="0.0.0.0:8888" home="~" log-file="/var/log/micdn/micdn.log">`));
   assert(ex.body.canFind(`<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`));
-  assert(ex.body.canFind(`<maven base="/var/lib/micdn/maven">`));
+  assert(ex.body.canFind(`<maven base="~/maven">`));
   assert(ex.body.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
   assert(ex.body.canFind(`<auth publish-key="publish-secret" download-key="download-secret" max-size="64M"/>`));
   assert(ex.body.canFind(`<blob base="~/blob" max-size="50M">`));
   assert(ex.body.canFind(`<bucket name="openurp.prod" key="fedcba9876543210fedcba9876543210"/>`));
-  assert(ex.body.canFind(`<static base="/var/lib/micdn/asset">`));
+  assert(ex.body.canFind(`<static base="~/asset">`));
   assert(ex.body.canFind(`<bundle name="bas">`));
   assert(ex.body.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
-  assert(ex.body.canFind(`<www base="/var/lib/micdn/www">`));
+  assert(ex.body.canFind(`<www base="~/www">`));
   assert(ex.body.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
 
   ex = callWithHeaders(router, HTTPMethod.GET,
@@ -848,7 +848,7 @@ unittest {
   assert(doc["config"]["auth"]["publishKeySet"].get!bool);
   assert(doc["config"]["auth"]["downloadKeySet"].get!bool);
   assert(doc["config"]["auth"].length == 3);
-  assert(doc["config"]["blob"].length == 2);
+  assert(doc["config"]["blob"].length == 1);
   assert(doc["config"]["blob"]["declared"].type == Json.Type.undefined);
   assert(doc["config"]["remote"].type == Json.Type.undefined);
   assert(doc["project"]["keyMasked"].get!string == "fe**10");
@@ -861,7 +861,6 @@ unittest {
   assert(!doc["xml"].get!string.canFind("fedcba9876543210fedcba9876543210"));
 
   auto config = doc["config"];
-  config["home"] = Json("/srv/micdn");
   auto savedBindings = doc["bindings"].get!(Json[]);
   savedBindings[0]["mountName"] = Json("ignored-mount");
   auto body = Json.emptyObject;
@@ -874,7 +873,7 @@ unittest {
       "http://localhost/api/bashub/micdn/openurp.prod/micdn.xml",
       ["Authorization": "Bearer fedcba9876543210fedcba9876543210"]);
   assert(ex.status == 200, ex.body);
-  assert(ex.body.canFind(`home="/srv/micdn"`));
+  assert(ex.body.canFind(`home="~"`));
   assert(ex.body.canFind(`publish-key="publish-secret"`));
   assert(ex.body.canFind(`download-key="download-secret"`));
   assert(ex.body.canFind(`<bucket name="openurp.prod" key="fedcba9876543210fedcba9876543210"/>`));
@@ -903,7 +902,7 @@ unittest {
   assert(ex.status == 404, ex.body);
 
   ex = call(router, HTTPMethod.PATCH, "http://localhost/api/bashub/micdn/projects/9999",
-      `{"config":{"listen":"0.0.0.0:8888","logLevel":"info"}}`);
+      `{"config":{"listen":"0.0.0.0:8888"}}`);
   assert(ex.status == 404, ex.body);
 }
 
@@ -914,7 +913,7 @@ unittest {
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["project"]["keySet"].get!bool);
-  assert(doc["config"]["blob"].length == 2);
+  assert(doc["config"]["blob"].length == 1);
   assert(doc["xml"].get!string.canFind(`<blob base="~/blob" max-size="100M">`));
   assert(doc["xml"].get!string.canFind(`<bucket name="beangle.demo" key="01**ef"/>`));
 }
@@ -1067,6 +1066,7 @@ unittest {
   auto bound = parseJson(ex.body);
   assert(bound["data"]["name"].get!string == "bas-static");
   assert(bound["deployments"].get!(Json[]).length > 0);
+  assert(bound["deployments"][0]["version"].get!string == "0.0.8");
 
   // 绑定到 Project 后再删除组件：删除组件必须同时清掉 Project 的绑定。
   auto projectDoc = parseJson(call(router, HTTPMethod.GET,

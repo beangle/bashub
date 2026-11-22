@@ -1,9 +1,11 @@
 <template>
   <section class="page-panel">
     <div class="page-head">
-      <div>
-        <router-link class="detail-back" :to="listPath">← 返回主机管理</router-link>
-        <h2 class="page-title">{{ hostName || '主机详情' }}</h2>
+      <div class="detail-heading">
+        <div class="title-row">
+          <h2 class="page-title">{{ hostName || '主机详情' }}</h2>
+          <router-link class="title-back" :to="listPath">← 返回主机管理</router-link>
+        </div>
       </div>
       <div class="page-actions">
         <t-button v-if="scriptUrl" variant="outline" tag="a" :href="scriptUrl" target="_blank">
@@ -223,16 +225,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.detail-back {
-  display: inline-block;
-  margin-bottom: 4px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-}
-
-.detail-back:hover {
-  color: var(--td-brand-color);
-}
 
 .host-card {
   border: 1px solid var(--td-component-stroke);
