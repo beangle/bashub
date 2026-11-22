@@ -1317,7 +1317,7 @@ class HubService {
     while (originBase.length > 1 && originBase.endsWith("/"))
       originBase = originBase[0 .. $ - 1];
     auto nativeRemote = originBase.length > 0 ? originBase ~ "/native" : "";
-    return renderMicdnXml(state.config, state.components, attributeText(data, "name"),
+    return renderMicdnXml(state.config, state.components, qualifiedName,
         attributeText(data, "key"), maskSecrets, remoteUrl,
         cfg.mavenDownloadToken, cfg.mavenDownloadToken, nativeRemote);
   }

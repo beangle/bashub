@@ -77,7 +77,7 @@ export interface MicdnConfig {
   auth: MicdnAuthConfig
   static: Record<string, never>
   www: Record<string, never>
-  blob: { base: string; maxSize: string; publicImages: boolean }
+  blob: { maxSize: string; publicImages: boolean }
   servers: MicdnServer[]
 }
 
@@ -132,7 +132,7 @@ export function defaultMicdnConfig(): MicdnConfig {
     auth: { maxSize: '64M' },
     static: {},
     www: {},
-    blob: { base: '', maxSize: '100M', publicImages: true },
+    blob: { maxSize: '100M', publicImages: true },
     servers: [],
   }
 }

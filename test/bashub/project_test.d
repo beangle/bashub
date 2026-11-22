@@ -300,15 +300,15 @@ unittest {
   // maven/npm/native 的 base 不可配置，即使旧配置塞了值也必须落回 home 下的默认目录。
   state.config["maven"]["base"] = Json("/tmp/not-micdn");
   auto xml = renderMicdnXml(state.config, state.components,
-      attributeText(project.data, "name"), attributeText(project.data, "key"));
+      attributeText(project.data, "qualifiedName"), attributeText(project.data, "key"));
   assert(xml.canFind(`<maven base="/var/lib/micdn/maven">`));
   assert(!xml.canFind("/tmp/not-micdn"));
   assert(xml.canFind(`<static base="/var/lib/micdn/asset">`));
   assert(xml.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
   assert(xml.canFind(`<www base="/var/lib/micdn/www">`));
   assert(xml.canFind(`<doc name="manual" npm="@beangle/manual@1.0.0" try-file="index.html"/>`));
-  assert(xml.canFind(`<blob base="/var/lib/micdn/blob" max-size="50M">`));
-  assert(xml.canFind(`<bucket name="prod" key="fedcba9876543210fedcba9876543210"/>`));
+  assert(xml.canFind(`<blob base="~/blob" max-size="50M">`));
+  assert(xml.canFind(`<bucket name="openurp.prod" key="fedcba9876543210fedcba9876543210"/>`));
 }
 
 @("micdn render omits every optional section when nothing is configured")
@@ -382,7 +382,7 @@ unittest {
 @("micdn blob follows the project key")
 unittest {
   auto xml = renderMicdnXml(defaultMicdnConfig(), [], "prod", "secret-key");
-  assert(xml.canFind(`<blob base="/blob" max-size="100M">`));
+  assert(xml.canFind(`<blob base="~/blob" max-size="100M">`));
   assert(xml.canFind(`<bucket name="prod" key="secret-key"/>`));
 
   auto masked = renderMicdnXml(defaultMicdnConfig(), [], "prod", "secret-key", true);
@@ -597,17 +597,19 @@ unittest {
 }
 
 
-@("micdn normalize drops legacy maven/npm/native/www/static base fields") unittest {
+@("micdn normalize drops legacy maven/npm/native/www/static/blob base fields") unittest {
   auto raw = defaultMicdnConfig();
   raw["maven"]["base"] = Json("/legacy/maven");
   raw["npm"]["base"] = Json("/legacy/npm");
   raw["native"]["base"] = Json("/legacy/native");
   raw["www"]["base"] = Json("/legacy/www");
   raw["static"]["base"] = Json("/legacy/static");
+  raw["blob"]["base"] = Json("/legacy/blob");
   auto config = normalizeMicdnConfig(raw);
   assert(jsonGet(jsonGet(config, "maven"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "npm"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "native"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "www"), "base").type == Json.Type.undefined);
   assert(jsonGet(jsonGet(config, "static"), "base").type == Json.Type.undefined);
+  assert(jsonGet(jsonGet(config, "blob"), "base").type == Json.Type.undefined);
 }

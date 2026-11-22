@@ -54,6 +54,8 @@
   的本地 micdn（`servers[].host` + `listen`），没有 host 时三个元素都不生成；不再使用 Project 的
   `remoteRepo`。下载 key 缺失时自动生成 `qualifiedName.<随机串>`，同一 Project 的所有 micdn
   节点共用并写入 server.xml/micdn.xml；Micdn 配置页提供「生成/重新生成」下载密钥按钮。
+- **Blob 身份与目录固定**：Micdn 的 `<bucket name>` 改用 Project 的 `qualifiedName`，不再用显示名；
+  Blob 本地目录固定为 `~/blob`，移除配置页的目录输入；旧 `blob.base` 在下一次保存时归一化丢弃。
 - **Micdn 默认日志文件**：新建/空配置的 `logFile` 默认写
   `/var/log/micdn/micdn.log`，下发的 `micdn.xml` 带 `log-file`；仍可在配置页显式改成
   `console`。
@@ -77,6 +79,10 @@
 - **Server 开机自启**：`cfg_servers` 增加 `auto_start`、`wait_for`；server.xml 输出
   `<auto-start>` / `<wait-for>`，管理台服务表单可配置，供 basagent 自动启动本机节点。
 - **监控**：延长 agent 日志读取超时，避免大日志或慢磁盘被误判为读取失败。
+- **监控代理服务状态**：agent 在 `report:health` 上报 `proxyState.haproxy/nginx`；监控摘要按实际服务状态显示「在线 / 已停止 / 节点离线」，不再用 agent 在线代替 haproxy/nginx 运行状态。
+- **监控 Micdn 服务状态**：agent 在 `report:os` / `report:health` 上报 `micdn.active`；
+  监控摘要和 Project 详情按实际服务状态显示「在线 / 已停止 / 节点离线」，不再把 agent 在线当作
+  micdn 在线。
 - **监控 Micdn 摘要**：去掉 Micdn 的 `1/1 在线` 重复提示，仅保留状态标签。
 - **监控摘要**：Project 标题行保留刷新上报/运行历史/配置，标题下方合一展示 BAS 统计、Micdn
   节点 IP/组件/在线状态与 Reload、代理 IP/引擎版本/状态与 Apply；目标节点未全部在线时禁用操作。

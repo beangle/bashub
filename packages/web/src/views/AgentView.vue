@@ -91,10 +91,10 @@
             </span>
             <t-tag
               size="small"
-              :theme="micdnHosts.length === 0 ? 'default' : micdnAllOnline ? 'success' : 'warning'"
+              :theme="micdnHosts.length === 0 ? 'default' : micdnAllRunning ? 'success' : 'warning'"
               variant="light"
             >
-              {{ micdnHosts.length === 0 ? '未登记' : micdnAllOnline ? '在线' : '部分离线' }}
+              {{ micdnStatusLabel }}
             </t-tag>
             <t-button
               size="small"
@@ -111,8 +111,15 @@
             <span class="summary-label">Proxy</span>
             <strong class="summary-address" :title="proxyHosts.join(', ')">{{ proxyHosts.join(', ') || '未登记' }}</strong>
             <span class="summary-meta">
-              {{ proxyEngineLabel }}{{ proxyVersionText ? ` ${proxyVersionText}` : '' }} · {{ proxyOnlineCount }}/{{ proxyHosts.length }} 在线
+              {{ proxyEngineLabel }}{{ proxyVersionText ? ` ${proxyVersionText}` : '' }}
             </span>
+            <t-tag
+              size="small"
+              :theme="proxyHosts.length === 0 ? 'default' : proxyAllRunning ? 'success' : 'warning'"
+              variant="light"
+            >
+              {{ proxyStatusLabel }}
+            </t-tag>
             <t-button
               size="small"
               variant="outline"
@@ -572,10 +579,41 @@ const onlineIps = computed(() => new Set(
 const micdnAllOnline = computed(() =>
   micdnHosts.value.length > 0 && micdnHosts.value.every((host) => onlineIps.value.has(host)),
 )
+function micdnAgentFor(host: string) {
+  return (activeGroup.value?.agents ?? []).find((agent) => agent.ip === host || agent.host === host)
+}
+const micdnStates = computed(() => micdnHosts.value.map((host) => micdnAgentFor(host)?.os?.micdn?.state))
+const micdnAllRunning = computed(() =>
+  micdnStates.value.length > 0 && micdnStates.value.every((state) => state === 'active'),
+)
+const micdnStatusLabel = computed(() => {
+  if (micdnHosts.value.length === 0) return '未登记'
+  if (!micdnAllOnline.value) return '节点离线'
+  if (micdnAllRunning.value) return '在线'
+  if (micdnStates.value.some((state) => !state)) return '状态未知'
+  if (micdnStates.value.some((state) => state === 'active')) return '部分停止'
+  return '已停止'
+})
 const proxyAllOnline = computed(() =>
   proxyHosts.value.length > 0 && proxyHosts.value.every((host) => onlineIps.value.has(host)),
 )
-const proxyOnlineCount = computed(() => proxyHosts.value.filter((host) => onlineIps.value.has(host)).length)
+function proxyAgentFor(host: string) {
+  return (activeGroup.value?.agents ?? []).find((agent) => agent.ip === host || agent.host === host)
+}
+const proxyStates = computed(() => proxyHosts.value.map((host) =>
+  proxyAgentFor(host)?.os?.proxyState?.[proxyEngine.value as 'haproxy' | 'nginx'],
+))
+const proxyAllRunning = computed(() =>
+  proxyStates.value.length > 0 && proxyStates.value.every((state) => state?.active === true),
+)
+const proxyStatusLabel = computed(() => {
+  if (proxyHosts.value.length === 0) return '未登记'
+  if (!proxyAllOnline.value) return '节点离线'
+  if (proxyAllRunning.value) return '在线'
+  if (proxyStates.value.some((state) => !state)) return '状态未知'
+  if (proxyStates.value.some((state) => state?.active === true)) return '部分停止'
+  return '已停止'
+})
 const proxyEngineLabel = computed(() => {
   if (proxyEngine.value === 'haproxy') return 'HAProxy'
   if (proxyEngine.value === 'nginx') return 'nginx'

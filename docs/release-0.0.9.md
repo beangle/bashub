@@ -115,10 +115,16 @@ micdn.xml 负责中心上游、SNAPSHOT/NPM dev 和 native 回源。
 - Project 详情页代理卡片增加「应用到节点」按钮，带确认和失败节点提示；目标节点未全部在线时按钮禁用。
 - Project 详情页 Micdn 卡片增加「Reload micdn」；登记节点未全部在线时禁用。
 - Project 详情页 BAS 服务卡片增加「打开监控」，带当前 Project 跳到在线节点页。
-- 在线节点页在 Project 标题下方增加紧凑摘要，展示 BAS 统计（0 停止时省略）、Micdn 节点 IP/组件状态、代理 IP/引擎版本/状态；Micdn 不再重复显示 `1/1 在线`；
+- 在线节点页在 Project 标题下方增加紧凑摘要，展示 BAS 统计（0 停止时省略）、Micdn 节点 IP/组件状态、代理 IP/引擎版本/状态；代理状态来自 agent 上报的 `proxyState`，服务停止时显示「已停止」；Micdn 不再重复显示 `1/1 在线`；Micdn 状态来自 agent 上报的 `micdn.active`，服务停止时显示「已停止」；
   全部在线时提供 Reload micdn 和「应用到节点」，否则禁用。
 
 - CentOS 7 使用 polkit 0.112 的 JavaScript 规则；不使用无法限定 unit 的宽泛 `.pkla`。
+
+### Blob 身份与目录
+
+Micdn `<bucket name>` 使用 Project 的 `qualifiedName`（例如 `openurp.prod`），不再使用显示名称；
+Blob 本地目录固定为 `~/blob`，配置页不再提供目录输入。旧配置里的 `blob.base` 会在下一次保存时
+被归一化丢弃。
 
 ### Micdn 默认日志文件
 

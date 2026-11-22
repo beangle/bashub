@@ -396,11 +396,14 @@
               <p v-if="micdn && micdnServerStatus.length > 0 && !micdnAllOnline" class="load-error">
                 Micdn 节点未全部在线，无法 reload。
               </p>
+              <p v-else-if="micdn && micdnServerStatus.length > 0 && !micdnAllRunning" class="load-error">
+                Micdn 服务未全部运行，可用 Reload 拉起。
+              </p>
               <div v-if="micdn && micdnServerStatus.length > 0" class="micdn-host-list">
                 <span v-for="server in micdnServerStatus" :key="server.host" class="micdn-host">
                   <code>{{ server.host }}</code>
-                  <t-tag size="small" :theme="server.online ? 'success' : 'default'" variant="light">
-                    {{ server.online ? '在线' : '离线' }}
+                  <t-tag size="small" :theme="server.active ? 'success' : server.agentOnline ? 'warning' : 'default'" variant="light">
+                    {{ server.active ? '在线' : server.agentOnline ? '已停止' : '离线' }}
                   </t-tag>
                 </span>
               </div>
@@ -450,7 +453,7 @@
                 <div class="fact"><span>NPM</span><strong>{{ micdn.config.npm.declared ? '已启用' : '未启用' }}</strong></div>
                 <div class="fact"><span>Native</span><strong>{{ micdn.config.native.declared ? '已启用' : '未启用' }}</strong></div>
                 <div class="fact"><span>Blob</span><strong>{{ micdn.project.keySet ? '已启用' : '未启用' }}</strong></div>
-                <div class="fact"><span>Bucket</span><strong>{{ micdn.project.name || '—' }}</strong></div>
+                <div class="fact"><span>Bucket</span><strong>{{ micdn.project.qualifiedName || '—' }}</strong></div>
                 <div class="fact"><span>Bucket Key</span><strong>{{ micdn.project.keySet ? micdn.project.keyMasked : '未设置' }}</strong></div>
               </div>
             </article>
@@ -693,15 +696,22 @@ const proxyAllOnline = computed(() =>
   proxyHosts.value.length > 0 && proxyHosts.value.every((host) => onlineHosts.value.has(host)),
 )
 const micdnServerStatus = computed(() =>
-  micdnServers.value.map((server) => ({ host: server.host.trim(), online: onlineHosts.value.has(server.host.trim()) })),
+  micdnServers.value.map((server) => {
+    const host = server.host.trim()
+    const agent = onlineAgents.value.find((item) => item.ip === host || item.host === host)
+    return { host, agentOnline: onlineHosts.value.has(host), active: agent?.os?.micdn?.active === true }
+  }),
 )
 const micdnAllOnline = computed(() =>
-  micdnServerStatus.value.length > 0 && micdnServerStatus.value.every((server) => server.online),
+  micdnServerStatus.value.length > 0 && micdnServerStatus.value.every((server) => server.agentOnline),
+)
+const micdnAllRunning = computed(() =>
+  micdnServerStatus.value.length > 0 && micdnServerStatus.value.every((server) => server.active),
 )
 const micdnReloadTitle = computed(() => {
   if (!micdn.value) return 'Micdn 配置尚未加载'
   if (micdnServerStatus.value.length === 0) return '尚未登记 Micdn 节点'
-  const offline = micdnServerStatus.value.filter((server) => !server.online).map((server) => server.host)
+  const offline = micdnServerStatus.value.filter((server) => !server.agentOnline).map((server) => server.host)
   return offline.length === 0 ? '向登记节点发送 reload' : `离线节点：${offline.join(', ')}`
 })
 const instanceRows = computed<InstanceRow[]>(() =>

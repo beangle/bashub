@@ -185,8 +185,8 @@
             <div class="form-grid">
               <div class="form-field">
                 <span>Bucket 名称</span>
-                <code class="readonly-value">{{ doc.project.name }}</code>
-                <small>来自 Project name，不能单独修改。</small>
+                <code class="readonly-value">{{ doc.project.qualifiedName }}</code>
+                <small>来自 Project qualifiedName，不能单独修改。</small>
               </div>
               <div class="form-field">
                 <span>Bucket Key</span>
@@ -194,10 +194,6 @@
                 <small v-if="doc.project.keySet">来自 Project key，仅显示首尾字符。</small>
                 <small v-else class="danger-text">当前 Project 没有 key，不会生成 Blob。</small>
               </div>
-              <label class="form-field">
-                <span>Blob 本地目录</span>
-                <t-input v-model="config.blob.base" placeholder="留空使用 {home}/blob；home 为空时为 /blob" />
-              </label>
               <label class="form-field">
                 <span>上传大小上限</span>
                 <t-input v-model="config.blob.maxSize" placeholder="100M" />

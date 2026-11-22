@@ -176,6 +176,12 @@ final class AgentSession {
         auto mem = jsonGet(message.body, "mem");
         if (mem.type != Json.Type.undefined)
           osReport["mem"] = mem;
+        auto micdn = jsonGet(message.body, "micdn");
+        if (micdn.type != Json.Type.undefined)
+          osReport["micdn"] = micdn;
+        auto proxyState = jsonGet(message.body, "proxyState");
+        if (proxyState.type != Json.Type.undefined)
+          osReport["proxyState"] = proxyState;
         osAt = message.at;
       }
       break;

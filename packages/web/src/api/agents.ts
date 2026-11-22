@@ -30,12 +30,24 @@ export interface AgentProxySnapshot {
   nginx?: string
 }
 
+export interface AgentMicdnSnapshot {
+  active?: boolean
+  state?: string
+}
+
+export interface AgentProxyState {
+  active?: boolean
+  state?: string
+}
+
 export interface AgentOsSnapshot {
   os?: AgentOsInfo
   cpu?: AgentCpuInfo
   mem?: AgentMemInfo
   disk?: AgentDiskInfo[]
   proxy?: AgentProxySnapshot
+  proxyState?: { haproxy?: AgentProxyState; nginx?: AgentProxyState }
+  micdn?: AgentMicdnSnapshot
 }
 
 export interface AgentWebapp {

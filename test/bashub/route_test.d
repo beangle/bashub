@@ -796,8 +796,8 @@ unittest {
   assert(ex.body.canFind(`<maven base="/var/lib/micdn/maven">`));
   assert(ex.body.canFind(`<remote url="https://repo1.maven.org/maven2"/>`));
   assert(ex.body.canFind(`<auth publish-key="publish-secret" download-key="download-secret" max-size="64M"/>`));
-  assert(ex.body.canFind(`<blob base="/var/lib/micdn/blob" max-size="50M">`));
-  assert(ex.body.canFind(`<bucket name="prod" key="fedcba9876543210fedcba9876543210"/>`));
+  assert(ex.body.canFind(`<blob base="~/blob" max-size="50M">`));
+  assert(ex.body.canFind(`<bucket name="openurp.prod" key="fedcba9876543210fedcba9876543210"/>`));
   assert(ex.body.canFind(`<static base="/var/lib/micdn/asset">`));
   assert(ex.body.canFind(`<bundle name="bas">`));
   assert(ex.body.canFind(`<jar gav="org.beangle.bashub:bas-web:0.0.8"/>`));
@@ -848,7 +848,7 @@ unittest {
   assert(doc["config"]["auth"]["publishKeySet"].get!bool);
   assert(doc["config"]["auth"]["downloadKeySet"].get!bool);
   assert(doc["config"]["auth"].length == 3);
-  assert(doc["config"]["blob"].length == 3);
+  assert(doc["config"]["blob"].length == 2);
   assert(doc["config"]["blob"]["declared"].type == Json.Type.undefined);
   assert(doc["config"]["remote"].type == Json.Type.undefined);
   assert(doc["project"]["keyMasked"].get!string == "fe**10");
@@ -856,7 +856,7 @@ unittest {
   assert(doc["components"].get!(Json[]).length == 2);
   assert(doc["xml"].get!string.canFind(`<prune at="03:30"`));
   assert(doc["xml"].get!string.canFind(`publish-key="********"`));
-  assert(doc["xml"].get!string.canFind(`<bucket name="prod" key="fe**10"/>`));
+  assert(doc["xml"].get!string.canFind(`<bucket name="openurp.prod" key="fe**10"/>`));
   assert(!doc["xml"].get!string.canFind("publish-secret"));
   assert(!doc["xml"].get!string.canFind("fedcba9876543210fedcba9876543210"));
 
@@ -877,7 +877,7 @@ unittest {
   assert(ex.body.canFind(`home="/srv/micdn"`));
   assert(ex.body.canFind(`publish-key="publish-secret"`));
   assert(ex.body.canFind(`download-key="download-secret"`));
-  assert(ex.body.canFind(`<bucket name="prod" key="fedcba9876543210fedcba9876543210"/>`));
+  assert(ex.body.canFind(`<bucket name="openurp.prod" key="fedcba9876543210fedcba9876543210"/>`));
   assert(ex.body.canFind(`<bundle name="bas">`));
   assert(!ex.body.canFind("ignored-mount"));
 
@@ -914,9 +914,9 @@ unittest {
   assert(ex.status == 200, ex.body);
   auto doc = parseJson(ex.body);
   assert(doc["project"]["keySet"].get!bool);
-  assert(doc["config"]["blob"].length == 3);
-  assert(doc["xml"].get!string.canFind(`<blob base="/blob" max-size="100M">`));
-  assert(doc["xml"].get!string.canFind(`<bucket name="demo" key="01**ef"/>`));
+  assert(doc["config"]["blob"].length == 2);
+  assert(doc["xml"].get!string.canFind(`<blob base="~/blob" max-size="100M">`));
+  assert(doc["xml"].get!string.canFind(`<bucket name="beangle.demo" key="01**ef"/>`));
 }
 
 @("webapp libs folds pasted newlines into commas")

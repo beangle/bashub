@@ -104,7 +104,6 @@ Json defaultMicdnConfig() {
   root["www"] = www;
 
   auto blob = Json.emptyObject;
-  blob["base"] = Json("");
   blob["maxSize"] = Json("100M");
   blob["publicImages"] = Json(true);
   root["blob"] = blob;
@@ -385,7 +384,7 @@ void readMicdnConfig(Store store, Registry reg, string projectId, out Json confi
   }
 }
 
-/// 渲染 Project 的 micdn.xml；`projectName` / `projectKey` 用于生成唯一的 blob bucket。
+/// 渲染 Project 的 micdn.xml；`projectQualifiedName` / `projectKey` 用于生成唯一的 blob bucket。
 /// maskSecrets=true 时只用于页面预览，bucket key 保留首尾各两个字符。
 /// `remoteUrl` 由下载请求的 origin 推导，不进入 Project 配置；`upstreamDevToken` / `upstreamSnapshotToken`
 /// 来自 bashub 全局配置 `<snapshot download-token>`，不落库、不进 Project 配置；maven/npm 共用。
@@ -393,13 +392,13 @@ void readMicdnConfig(Store store, Registry reg, string projectId, out Json confi
 /// 安全边界：令牌会附加到**所有非空的** `<dev>` / `<snapshot>` 上游。配置者必须保证这两个上游
 /// 指向中心 micdn（或会补同值鉴权的反代）；不要把外部 registry 配成 dev/snapshot 上游，否则会把
 /// 中心读令牌发给外部。
-string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectName,
+string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string projectQualifiedName,
     string projectKey, bool maskSecrets = false, string remoteUrl = "",
     string upstreamDevToken = "", string upstreamSnapshotToken = "",
     string nativeRemoteDefault = "") {
   auto config = normalizeMicdnConfig(rawConfig);
   validateMicdnConfig(config);
-  validateBlobIdentity(projectName, projectKey);
+  validateBlobIdentity(projectQualifiedName, projectKey);
 
   BoundComponent[] staticBundles;
   BoundComponent[] wwwDocs;
@@ -515,11 +514,11 @@ string renderMicdnXml(Json rawConfig, const BoundComponent[] components, string 
   auto key = projectKey.strip;
   if (key.length > 0) {
     xml.put("  <blob");
-    putAttr(xml, "base", effectiveBase(config, "blob", "/blob"));
+    putAttr(xml, "base", "~/blob");
     putAttr(xml, "max-size", field(blob, "maxSize"));
     xml.put(">\n");
     xml.put("    <bucket");
-    putAttr(xml, "name", projectName.strip);
+    putAttr(xml, "name", projectQualifiedName.strip);
     putAttr(xml, "key", maskSecrets ? maskSecret(key) : key);
     if (!flag(blob, "publicImages", true))
       putAttr(xml, "publicImages", "false");
@@ -627,7 +626,7 @@ Json micdnProjectDocument(const MicdnProjectView view, string remoteUrl = "",
   foreach (ref resource; view.state.catalog)
     catalog ~= plainComponent(resource);
   doc["components"] = Json(catalog);
-  auto projectName = jsonText(view.project["name"]);
+  auto projectName = jsonText(view.project["qualifiedName"]);
   doc["xml"] = Json(renderMicdnXml(view.state.config, view.state.components, projectName, view.projectKey,
       true, remoteUrl, upstreamDevToken, upstreamSnapshotToken));
   return doc;
@@ -648,7 +647,7 @@ void saveMicdnProject(Store store, Registry reg, string projectId, Json body) {
     throw new MicdnConfigException("config", "缺少 config 对象");
   auto config = normalizeMicdnConfig(mergeMicdnSecrets(rawConfig, oldState.config));
   validateMicdnConfig(config);
-  validateBlobIdentity(attributeText(project["data"], "name"), attributeText(project["data"], "key"));
+  validateBlobIdentity(attributeText(project["data"], "qualifiedName"), attributeText(project["data"], "key"));
 
   Json[string] catalogById;
   foreach (ref component; oldState.catalog) {
@@ -773,7 +772,6 @@ private void normalizePrune(Json source, ref Json result) {
 private void normalizeBlob(Json source, ref Json result) {
   auto section = objectAt(source, "blob");
   auto target = jsonGet(result, "blob");
-  target["base"] = Json(field(section, "base"));
   auto maxSize = field(section, "maxSize");
   target["maxSize"] = Json(maxSize.length > 0 ? maxSize : "100M");
   target["publicImages"] = Json(flag(section, "publicImages", true));
@@ -883,12 +881,12 @@ private void validateMicdnConfig(Json config) {
   validateSize(field(blob, "maxSize"), "blob.maxSize");
 }
 
-/// Blob 的 bucket 身份固定来自 Project：名称取 `project.name`，密钥取 `project.key`。
-/// 没有 key 时不生成 Blob；有 key 时 Project 名必须能作为 bucket 名。
-private void validateBlobIdentity(string projectName, string projectKey) {
+/// Blob 的 bucket 身份固定来自 Project：名称取 `project.qualifiedName`，密钥取 `project.key`。
+/// 没有 key 时不生成 Blob；有 key 时 qualifiedName 必须能作为 bucket 名。
+private void validateBlobIdentity(string projectQualifiedName, string projectKey) {
   if (projectKey.strip.length == 0)
     return;
-  validateSingleName(projectName.strip, "project.name");
+  validateSingleName(projectQualifiedName.strip, "project.qualifiedName");
 }
 
 /** maven/npm/native 的存储目录固定为 `{home}/<sub>`，不读取配置里的 base。 */
@@ -897,15 +895,6 @@ private string defaultRepoBase(Json config, string defaultSubDir) {
   return home.length > 0 ? home ~ defaultSubDir : defaultSubDir;
 }
 
-private string effectiveBase(Json config, string sectionName, string defaultSubDir) {
-  auto base = field(jsonGet(config, sectionName), "base");
-  if (base.length > 0)
-    return base;
-  auto home = field(config, "home");
-  if (home.length > 0)
-    return home ~ defaultSubDir;
-  return defaultSubDir;
-}
 
 private Json sanitizeConfig(Json config) {
   auto result = copyJson(config);
