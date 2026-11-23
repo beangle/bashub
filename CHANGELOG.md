@@ -2,6 +2,7 @@
 
 ## v0.0.9 (unreleased)
 
+- **代理点证书编辑入口**：代理点表单移除只能填公钥的 `certificate` 字段，统一到 Project 详情「证书」页的公钥/私钥编辑器维护。
 - **逐节点操作错误**：代理应用和 Micdn reload 失败时不再只显示节点 IP，而是弹出每台节点的 `error` 与 Agent/helper 返回的 `detail`，可直接看到缺少 haproxy、helper 失败等具体原因。
 - **主机硬件现状**：Host 的详细系统版本、CPU 型号和体系结构折叠到只读 `hardware` JSON；
   表单只保留名称、IP、Project、组网分组、操作系统、内存、CPU 核心数和系统特性。新增

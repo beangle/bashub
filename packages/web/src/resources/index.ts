@@ -113,7 +113,7 @@ export const resourceSchemas: ResourceSchema[] = [
     type: 'endpoints',
     title: '代理点',
     group: '平台配置',
-    description: '项目级代理配置：IP、域名、引擎、TLS 与证书；bundle 供代理机下载',
+    description: '项目级代理配置：IP、域名、引擎与 TLS；证书在项目详情的证书页维护，bundle 供代理机下载',
     sort: 'name',
     followProject: false,
     filters: [{ key: 'project', label: '项目', type: 'ref', ref: projectRef }],
@@ -132,7 +132,6 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'maxconn', label: '最大连接数', type: 'number', column: false },
       { key: 'sslCiphers', label: 'SSL 加密套件', column: false },
       { key: 'sslProtocols', label: 'SSL 协议', column: false },
-      { key: 'certificate', label: '证书', type: 'textarea', rows: 4, column: false, help: '可留空；证书随代理 ZIP bundle 下发' },
     ],
   },
   {
