@@ -8,6 +8,7 @@
         </div>
       </div>
       <div class="page-actions">
+        <t-button variant="outline" :loading="adopting" @click="adoptHardware">从 Agent 更新</t-button>
         <t-button v-if="scriptUrl" variant="outline" tag="a" :href="scriptUrl" target="_blank">
           <template #icon><DownloadIcon /></template>
           下载初始化脚本
@@ -40,10 +41,24 @@
                 </td>
               </tr>
               <tr>
-                <td class="info-table__label">CPU规格</td>
+                <td class="info-table__label">CPU 型号</td>
                 <td class="info-table__value">{{ cpuText || '—' }}</td>
-                <td class="info-table__label">CPU核心数</td>
+                <td class="info-table__label">CPU 核心数</td>
                 <td class="info-table__value">{{ coresText || '—' }}</td>
+              </tr>
+              <tr>
+                <td class="info-table__label">内核</td>
+                <td class="info-table__value">{{ kernelText || '—' }}</td>
+                <td class="info-table__label">架构</td>
+                <td class="info-table__value">{{ archText || '—' }}</td>
+              </tr>
+              <tr>
+                <td class="info-table__label">磁盘</td>
+                <td class="info-table__value">{{ diskText || '—' }}</td>
+                <td class="info-table__label">采集</td>
+                <td class="info-table__value">
+                  {{ hardwareSource || '—' }}<template v-if="collectedAt"> · {{ collectedAt }}</template>
+                </td>
               </tr>
               <tr>
                 <td class="info-table__label">系统特性</td>
@@ -92,7 +107,8 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { runtimeConfig } from '@/auth'
-import { apiRootPath } from '@/api/prefix'
+import { apiClient } from '@/api/client'
+import { apiPath, apiRootPath } from '@/api/prefix'
 import {
   attributeText,
   fetchDocument,
@@ -115,20 +131,47 @@ const included = ref<Map<string, ResourceRow>>(new Map())
 const servers = ref<ResourceRow[]>([])
 const webapps = ref<ResourceRow[]>([])
 const loading = ref(false)
+const adopting = ref(false)
+
+interface HardwareSnapshot {
+  source?: string
+  collectedAt?: string
+  os?: { name?: string; prettyName?: string; version?: string; kernel?: string; arch?: string }
+  cpu?: { model?: string; cores?: number }
+  mem?: { total?: number }
+  disks?: { mount?: string; total?: number; available?: number }[]
+}
 
 const hostName = computed(() => attributeText(host.value?.attributes.name))
 const hostIp = computed(() => attributeText(host.value?.attributes.ip))
-const cpuText = computed(() => attributeText(host.value?.attributes.cpu))
+const hardware = computed<HardwareSnapshot>(() => {
+  const value = host.value?.attributes.hardware
+  return value && typeof value === 'object' ? value as HardwareSnapshot : {}
+})
+const cpuText = computed(() => hardware.value.cpu?.model || '')
 const coresText = computed(() => attributeText(host.value?.attributes.cores))
 const memoryGb = computed(() => Number(host.value?.attributes.memory ?? 0))
 const memoryText = computed(() => (host.value ? `${memoryGb.value}GB` : '—'))
+const kernelText = computed(() => hardware.value.os?.kernel || '')
+const archText = computed(() => hardware.value.os?.arch || '')
+const hardwareSource = computed(() => hardware.value.source || '')
+const collectedAt = computed(() => hardware.value.collectedAt || '')
+const diskText = computed(() => {
+  const disks = hardware.value.disks ?? []
+  if (disks.length === 0) return ''
+  return disks
+    .map((disk) => `${disk.mount || '?'} ${formatBytes(disk.total)}`)
+    .join('；')
+})
 
 const platform = computed(() => related(host.value, 'platform', 'platforms'))
 const platformIcon = computed(() => attributeText(platform.value?.attributes.fonticon))
 const platformText = computed(() => {
-  if (!platform.value) return ''
-  const version = attributeText(host.value?.attributes.platformVersion)
-  return `${attributeText(platform.value.attributes.name)}(${version})`
+  const os = hardware.value.os
+  if (os?.prettyName) return os.prettyName
+  if (os?.name) return os.name
+  const name = attributeText(platform.value?.attributes.name)
+  return name && os?.version ? `${name}(${os.version})` : name
 })
 
 const projectName = computed(() =>
@@ -198,7 +241,12 @@ function webappLabel(webapp: ResourceRow): string {
   return title ? `${title}(${gav})` : gav
 }
 
-onMounted(async () => {
+function formatBytes(value?: number): string {
+  if (!value || value <= 0) return '—'
+  return `${Math.round(value / 1024 / 1024 / 1024)}GB`
+}
+
+async function load() {
   loading.value = true
   try {
     const [hostDetail, serverPage, webappDoc, featurePage] = await Promise.all([
@@ -221,7 +269,23 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+async function adoptHardware() {
+  if (!host.value) return
+  adopting.value = true
+  try {
+    await apiClient.post(apiPath('config', `/hosts/${hostId}/adopt-agent`), {})
+    await load()
+    MessagePlugin.success('已从 Agent 更新硬件现状')
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '更新硬件现状失败')
+  } finally {
+    adopting.value = false
+  }
+}
+
+onMounted(load)
 </script>
 
 <style scoped>

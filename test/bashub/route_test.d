@@ -314,6 +314,33 @@ unittest {
   assert(webapps[0]["title"].get!string == "BAS 控制台");
 }
 
+@("host hardware adopt accepts an online agent snapshot without overwriting capacity")
+unittest {
+  auto agents = new AgentRegistry();
+  auto router = newRouter(false, agents);
+  auto session = agents.attach("openurp.prod", "1002", "10.0.0.11");
+  session.osAt = "2026-11-23T14:25:43+08:00";
+  session.osReport = parseJsonString(`{
+    "os":{"name":"CentOS Linux 7","id":"centos","versionId":"7","kernel":"3.10.0","arch":"x86_64"},
+    "cpu":{"cores":16,"model":"Xeon Gold 6248"},
+    "mem":{"total":34359738368,"available":17179869184},
+    "disk":[{"mount":"/","total":107374182400,"available":53687091200}]
+  }`);
+
+  auto ex = call(router, HTTPMethod.POST,
+      "http://localhost/api/bashub/config/hosts/2001/adopt-agent");
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["hardware"]["os"]["id"].get!string == "centos");
+
+  ex = call(router, HTTPMethod.GET, "http://localhost/api/bashub/config/hosts/2001");
+  assert(ex.status == 200, ex.body);
+  auto attrs = parseJson(ex.body)["data"]["attributes"];
+  assert(attrs["hardware"]["cpu"]["model"].get!string == "Xeon Gold 6248");
+  assert(attrs["cores"].get!long == 8);
+  assert(attrs["memory"].get!long == 32);
+  assert(attrs["hardware"]["disks"][0]["mount"].get!string == "/");
+}
+
 @("agents/summary returns health counts without full snapshots") unittest {
   auto agents = new AgentRegistry();
   auto router = newRouter(false, agents);

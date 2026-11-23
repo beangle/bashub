@@ -137,9 +137,7 @@ Registry hubRegistry() {
         Column("ip", "ip", Kind.text),
         Column("memory", "memory", Kind.number),
         Column("cores", "cores", Kind.number),
-        Column("cpu", "cpu", Kind.text),
-        Column("platform_version", "platformVersion", Kind.text),
-        Column("arch", "arch", Kind.number),
+        Column("hardware", "hardware", Kind.jsonDocument, false),
         Column("agent_group", "agentGroup", Kind.text),
         Column("feature_ids", "featureIds", Kind.jsonDocument),
       ],
@@ -316,7 +314,7 @@ private string[] requiredOf(string path) {
   case "servers":
     return ["name", "farm", "host"];
   case "hosts":
-    return ["name", "ip", "project", "agentGroup", "platform", "platformVersion", "memory", "arch", "cores", "cpu"];
+    return ["name", "ip", "project", "agentGroup", "platform", "memory", "cores"];
   case "artifacts":
     return ["title", "artifactId", "groupId", "packaging", "latestVersion"];
   case "webapps":

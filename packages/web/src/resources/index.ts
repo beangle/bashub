@@ -238,19 +238,15 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'ip', label: 'IP', columnTitle: 'IP地址', required: true, width: '13%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
-      // 与原 host/list.ftl 一致：平台图标 + 名称(版本) 合成一列。
       {
         key: 'platform', label: '操作系统', type: 'ref', ref: platformRef, required: true, width: '12%',
-        cell: { type: 'iconText', iconField: 'platform.fonticon', template: '{platform.name}({platformVersion})' },
+        cell: { type: 'iconText', iconField: 'platform.fonticon', template: '{platform.name}' },
       },
       // 后端 featureLogos 已按 support(platform) 过滤，只显示功能 logo（title 为功能名）。
       { key: 'featureLogos', label: '系统特性', form: false, sortable: false, cell: { type: 'icons', titleField: 'name' } },
-      { key: 'platformVersion', label: '系统版本', required: true, column: false },
-      // 列序与原 host/list.ftl 一致：系统特性 → 内存 → 平台 → CPU核心 → CPU规格。
       { key: 'memory', label: '内存', type: 'number', required: true, width: '8%', help: '单位：GB', cell: { type: 'text', suffix: 'GB' } },
-      { key: 'arch', label: '体系结构', columnTitle: '平台', type: 'select', options: archOptions, required: true, width: '10%' },
       { key: 'cores', label: 'CPU 核心数', columnTitle: 'CPU核心', type: 'number', required: true, width: '8%' },
-      { key: 'cpu', label: 'CPU 规格', columnTitle: 'CPU规格', required: true, width: '20%', cell: { type: 'text', style: 'font-size:0.8em' } },
+      { key: 'hardware', label: '硬件现状', form: false, column: false },
       { key: 'agentGroup', label: '组网分组', type: 'text', required: true, defaultValue: 'default_group', help: '同一分组内的 agent 自动选主；不同分组互不组网' },
       { key: 'featureIds', label: '系统特性', type: 'ids', ref: featureRef, column: false, help: '按平台功能名称多选' },
     ],

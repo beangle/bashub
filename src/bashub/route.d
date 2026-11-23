@@ -2309,6 +2309,89 @@ class HubService {
     writeJsonApi(res, okDocument(), HTTPStatus.ok);
   }
 
+  /// `POST /api/bashub/config/hosts/{id}/adopt-agent`：把在线 Agent 上报的系统现状写入
+  /// `hardware`；只回填空的 memory/cores，不覆盖人工配置。
+  void adoptHostHardware(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto id = req.params.get("id", "");
+    auto hosts = reg.find("hosts");
+    Json host;
+    if (!store.fetch(hosts, id, Query.init, host)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no hosts with id " ~ id), HTTPStatus.notFound);
+      return;
+    }
+    auto data = host["data"];
+    auto projectId = relationId(data, "project");
+    Json project;
+    if (projectId.length == 0 || !store.fetch(reg.find("projects"), projectId, Query.init, project)) {
+      writeJsonApi(res, errorDocument(409, "主机缺少 Project", "host has no project"), HTTPStatus.conflict);
+      return;
+    }
+    auto qualifiedName = attributeText(project["data"], "qualifiedName");
+    auto ip = attributeText(data, "ip");
+    auto session = agents.find(qualifiedName, ip);
+    if (session is null) {
+      writeJsonApi(res, errorDocument(409, "Agent 不在线",
+          "agent offline: " ~ qualifiedName ~ "@" ~ ip), HTTPStatus.conflict);
+      return;
+    }
+    auto report = session.osReport;
+    auto os = jsonGet(report, "os");
+    auto cpu = jsonGet(report, "cpu");
+    auto mem = jsonGet(report, "mem");
+    if (os.type != Json.Type.object || cpu.type != Json.Type.object || mem.type != Json.Type.object) {
+      writeJsonApi(res, errorDocument(409, "Agent 未上报系统现状",
+          "agent has no report:os snapshot; request a report first"), HTTPStatus.conflict);
+      return;
+    }
+
+    auto hardware = Json.emptyObject;
+    hardware["schema"] = Json(1L);
+    hardware["source"] = Json("agent");
+    if (session.osAt.length > 0)
+      hardware["collectedAt"] = Json(session.osAt);
+    auto osSnapshot = os;
+    if (jsonText(jsonGet(osSnapshot, "prettyName")).length == 0) {
+      auto pretty = jsonText(jsonGet(osSnapshot, "name"));
+      if (pretty.length > 0)
+        osSnapshot["prettyName"] = Json(pretty);
+    }
+    hardware["os"] = osSnapshot;
+    hardware["cpu"] = cpu;
+    hardware["mem"] = mem;
+    auto disks = jsonGet(report, "disk");
+    if (disks.type == Json.Type.array)
+      hardware["disks"] = disks;
+
+    Row values;
+    values["hardware"] = hardware;
+    long currentCores;
+    try
+      currentCores = attributeText(data, "cores").to!long;
+    catch (Exception) {
+    }
+    auto reportedCores = jsonGet(cpu, "cores");
+    if (currentCores <= 0 && (reportedCores.type == Json.Type.int_ || reportedCores.type == Json.Type.bigInt))
+      values["cores"] = Json(reportedCores.get!long);
+
+    long currentMemory;
+    try
+      currentMemory = attributeText(data, "memory").to!long;
+    catch (Exception) {
+    }
+    auto totalBytes = jsonGet(mem, "total");
+    if (currentMemory <= 0 && (totalBytes.type == Json.Type.int_ || totalBytes.type == Json.Type.bigInt)) {
+      auto gb = (totalBytes.get!long + 1073741823L) / 1073741824L;
+      if (gb > 0)
+        values["memory"] = Json(gb);
+    }
+    store.updateColumns(hosts, id, values);
+    auto doc = Json.emptyObject;
+    doc["hardware"] = hardware;
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
   /// `GET /api/bashub/config/hosts/{id}/webapps`：部署到该主机上运行的应用。
   ///
   /// webapp 经 `targets` 指向 server，server 才指向 host；现有查询计划没有 to-many 过滤，
@@ -2828,6 +2911,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.post(api.config ~ "/projects/:id/reset-key", &hub.resetKey);
   router.post(api.config ~ "/webapps/upgrade", &hub.upgradeWebapps);
   router.post(api.config ~ "/artifacts/update-version", &hub.updateArtifactVersions);
+  router.post(api.config ~ "/hosts/:id/adopt-agent", &hub.adoptHostHardware);
   router.get(api.config ~ "/hosts/:id/webapps", &hub.hostWebapps);
   router.get(api.config ~ "/artifacts/:id/webapps", &hub.artifactWebapps);
   router.get(api.ems ~ "/resources/:id/menus", &hub.resourceMenus);

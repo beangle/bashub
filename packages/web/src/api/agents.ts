@@ -3,12 +3,15 @@ import { apiPath } from './prefix'
 
 export interface AgentOsInfo {
   name?: string
+  id?: string
+  versionId?: string
   kernel?: string
   arch?: string
 }
 
 export interface AgentCpuInfo {
   cores?: number
+  model?: string
   load1?: number
   load5?: number
   load15?: number

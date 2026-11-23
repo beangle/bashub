@@ -95,14 +95,12 @@
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
             <column name="agent_group" type="varchar(64)" nullable="false" defaultValue="default_group" comment="agent 组网分组"/>
-            <column name="arch" type="integer" nullable="false" comment="arch?"/>
             <column name="cores" type="integer" nullable="false" defaultValue="0" comment="cores?"/>
-            <column name="cpu" type="varchar(200)" nullable="false" comment="cpu?"/>
+            <column name="hardware" type="jsonb" nullable="false" defaultValue="{}" comment="Agent/人工采集的系统与硬件现状 JSON"/>
             <column name="ip" type="varchar(255)" nullable="false" comment="ip?"/>
             <column name="memory" type="integer" nullable="false" defaultValue="0" comment="memory?"/>
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
             <column name="platform_id" type="integer" nullable="false" comment="Platform?ID"/>
-            <column name="platform_version" type="varchar(255)" nullable="false" comment="platformVersion?"/>
             <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
             <column name="feature_ids" type="jsonb" nullable="false" defaultValue="[]" comment="系统特性 ID 数组"/>
           </columns>

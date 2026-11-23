@@ -2,6 +2,10 @@
 
 ## v0.0.9 (unreleased)
 
+- **主机硬件现状**：Host 的详细系统版本、CPU 型号和体系结构折叠到只读 `hardware` JSON；
+  表单只保留名称、IP、Project、组网分组、操作系统、内存、CPU 核心数和系统特性。新增
+  `POST /api/bashub/config/hosts/{id}/adopt-agent`，从在线 Agent 回填 hardware，且只回填空的
+  memory/cores，不覆盖人工配置。
 - **Micdn 清理策略**：生成 `<prune at="03:30" npm-dev-keep="1" maven-snapshot-keep="1"/>`，
   由各 micdn 按本地时区执行；不再由 bashub 起定时器。
 - **共享上游令牌**：`<snapshot download-token>` 同时下发为客户 micdn 的 `<snapshot token>` 和
