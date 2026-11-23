@@ -691,6 +691,24 @@ watch(() => configProjectId.value, (projectId) => {
   void loadConfigOps(projectId)
 }, { immediate: true })
 
+function operationFailureText(item: { host: string; error?: string; data?: unknown }): string {
+  let detail = item.error || '未知错误'
+  if (item.data && typeof item.data === 'object' && 'detail' in item.data) {
+    const value = (item.data as { detail?: unknown }).detail
+    if (typeof value === 'string' && value.length > 0)
+      detail += `\n${value}`
+  }
+  return `${item.host}\n${detail}`
+}
+
+function showOperationError(title: string, detail: string) {
+  serviceErrorTitle.value = title
+  serviceErrorDetail.value = detail
+  serviceErrorLogTail.value = []
+  serviceErrorTruncated.value = false
+  serviceErrorVisible.value = true
+}
+
 async function reloadMicdnFromMonitor() {
   if (!configProjectId.value || !micdnAllOnline.value) return
   micdnReloading.value = true
@@ -698,12 +716,12 @@ async function reloadMicdnFromMonitor() {
     const results = await reloadMicdnProject(configProjectId.value)
     const failed = results.filter((item) => !item.ok)
     if (failed.length > 0) {
-      MessagePlugin.error(`reload 失败: ${failed.map((item) => item.host).join(', ')}`)
+      showOperationError('Micdn reload 失败', failed.map(operationFailureText).join('\n\n'))
     } else {
       MessagePlugin.success('micdn 已 reload')
     }
   } catch (reason) {
-    MessagePlugin.error(errorText(reason))
+    showOperationError('Micdn reload 失败', errorText(reason))
   } finally {
     micdnReloading.value = false
   }
@@ -732,12 +750,12 @@ async function applyProxyFromMonitor() {
     )
     const failed = results.filter((item) => !item.ok)
     if (failed.length > 0) {
-      MessagePlugin.error(`应用失败: ${failed.map((item) => item.host).join(', ')}`)
+      showOperationError('代理应用失败', failed.map(operationFailureText).join('\n\n'))
     } else {
       MessagePlugin.success('代理配置已应用')
     }
   } catch (reason) {
-    MessagePlugin.error(errorText(reason))
+    showOperationError('代理应用失败', errorText(reason))
   } finally {
     proxyApplying.value = false
   }

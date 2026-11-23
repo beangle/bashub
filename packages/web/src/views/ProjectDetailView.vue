@@ -504,6 +504,10 @@
         <t-alert v-if="certificateError" theme="error" :message="certificateError" />
       </div>
     </t-dialog>
+
+    <t-dialog v-model:visible="operationErrorVisible" :header="operationErrorTitle" width="760px" :footer="false">
+      <pre class="operation-error">{{ operationErrorDetail }}</pre>
+    </t-dialog>
   </section>
 </template>
 
@@ -657,6 +661,9 @@ const certificateNotAfterDraft = ref('')
 const privateKeyDraft = ref('')
 const savingCertificate = ref(false)
 const certificateError = ref('')
+const operationErrorVisible = ref(false)
+const operationErrorTitle = ref('')
+const operationErrorDetail = ref('')
 const keyConfigured = computed(() => Boolean(attrOf(project.value, 'key')) || micdn.value?.project.keySet === true)
 const organizationText = computed(() => {
   const orgTitle = attrOf(organization.value, 'title')
@@ -805,6 +812,22 @@ function openMonitor() {
   void router.push({ path: '/monitor/agents', query: { project: qualifiedName.value } })
 }
 
+function operationFailureText(item: { host: string; error?: string; data?: unknown }): string {
+  let detail = item.error || '未知错误'
+  if (item.data && typeof item.data === 'object' && 'detail' in item.data) {
+    const value = (item.data as { detail?: unknown }).detail
+    if (typeof value === 'string' && value.length > 0)
+      detail += `\n${value}`
+  }
+  return `${item.host}\n${detail}`
+}
+
+function showOperationError(title: string, detail: string) {
+  operationErrorTitle.value = title
+  operationErrorDetail.value = detail
+  operationErrorVisible.value = true
+}
+
 async function reloadMicdn() {
   if (!micdnAllOnline.value) {
     MessagePlugin.error('Micdn 节点未全部在线，无法 reload')
@@ -815,12 +838,12 @@ async function reloadMicdn() {
     const results = await reloadMicdnProject(projectId)
     const failed = results.filter((item) => !item.ok)
     if (failed.length > 0) {
-      MessagePlugin.error(`reload 失败: ${failed.map((item) => item.host).join(', ')}`)
+      showOperationError('Micdn reload 失败', failed.map(operationFailureText).join('\n\n'))
     } else {
       MessagePlugin.success('micdn 已 reload')
     }
   } catch (error) {
-    MessagePlugin.error(error instanceof Error ? error.message : 'reload micdn 失败')
+    showOperationError('Micdn reload 失败', errorText(error))
   } finally {
     micdnReloading.value = false
   }
@@ -924,13 +947,13 @@ function applyProxy() {
         )
         const failed = results.filter((item) => !item.ok)
         if (failed.length > 0) {
-          MessagePlugin.error(`应用失败: ${failed.map((item) => item.host).join(', ')}`)
+          showOperationError('代理应用失败', failed.map(operationFailureText).join('\n\n'))
         } else {
           MessagePlugin.success('代理已应用到节点')
         }
         dialog.destroy()
       } catch (error) {
-        MessagePlugin.error(error instanceof Error ? error.message : '应用代理失败')
+        showOperationError('代理应用失败', errorText(error))
       } finally {
         proxyApplying.value = false
       }
@@ -1509,6 +1532,15 @@ onMounted(load)
 
 .config-preview--certificate {
   max-height: 260px;
+}
+
+.operation-error {
+  margin: 0;
+  color: var(--td-text-color-primary);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .empty-text,
