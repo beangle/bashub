@@ -167,12 +167,10 @@ private void attachMicdn(ref ProxyModel model, const MicdnProjectView view) {
     model.micdnPaths ~= "/asset";
   if (wwwBound)
     model.micdnPaths ~= "/www";
-  if (flag(objGet(config, "maven"), "declared", false))
-    model.micdnPaths ~= "/maven";
-  if (flag(objGet(config, "npm"), "declared", false))
-    model.micdnPaths ~= "/npm";
-  if (flag(objGet(config, "native"), "declared", false))
-    model.micdnPaths ~= "/native";
+  // maven/npm/native 在 micdn 配置中固定启用；代理路径必须始终包含。
+  model.micdnPaths ~= "/maven";
+  model.micdnPaths ~= "/npm";
+  model.micdnPaths ~= "/native";
   // blob/static 由 micdn 提供；/std/spa 不是固定 micdn 路径，来自 webapp 或 www mount。
   model.micdnPaths ~= "/blob";
   model.micdnPaths ~= "/static";

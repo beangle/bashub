@@ -538,6 +538,9 @@ unittest {
   auto map = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
   assert(map.canFind("/blob  micdn"));
   assert(map.canFind("/static  micdn"));
+  assert(map.canFind("/maven  micdn"));
+  assert(map.canFind("/npm  micdn"));
+  assert(map.canFind("/native  micdn"));
   assert(text.canFind("backend micdn"));
   assert(text.canFind("server s1 10.0.0.31:8888 check"));
   assert(!map.canFind("/std/spa  micdn"));
