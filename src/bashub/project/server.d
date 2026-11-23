@@ -240,8 +240,6 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
       auto maxHeap = attributeLong(server, "maxHeapSize");
       if (maxHeap > 0)
         putAttr(xml, "max-heap-size", maxHeap.to!string ~ "M");
-      if (hasAttribute(server, "proxyHttpPort"))
-        putAttr(xml, "proxy-http-port", numberText(server, "proxyHttpPort"));
       if (hasAttribute(server, "proxyOptions"))
         putAttr(xml, "proxy-options", attributeText(server, "proxyOptions"));
       auto autoStart = attributeBool(server, "autoStart");

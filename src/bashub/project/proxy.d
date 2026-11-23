@@ -357,8 +357,7 @@ private ProxyServer[] targetServers(Json webapp, const ProjectData data) {
     if (hostId in data.hostsById)
       item.ip = attributeText(data.hostsById[hostId], "ip");
     item.options = attributeText(server, "proxyOptions").strip;
-    item.port = hasAttribute(server, "proxyHttpPort") ?
-        attributeLong(server, "proxyHttpPort") : attributeLong(server, "httpPort");
+    item.port = attributeLong(server, "httpPort");
     servers ~= item;
   }
   sort!((a, b) => a.name < b.name || (a.name == b.name && a.id < b.id))(servers);

@@ -130,7 +130,7 @@ unittest {
   assert(xml.canFind(`<host name="host01" ip="10.0.0.11" agent-group="default_group"/>`));
   assert(xml.canFind(`<host name="host02" ip="10.0.0.12" agent-group="default_group"/>`));
   assert(xml.canFind(`<farm name="prod-farm" engine="tomcat" max-heap-size="2048M">`));
-  assert(xml.canFind(`<server name="app1" host="host01" http="8080" proxy-http-port="9080"`));
+  assert(xml.canFind(`<server name="app1" host="host01" http="8080"`));
   assert(xml.canFind(`<auto-start>`));
   assert(xml.canFind(`<wait-for ref="prod-farm.app2"/>`));
   assert(xml.canFind(`<wait-for url="https://db.example/health" timeout="30"/>`));
@@ -200,8 +200,8 @@ unittest {
   auto nginx = renderProxyForEndpoint(store, reg, project, "edge-web");
   assert(nginx.canFind("worker_connections 60000;"));
   assert(nginx.canFind("upstream prod-farm{"));
-  assert(nginx.canFind("server 10.0.0.11:9080 check inter 5s;"));
-  assert(nginx.canFind("server 10.0.0.12:9081;"));
+  assert(nginx.canFind("server 10.0.0.11:8080 check inter 5s;"));
+  assert(nginx.canFind("server 10.0.0.12:8081;"));
   assert(nginx.canFind("location /bas {"));
   assert(nginx.canFind("proxy_pass http://prod-farm;"));
   assert(nginx.canFind("ssl_certificate /etc/nginx/certs/edge-web.pem;"));
@@ -217,7 +217,7 @@ unittest {
   assert(haproxy.canFind("bind *:80"));
   assert(!haproxy.canFind("ssl crt /etc/setline/certs/edge-ip.bundle.pem"));
   assert(haproxy.canFind("backend prod-farm"));
-  assert(haproxy.canFind("server app1 10.0.0.11:9080 check inter 5s"));
+  assert(haproxy.canFind("server app1 10.0.0.11:8080 check inter 5s"));
   auto hmap = renderHaproxyMapForEndpoint(store, reg, project, "edge-ip");
   assert(hmap.canFind("/bas  prod-farm"));
   assert(haproxy.all!isASCII);
@@ -236,7 +236,7 @@ unittest {
   auto servers = reg.find("servers");
   dao.seed(servers, [
     "id": Json("5003"), "name": Json("app3"), "farm": Json("4001"), "host": Json("2001"),
-    "http_port": Json(8082L), "max_heap_size": Json(0L), "proxy_http_port": Json(9082L),
+    "http_port": Json(8082L), "max_heap_size": Json(0L),
     "proxy_options": Json(""),
   ]);
 

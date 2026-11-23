@@ -155,13 +155,13 @@ private Row[] serverRows() {
   return [
     row("5001", [
       "name": Json("app1"), "farm": Json("4001"), "host": Json("2001"),
-      "http_port": Json(8080L), "max_heap_size": Json(0L), "proxy_http_port": Json(9080L),
+      "http_port": Json(8080L), "max_heap_size": Json(0L),
       "proxy_options": Json("check inter 5s"), "auto_start": Json(true),
       "wait_for": Json(`[{"ref":"prod-farm.app2"},{"url":"https://db.example/health","timeout":30}]`),
     ]),
     row("5002", [
       "name": Json("app2"), "farm": Json("4001"), "host": Json("2002"),
-      "http_port": Json(8081L), "max_heap_size": Json(1024L), "proxy_http_port": Json(9081L),
+      "http_port": Json(8081L), "max_heap_size": Json(1024L),
       "proxy_options": Json(""),
     ]),
   ];

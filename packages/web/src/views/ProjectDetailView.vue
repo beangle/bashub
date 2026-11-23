@@ -281,7 +281,6 @@
                       <th>群集</th>
                       <th>服务</th>
                       <th>HTTP</th>
-                      <th>代理</th>
                       <th>堆</th>
                       <th>状态</th>
                     </tr>
@@ -298,7 +297,6 @@
                       <td>{{ item.farmName }}</td>
                       <td class="service-table__name" :title="item.name">{{ item.name }}</td>
                       <td>{{ item.httpPort || '—' }}</td>
-                      <td>{{ item.proxyPort || '—' }}</td>
                       <td>{{ item.heap || '—' }}</td>
                       <td>
                         <t-tag size="small" :theme="item.running ? 'success' : 'warning'" variant="light">
@@ -573,7 +571,6 @@ interface ServerRunEntry {
   name: string
   farmName: string
   httpPort: string
-  proxyPort: string
   heap: string
   running: boolean
 }
@@ -742,7 +739,6 @@ const serviceRows = computed<ServerRunEntry[]>(() => {
       name: serverName,
       farmName,
       httpPort: attrOf(server, 'httpPort'),
-      proxyPort: attrOf(server, 'proxyHttpPort'),
       heap: heapText(server),
       running: instance ? isRunning(instance) : false,
     })
@@ -762,7 +758,6 @@ const serviceRows = computed<ServerRunEntry[]>(() => {
         name: id,
         farmName: dot > 0 ? id.slice(0, dot) : '未分组',
         httpPort: instance.httpPort ? String(instance.httpPort) : '',
-        proxyPort: '',
         heap: '',
         running: isRunning(instance),
       })

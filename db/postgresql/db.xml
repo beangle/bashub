@@ -238,7 +238,6 @@
             <column name="http_port" type="integer" nullable="false" defaultValue="0" comment="httpPort?"/>
             <column name="max_heap_size" type="integer" nullable="false" defaultValue="0" comment="maxHeapSize?"/>
             <column name="name" type="varchar(255)" nullable="false" comment="名称"/>
-            <column name="proxy_http_port" type="integer" comment="proxyHttpPort?"/>
             <column name="proxy_options" type="varchar(255)" comment="proxyOptions?"/>
             <column name="auto_start" type="boolean" nullable="false" defaultValue="false" comment="basagent 开机自启"/>
             <column name="wait_for" type="text" comment="启动等待条件 JSON 数组"/>

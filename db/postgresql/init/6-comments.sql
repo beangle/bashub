@@ -80,7 +80,6 @@ comment on column bas.cfg_servers.http_port is 'httpPort?';
 comment on column bas.cfg_servers.id is '非业务主键:datetime';
 comment on column bas.cfg_servers.max_heap_size is 'maxHeapSize?';
 comment on column bas.cfg_servers.name is '名称';
-comment on column bas.cfg_servers.proxy_http_port is 'proxyHttpPort?';
 comment on column bas.cfg_servers.proxy_options is 'proxyOptions?';
 comment on column bas.cfg_webapps.artifact_id is 'Artifact?ID';
 comment on column bas.cfg_webapps.context_path is 'contextPath?';

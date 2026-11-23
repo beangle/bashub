@@ -209,10 +209,9 @@ export const resourceSchemas: ResourceSchema[] = [
     fields: [
       { key: 'name', label: '名称', required: true },
       { key: 'farm', label: '群集', type: 'ref', ref: farmRef, required: true },
-      { key: 'host', label: '主机', type: 'ref', ref: hostRef, required: true },
+      { key: 'host', label: '主机', type: 'ref', ref: hostRef, required: true, optionsFilter: 'host.project.id', refreshOptions: true, help: '只能选择当前 Project 的主机' },
       { key: 'httpPort', label: 'HTTP 端口', type: 'number' },
-      { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', help: '0 表示与群集一致' },
-      { key: 'proxyHttpPort', label: '代理端口', type: 'number' },
+      { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', defaultValue: 0, placeholder: '0', help: '0 表示与群集一致，可留空' },
       { key: 'proxyOptions', label: '代理', type: 'textarea', column: true },
       { key: 'autoStart', label: '开机自启', type: 'boolean', column: false, help: '存在 auto-start 才由 basagent 自动启动' },
       {

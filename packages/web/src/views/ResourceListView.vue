@@ -232,12 +232,13 @@
 import { DataGrid, UnderlineTabs, type DataGridAction, type DataGridColumn, type UnderlineTabItem } from '@beangle/bui-vue'
 import { AddIcon, DeleteIcon, EditIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin, type FormInstanceFunctions, type FormRule, type PageInfo } from 'tdesign-vue-next'
-import { computed, h, nextTick, onMounted, reactive, ref, shallowRef } from 'vue'
+import { computed, h, nextTick, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   attributeText,
   callResourceAction,
   getPlainJson,
+  getResourceDetail,
   indexIncluded,
   listResource,
   relationshipIds,
@@ -669,7 +670,15 @@ function refsOf(): FieldSchema[] {
 }
 
 async function loadOptions(fields: FieldSchema[] = refsOf()) {
-  const project = projectId(form.project) || projectId(filterValues.project) || currentProjectId.value
+  let project = projectId(form.project) || projectId(filterValues.project) || currentProjectId.value
+  if (!project && form.farm) {
+    try {
+      const farm = await getResourceDetail('/farms', String(form.farm))
+      project = relationshipIds(farm.row, 'project')[0] || ''
+    } catch {
+      // 关联加载失败时保留空 scope，避免表单无法打开；host 仍由后端鉴权。
+    }
+  }
   await Promise.all(
     fields.map(async (field) => {
       const ref = field.ref!
@@ -715,6 +724,11 @@ async function refreshFormOptions() {
   if (dynamic.length > 0)
     await loadOptions(dynamic)
 }
+
+watch(() => form.farm, () => {
+  if (formVisible.value)
+    void refreshFormOptions()
+})
 
 const gridActions = computed<DataGridAction[]>(() => {
   const actions: DataGridAction[] = []

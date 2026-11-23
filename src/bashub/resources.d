@@ -115,7 +115,6 @@ Registry hubRegistry() {
         Column("name", "name", Kind.text),
         Column("http_port", "httpPort", Kind.number),
         Column("max_heap_size", "maxHeapSize", Kind.number),
-        Column("proxy_http_port", "proxyHttpPort", Kind.number),
         Column("proxy_options", "proxyOptions", Kind.text),
         Column("auto_start", "autoStart", Kind.boolean),
         Column("wait_for", "waitFor", Kind.text),
