@@ -253,6 +253,23 @@ function onFieldChange(field: FieldSchema, value: unknown) {
   for (const [target, path] of Object.entries(field.refDefaults)) {
     form[target] = attributeText(selected.attributes[path]) || ''
   }
+  fillSingleCoupledOption()
+}
+
+/**
+ * 条件必填的关联字段（如应用部署的「代理点」随「上下文」出现）：
+ * 目标字段为空且只有一个可选项时自动选中；有多个选项则留空，由用户明确选择。
+ */
+function fillSingleCoupledOption() {
+  formFields.forEach((field) => {
+    if (!field.requiredWhenFilled || !filled(form[field.requiredWhenFilled])) return
+    if (field.type !== 'refs' && field.type !== 'ref') return
+    const selected = form[field.key]
+    if (filled(selected)) return
+    const options = optionsCache[field.key] || []
+    if (options.length !== 1) return
+    form[field.key] = field.type === 'refs' ? [String(options[0].value)] : String(options[0].value)
+  })
 }
 
 const rules = computed<Record<string, FormRule[]>>(() => {
