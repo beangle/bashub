@@ -114,7 +114,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 - 列表页「新建/编辑」统一进入 `ResourceFormView` 全页表单；普通详情从列表数据锚点打开
   `ResourceDetailPanel` 抽屉，跨实体/长关系的复杂详情使用专用路由。抽屉不再承载复杂编辑。
   表单使用 `t-form`、`label-align="top"`、`required-mark-position="right"`，字段放进
-  `.form-page-grid`（多行控件占整行），底部固定操作栏；`requiredMark`/`requiredMarkPosition`
+  `.form-page-grid`（短字段默认两列，`formColumns: 3` 的资源用三列；多行控件占整行），底部固定操作栏；`requiredMark`/`requiredMarkPosition`
   是两个 prop，不要写成 `required-mark="right"`。字段说明用 `<template #help>`。
   FormItem 常驻 DOM，给 model 赋空值会触发 TDesign「值变化即校验」，因此表单绑定
   `:show-error-message="showErrors"`，打开时 false、首次提交前置 true。
@@ -122,8 +122,9 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 ## 页面组织
 
 - 资源页是元数据驱动的：`src/resources/index.ts` 声明每个资源的 `path`/`type`/`fields`/`filters`/`tools`，
-  `src/views/ResourceListView.vue` 据此渲染 DataGrid、查询、增删改与批量动作；`src/router`、`HomeView`、
-  `StandaloneShell` 的菜单也由同一份 schema 生成。新增一个后台资源通常只需加一段 schema。
+  `src/views/ResourceListView.vue` 据此渲染 DataGrid、查询、增删改与批量动作；`src/router`、`HomeView`
+  仍由同一份 schema 生成。侧栏菜单固定在 `StandaloneShell.buildMenus()`，按「配置与监控 / 配置管理 / 应用管理」
+  三组组织，新增资源页后如需出现在菜单中要显式登记。
   字段列宽用 `field.width`：数字按 px（如顺序号 100、菜单启用列 80、菜单名称列 200），字符串按百分比。
 - 查询条件渲染在左侧 `aside.query-panel`（对齐 exam 的 `data-workbench` 布局），字段来自 `schema.filters`：
   `ref`/`select`/`boolean` 用下拉，`number` 用数字框，其余用文本框（回车即查）。
