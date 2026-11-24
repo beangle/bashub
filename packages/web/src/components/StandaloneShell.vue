@@ -98,45 +98,43 @@ const itemIcons: Record<string, Component> = {
   menus: ViewListIcon,
 }
 
-/** 概览单列；页签组只占一个菜单项，其余资源按 schema.group 归组缩进。 */
+/** 左侧菜单按产品约定的三组组织，不再跟随 schema 自动生成。 */
 function buildMenus(): AppShellMenuItem[] {
-  const groups = new Map<string, AppShellMenuItem[]>()
-  const tabGroupBySchema = new Map(
-    resourceTabGroups.flatMap((group) => group.tabs.map((tab) => [tab.key, group])),
-  )
-  const placedTabGroups = new Set<string>()
-  resourceSchemas.forEach((schema) => {
-    const children = groups.get(schema.group) ?? []
-    const tabGroup = tabGroupBySchema.get(schema.key)
-    if (tabGroup && !placedTabGroups.has(tabGroup.key)) {
-      placedTabGroups.add(tabGroup.key)
-      children.push({ path: tabGroup.path, title: tabGroup.title, icon: itemIcons[tabGroup.key] || AppIcon })
-    }
-    if (tabGroup) {
-      groups.set(schema.group, children)
-      return
-    }
-    if (schema.menu === false) {
-      groups.set(schema.group, children)
-      return
-    }
-    children.push({ path: resourceApiPath(schema.path), title: schema.title, icon: itemIcons[schema.key] || AppIcon })
-    groups.set(schema.group, children)
-  })
-  groups.set('应用监控', [
-    { path: '/monitor/agents', title: '在线节点', icon: ServerIcon },
-  ])
-  groups.set('Micdn', [
-    { path: '/micdn/components', title: '组件目录', icon: CloudIcon },
-  ])
-
-  const items: AppShellMenuItem[] = [{ path: '/home', title: '概览', icon: HomeIcon }]
-  groups.forEach((children, title) => {
-    items.push({ path: '', title, icon: groupIcons[title] ?? FolderIcon, children })
-  })
-  return items
+  return [
+    { path: '/home', title: '概览', icon: HomeIcon },
+    {
+      path: '',
+      title: '配置与监控',
+      icon: ChartIcon,
+      children: [
+        { path: '/config/org-config', title: '项目配置', icon: UserIcon },
+        { path: '/config/farm-hosts', title: '主机配置', icon: ServerIcon },
+        { path: '/config/webapps', title: '部署维护', icon: RocketIcon },
+        { path: '/monitor/agents', title: '在线监控', icon: DesktopIcon },
+      ],
+    },
+    {
+      path: '',
+      title: '配置管理',
+      icon: Setting1Icon,
+      children: [
+        { path: '/config/platform-ops', title: '操作系统', icon: ComponentGridIcon },
+        { path: '/config/engines', title: '引擎管理', icon: Setting1Icon },
+        { path: '/config/artifacts', title: '组件维护', icon: AppIcon },
+        { path: '/micdn/components', title: '静态资源', icon: CloudIcon },
+      ],
+    },
+    {
+      path: '',
+      title: '应用管理',
+      icon: AppIcon,
+      children: [
+        { path: '/ems/app-config', title: '应用维护', icon: AppIcon },
+        { path: '/ems/menu-config', title: '菜单管理', icon: ViewListIcon },
+      ],
+    },
+  ]
 }
-
 const menus: AppShellMenuItem[] = buildMenus()
 
 const locale = ref<PortalLocale>(detectPortalLocale())
