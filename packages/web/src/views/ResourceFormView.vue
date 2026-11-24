@@ -320,7 +320,8 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
       return
     }
     if (field.type === 'lines') {
-      attributes[field.key] = String(raw ?? '').split('\n').map((line) => line.trim()).filter(Boolean).join('\n')
+      const lines = String(raw ?? '').split('\n').map((line) => line.trim()).filter(Boolean)
+      attributes[field.key] = field.json ? lines : lines.join('\n')
       return
     }
     if (field.type === 'number') {

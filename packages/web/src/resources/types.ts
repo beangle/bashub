@@ -156,6 +156,8 @@ export interface FieldSchema {
   filterKey?: string
   /** 在抽屉表单中独占一行；缺省由控件类型决定（textarea/lines 独占）。 */
   wide?: boolean
+  /** `lines` 字段提交为 JSON 数组（后端列是 json/jsonb），而不是换行文本。 */
+  json?: boolean
   width?: number | string
   /** 是否可点击列头排序；缺省：属性列可排序，`refs`（集合）列不可排序。 */
   sortable?: boolean

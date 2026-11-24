@@ -16,12 +16,24 @@
     @update:locale="applyLocale"
     @update:theme-mode="applyThemeMode"
   >
+    <template #topbar-extra>
+      <t-select
+        v-if="projectOptions.length > 0"
+        v-model="selectedProject"
+        class="global-project-picker"
+        :options="projectOptions"
+        size="small"
+        filterable
+        clearable
+        placeholder="选择 Project"
+      />
+    </template>
     <router-view :key="route.path" />
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, type Component } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   AppShell,
@@ -56,10 +68,36 @@ import {
 } from 'tdesign-icons-vue-next'
 import { auth, currentUser, runtimeConfig } from '@/auth'
 import { resourceApiPath } from '@/api/prefix'
+import { attributeText, listResource } from '@/api/resource'
+import { currentProjectId, forgetProject, projectId, rememberProject } from '@/current-project'
 import { resourceSchemas, resourceTabGroups } from '@/resources'
 
 const { handleLogin, handleLogout } = auth.useAuth()
 const route = useRoute()
+const projectOptions = ref<{ label: string; value: string }[]>([])
+const selectedProject = computed({
+  get: () => currentProjectId.value,
+  set: (value: string | number | undefined) => {
+    const id = projectId(value)
+    if (id) rememberProject(id)
+    else forgetProject()
+  },
+})
+
+async function loadProjectOptions() {
+  try {
+    const result = await listResource('/projects', { pageSize: 500 })
+    projectOptions.value = result.rows.map((row) => {
+      const name = attributeText(row.attributes.qualifiedName) || attributeText(row.attributes.name)
+      const title = attributeText(row.attributes.title)
+      return { label: title ? `${name} · ${title}` : name || row.id, value: row.id }
+    })
+    if (currentProjectId.value && !projectOptions.value.some((option) => option.value === currentProjectId.value))
+      forgetProject()
+  } catch {
+    projectOptions.value = []
+  }
+}
 
 /** 分组图标；分组标题即 schema.group，未登记的分组退化为 FolderIcon。 */
 const groupIcons: Record<string, Component> = {
@@ -154,7 +192,12 @@ function applyThemeMode(value: PortalThemeMode) {
 
 let unbindPortalUi: (() => void) | undefined
 
+watch(currentUser, (user) => {
+  if (user && projectOptions.value.length === 0) void loadProjectOptions()
+})
+
 onMounted(() => {
+  void loadProjectOptions()
   applyThemeMode(themeMode.value)
   unbindPortalUi = bindPortalUiSync({
     onLocale: applyLocale,

@@ -118,7 +118,6 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '项目级代理配置：IP、域名、引擎与 TLS；证书在项目详情的证书页维护，bundle 供代理机下载',
     sort: 'name',
-    followProject: false,
     formColumns: 3,
     filters: [{ key: 'project', label: '项目', type: 'ref', ref: projectRef }],
     fields: [
@@ -162,8 +161,8 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'jspSupport', label: 'JSP', type: 'boolean', section: '运行能力', help: '仅 tomcat-server（发行包）带 Jasper；嵌入式引擎不支持 JSP' },
       { key: 'websocketSupport', label: 'WebSocket', type: 'boolean', help: '关闭后 basctl 不再引入 websocket 依赖；tomcat-server 随发行包，不受影响' },
       { key: 'project', label: '配置', type: 'ref', ref: projectRef },
-      { key: 'listeners', label: '监听器', type: 'lines', column: false, section: '监听器与依赖', help: '一行一个监听器类名' },
-      { key: 'jars', label: '依赖 Jar', type: 'lines', column: false, help: '一行一个 jar 坐标' },
+      { key: 'listeners', label: '监听器', type: 'lines', json: true, column: false, section: '监听器与依赖', help: '一行一个监听器类名' },
+      { key: 'jars', label: '依赖 Jar', type: 'lines', json: true, column: false, help: '一行一个 jar 坐标' },
     ],
   },
   {
@@ -337,7 +336,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'unpack', label: '解压执行', type: 'boolean', column: false, width: 70 },
       { key: 'contextPath', label: '上下文', section: '访问与代理', allowEmpty: true, requiredWhenFilled: 'endpoints', help: '后台任务可留空；选择了代理点时必填' },
       { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, column: false, width: '12%', optionsFilter: 'endpoint.project.id', refreshOptions: true, requiredWhenFilled: 'contextPath', help: '填写上下文后必选；后台任务可留空' },
-      { key: 'urls', label: '对外路径', type: 'lines', rows: 2, column: false, help: '一行一个 URL 前缀，代理 bundle 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
+      { key: 'urls', label: '对外路径', type: 'lines', json: true, rows: 2, column: false, help: '一行一个 URL 前缀，代理 bundle 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
       { key: 'libs', label: '扩展库', type: 'textarea', rows: 4, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
     ],
   },

@@ -137,7 +137,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   不显示资源名那种 `/setting/config.action` 的权限串，与旧 `menu/list.ftl` 一致）；
   `join` 走列表 `include` 回来的关联数据，字段本身仍按 `refs` 参与表单与 include。多个字段用
   `separator` 连接，空值自动跳过（如菜单的「入口地址」= `entry.name` + `?` + `params`）。
-- 「当前配置」记忆（原 `ProjectHelper` + cookie `current_project_id` 的前端对等物，见 `src/current-project.ts`）：
+- 顶部栏的全局 Project 选择器是当前配置的唯一入口（原 `ProjectHelper` + cookie `current_project_id` 的前端对等物，见 `src/current-project.ts`）：
   查询条件里有 `ref`→`projects` 字段的资源视为**配置作用域**（当前是群集管理/主机管理/应用部署），
   打开页面时该查询条件自动填成记忆的配置，用户在查询条件里选中的配置会写回记忆（存 localStorage
   `bashub.current_project_id`），切到同类页面继续沿用；新建表单里的配置字段也默认取记忆值。

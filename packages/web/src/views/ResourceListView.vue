@@ -1240,7 +1240,7 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
         .split('\n')
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
-      setAt(attributes, path, lines.join('\n'))
+      setAt(attributes, path, field.json ? lines : lines.join('\n'))
       return
     }
     if (field.type === 'number') {
@@ -1333,6 +1333,15 @@ async function importXml(event: Event) {
     input.value = ''
   }
 }
+
+watch(currentProjectId, (id) => {
+  if (!projectFilter || !id) return
+  if (projectId(filterValues[projectFilter.key]) === id) return
+  filterValues[projectFilter.key] = id
+  pagination.current = 1
+  void syncListRoute()
+  void loadRows()
+})
 
 onMounted(async () => {
   filterFields.forEach((field) => {
