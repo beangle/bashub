@@ -109,7 +109,7 @@
                 <div class="stat"><span>群集</span><strong>{{ farms.length }}</strong></div>
                 <div class="stat"><span>服务</span><strong>{{ servers.length }}</strong></div>
                 <div class="stat"><span>主机</span><strong>{{ hosts.length }}</strong></div>
-                <div class="stat"><span>应用</span><strong>{{ webapps.length }}</strong></div>
+                <div class="stat"><span>应用</span><strong>{{ enabledWebapps.length }}</strong></div>
                 <div class="stat"><span>在线节点</span><strong>{{ onlineAgents.length }}</strong></div>
                 <div class="stat"><span>运行实例</span><strong>{{ runningInstanceCount }}</strong></div>
               </div>
@@ -258,7 +258,7 @@
                 <div class="stat"><span>群集</span><strong>{{ farms.length }}</strong></div>
                 <div class="stat"><span>服务</span><strong>{{ servers.length }}</strong></div>
                 <div class="stat"><span>主机</span><strong>{{ hosts.length }}</strong></div>
-                <div class="stat"><span>应用</span><strong>{{ webapps.length }}</strong></div>
+                <div class="stat"><span>应用</span><strong>{{ enabledWebapps.length }}</strong></div>
                 <div class="stat"><span>运行实例</span><strong>{{ runningInstanceCount }}</strong></div>
                 <div class="stat"><span>停止实例</span><strong>{{ stoppedInstanceCount }}</strong></div>
               </div>
@@ -320,13 +320,14 @@
               <p v-if="warnings.webapps" class="load-error">{{ warnings.webapps }}</p>
               <table v-else-if="webappRows.length > 0" class="detail-table">
                 <thead>
-                  <tr><th>上下文</th><th>应用</th><th>GAV</th></tr>
+                  <tr><th>上下文</th><th>应用</th><th>GAV</th><th>状态</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="webapp in webappRows" :key="webapp.id">
                     <td><code>{{ attrOf(webapp, 'contextPath') || '/' }}</code></td>
                     <td>{{ webappTitle(webapp) }}</td>
                     <td><code>{{ attrOf(webapp, 'gav') || '—' }}</code></td>
+                    <td><t-tag size="small" :theme="webappEnabled(webapp) ? 'success' : 'default'" variant="light">{{ webappEnabled(webapp) ? '启用' : '停用' }}</t-tag></td>
                   </tr>
                 </tbody>
               </table>
@@ -776,6 +777,12 @@ const serviceRows = computed<ServerRunEntry[]>(() => {
 const webappRows = computed(() =>
   [...webapps.value].sort((a, b) => attrOf(a, 'contextPath').localeCompare(attrOf(b, 'contextPath'))),
 )
+const enabledWebapps = computed(() => webapps.value.filter(webappEnabled))
+
+function webappEnabled(webapp: ResourceRow): boolean {
+  const value = webapp.attributes.enabled
+  return value === undefined || value === true || value === 'true'
+}
 const staticBindings = computed(() => bindingsOf('static_bundle'))
 const wwwBindings = computed(() => bindingsOf('www_doc'))
 const micdnServers = computed(() =>

@@ -268,6 +268,8 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   ProxyWebapp[] normalApps;
   ProxyWebapp[] rootApps;
   foreach (app; apps) {
+    if (hasAttribute(app, "enabled") && !attributeBool(app, "enabled"))
+      continue;
     if (endpointId.length && !relationshipIds(app, "endpoints").canFind(endpointId))
       continue;
     ProxyWebapp item;

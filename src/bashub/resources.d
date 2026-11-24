@@ -171,6 +171,7 @@ Registry hubRegistry() {
       [
         Column("version", "version", Kind.text),
         Column("context_path", "contextPath", Kind.text),
+        Column("enabled", "enabled", Kind.boolean),
         Column("urls", "urls", Kind.jsonArray),
         Column("unpack", "unpack", Kind.boolean),
         Column("libs", "libs", Kind.text),

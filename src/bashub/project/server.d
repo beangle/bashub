@@ -267,6 +267,8 @@ string renderServerXml(Store store, Registry reg, const ProjectContext context,
 
   xml.put("  <webapps>\n");
   foreach (webapp; webapps) {
+    if (hasAttribute(webapp, "enabled") && !attributeBool(webapp, "enabled"))
+      continue;
     auto artifactId = relationshipId(webapp, "artifact");
     if (artifactId !in data.artifactsById)
       continue;

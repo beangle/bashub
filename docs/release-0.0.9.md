@@ -145,6 +145,10 @@ Project 详情的「概览」、各详情卡片的标题与说明，以及 Micdn
 
 应用部署填写上下文后必须选择代理点；选择代理点后必须填写上下文。列表不再显示代理点、解压执行两列。
 
+### 应用部署临时下线
+
+`cfg_webapps.enabled` 默认 true，界面名「启用」。关闭后保留配置和端口，但不生成 server.xml、不生成代理路由，也不参与告警和统计。迁移文件：`db/postgresql/migrate/20261124-02-webapp-enabled.sql`。
+
 ### 无上下文的后台任务
 
 `cfg_webapps.context_path` 改为可空；没有上下文的部署视为后台任务，不生成任何代理路由。迁移文件：`db/postgresql/migrate/20261124-01-webapp-context-nullable.sql`。

@@ -331,6 +331,7 @@ export const resourceSchemas: ResourceSchema[] = [
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       { key: 'version', label: '版本', required: true, width: '12%', cell: { type: 'updatable' } },
+      { key: 'enabled', label: '启用', type: 'boolean', defaultValue: true, width: 70, help: '关闭后保留配置和端口，但不再运行，也不参与告警和统计' },
       { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, required: true, width: '26%', section: '部署目标', optionsFilter: 'farm.project.id', refreshOptions: true, help: '至少选择一个当前配置下的服务' },
       { key: 'unpack', label: '解压执行', type: 'boolean', column: false, width: 70 },
       { key: 'contextPath', label: '上下文', section: '访问与代理', allowEmpty: true, requiredWhenFilled: 'endpoints', help: '后台任务可留空；选择了代理点时必填' },

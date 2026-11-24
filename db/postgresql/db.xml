@@ -256,6 +256,7 @@
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>
             <column name="artifact_id" type="bigint" nullable="false" comment="Artifact?ID"/>
             <column name="context_path" type="varchar(255)" comment="contextPath? 可空：空表示后台任务，不生成代理路由"/>
+            <column name="enabled" type="boolean" nullable="false" defaultValue="true" comment="是否启用；false 表示临时下线，保留配置但不运行、不参与告警和统计"/>
             <column name="libs" type="varchar(255)" comment="libs?"/>
             <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
             <column name="unpack" type="boolean" nullable="false" defaultValue="false" comment="unpack?"/>

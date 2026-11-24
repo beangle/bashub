@@ -16,7 +16,7 @@ import bashub.project.resolver : ProjectContext, loadAll;
 
 import beangle.data.resource : Registry;
 import beangle.data.value : jsonText;
-import beangle.jsonapi.document : attributeText, relationshipId, relationshipIds;
+import beangle.jsonapi.document : attributeBool, attributeText, hasAttribute, relationshipId, relationshipIds;
 import beangle.jsonapi.store : Store;
 
 import vibe.data.json : Json;
@@ -47,7 +47,11 @@ ProjectData loadProjectData(Store store, Registry reg, const ProjectContext cont
   data.farms = loadAll(store, reg.find("farms"), ["project": context.id]);
   data.hosts = loadAll(store, reg.find("hosts"), ["project": context.id]);
   data.endpoints = loadAll(store, reg.find("endpoints"), ["project": context.id]);
-  data.webapps = loadAll(store, reg.find("webapps"), ["project": context.id]);
+  Json[] webapps;
+  foreach (webapp; loadAll(store, reg.find("webapps"), ["project": context.id]))
+    if (!hasAttribute(webapp, "enabled") || attributeBool(webapp, "enabled"))
+      webapps ~= webapp;
+  data.webapps = webapps;
 
   auto engineIds = referencedIds(data.farms, "engine", false);
   auto serverIds = referencedIds(data.farms, "servers", true);

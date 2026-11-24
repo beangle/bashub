@@ -38,11 +38,11 @@
               <h4>部署情况</h4>
               <p>每个 Project 的实际版本、context path 和对外 URL。</p>
             </div>
-            <t-tag variant="light">{{ webapps.length }} 个部署</t-tag>
+            <t-tag variant="light">{{ enabledWebapps.length }} 个启用部署</t-tag>
           </header>
           <table v-if="webapps.length > 0" class="detail-table">
             <thead>
-              <tr><th>Logo</th><th>Project</th><th>标题</th><th>实际版本</th><th>部署路径</th></tr>
+              <tr><th>Logo</th><th>Project</th><th>标题</th><th>实际版本</th><th>部署路径</th><th>状态</th></tr>
             </thead>
             <tbody>
               <tr v-for="webapp in webapps" :key="webapp.id">
@@ -54,6 +54,7 @@
                 <td>{{ projectTitle(webapp) }}</td>
                 <td><code>{{ attributeText(webapp.attributes.version) || '—' }}</code></td>
                 <td><code>{{ attributeText(webapp.attributes.contextPath) || '—' }}</code></td>
+                <td><t-tag size="small" :theme="isWebappEnabled(webapp) ? 'success' : 'default'" variant="light">{{ isWebappEnabled(webapp) ? '启用' : '停用' }}</t-tag></td>
               </tr>
             </tbody>
           </table>
@@ -88,6 +89,12 @@ const artifactId = String(route.params.id || '')
 const loading = ref(false)
 const artifact = ref<ResourceRow>()
 const webapps = ref<ResourceRow[]>([])
+const enabledWebapps = computed(() => webapps.value.filter(isWebappEnabled))
+
+function isWebappEnabled(webapp: ResourceRow): boolean {
+  const value = webapp.attributes.enabled
+  return value === undefined || value === true || value === 'true'
+}
 const included = ref<Map<string, ResourceRow>>(new Map())
 
 const artifactName = computed(
