@@ -124,7 +124,8 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 - 资源页是元数据驱动的：`src/resources/index.ts` 声明每个资源的 `path`/`type`/`fields`/`filters`/`tools`，
   `src/views/ResourceListView.vue` 据此渲染 DataGrid、查询、增删改与批量动作；`src/router`、`HomeView`
   仍由同一份 schema 生成。侧栏菜单固定在 `StandaloneShell.buildMenus()`，按「配置与监控 / 配置管理 / 应用管理」
-  三组组织，新增资源页后如需出现在菜单中要显式登记。
+  三组组织，新增资源页后如需出现在菜单中要显式登记。「项目总览」入口为 `/monitor/overview`，
+  汇总所有 Project 的健康状态；「在线监控」仍按单 Project 查看节点详情。
   字段列宽用 `field.width`：数字按 px（如顺序号 100、菜单启用列 80、菜单名称列 200），字符串按百分比。
 - 查询条件渲染在左侧 `aside.query-panel`（对齐 exam 的 `data-workbench` 布局），字段来自 `schema.filters`：
   `ref`/`select`/`boolean` 用下拉，`number` 用数字框，其余用文本框（回车即查）。

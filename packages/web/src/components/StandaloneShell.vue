@@ -107,6 +107,7 @@ function buildMenus(): AppShellMenuItem[] {
       title: '配置与监控',
       icon: ChartIcon,
       children: [
+        { path: '/monitor/overview', title: '项目总览', icon: ChartIcon },
         { path: '/config/org-config', title: '项目配置', icon: UserIcon },
         { path: '/config/farm-hosts', title: '主机配置', icon: ServerIcon },
         { path: '/config/webapps', title: '部署维护', icon: RocketIcon },
