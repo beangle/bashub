@@ -66,7 +66,9 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 | `/config/org-config?tab=organizations` | 机构管理，`organizations` | `/api/bashub/config/organizations` | — |
 | `/config/platform-ops?tab=platform-features` | 平台功能，`platform-features` | `/api/bashub/config/platform-features` | 卡片链接跳到 `/config/platform-features/{id}` |
 | `/config/platform-ops?tab=platforms` | 平台管理，`platforms` | `/api/bashub/config/platforms` | — |
-| `/config/farm-hosts?tab=farms` | 群集管理，`farms` | `/api/bashub/config/farms` | 编辑抽屉内直接维护服务 |
+| `/config/forms/{schema}/{new\|id/edit}` | 通用新建/编辑页，`ResourceFormView` | 按资源 schema 调用对应 API | 替代原资源抽屉表单 |
+| 无独立详情路由 | 普通资源详情抽屉，`ResourceDetailPanel` | 按资源 schema 调用详情 API | 从列表数据锚点打开；复杂详情沿用专用路由 |
+| `/config/farm-hosts?tab=farms` | 群集管理，`farms` | `/api/bashub/config/farms` | 详情页/编辑页内直接维护服务 |
 | `/config/farm-hosts?tab=hosts` | 主机管理，`hosts` | `/api/bashub/config/hosts` | 名称链接跳到 `/config/hosts/{id}` |
 | `/config/engines` | 引擎管理，`engines` | `/api/bashub/config/engines` | — |
 | `/config/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 批量刷新版本：`POST /api/bashub/config/artifacts/update-version` |

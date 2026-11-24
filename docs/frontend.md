@@ -111,14 +111,13 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 - 左栏查询面板的规格（面板内边距、60px 标签列、28px 控件、查询按钮）由 `@beangle/bui-vue/styles/query-form.css`
   提供，工作台外框/栅格由 `styles/workbench.css` 提供，两者都在 `main.ts` 引入；应用侧只用
   `--bui-query-*`/`--bui-*` 变量覆盖色板（含 `[theme-mode='dark']`），不要重写几何。
-- 列表页「新建/编辑」抽屉表单的规格由 `@beangle/bui-vue/styles/drawer-form.css` 提供（`main.ts` 引入）：
-  `t-drawer` + `t-form.drawer-form` + `label-align="top"` + `required-mark required-mark-position="right"`，
-  字段放进 `.drawer-form-grid`（两列，`textarea`/`lines` 用 `.drawer-form-field-wide` 占整行），
-  动作条放抽屉 `#footer` 插槽（`div.drawer-actions`；字段少、不需滚动的短表单才内联 `:footer="false"`）。
-  三个必须注意的点：`requiredMark`/`requiredMarkPosition` 是两个 prop，写 `required-mark="right"` 无效且会类型告警；
-  字段说明要用 `<template #help>`（走 `.t-input__help`，占一行），塞进默认插槽会挤在同一 flex 行里；
-  抽屉内的 FormItem 常驻 DOM，给 model 赋空值会触发 TDesign「值变化即校验」，所以表单绑定
-  `:show-error-message="showErrors"`，打开时置 false、首次提交前置 true。
+- 列表页「新建/编辑」统一进入 `ResourceFormView` 全页表单；普通详情从列表数据锚点打开
+  `ResourceDetailPanel` 抽屉，跨实体/长关系的复杂详情使用专用路由。抽屉不再承载复杂编辑。
+  表单使用 `t-form`、`label-align="top"`、`required-mark-position="right"`，字段放进
+  `.form-page-grid`（多行控件占整行），底部固定操作栏；`requiredMark`/`requiredMarkPosition`
+  是两个 prop，不要写成 `required-mark="right"`。字段说明用 `<template #help>`。
+  FormItem 常驻 DOM，给 model 赋空值会触发 TDesign「值变化即校验」，因此表单绑定
+  `:show-error-message="showErrors"`，打开时 false、首次提交前置 true。
 
 ## 页面组织
 
@@ -159,7 +158,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `/api/bashub/config/platforms`；写入走 JSON:API 的
   `POST/PATCH/DELETE /api/bashub/config/platform-feature-scripts`。该资源因此**没有独立列表页**，
   SPA 里也不再有对应的 schema。
-- Project 详情页 `/config/projects/:id`（`ProjectDetailView.vue`）：从配置列表的名称列或编辑抽屉进入，
+- Project 详情页 `/config/projects/:id`（`ProjectDetailView.vue`）：从配置列表的名称链接进入，
   左侧导航切换概览、Haproxy/Nginx、Setline、证书、BAS 服务与 Micdn，右侧以卡片展示配置和关联资源；
   `?section=setline` 等查询参数可直达对应分区。
 - 资源列表保持原有页签组织方式，页签组路由带能力域前缀：

@@ -111,6 +111,15 @@
     </div>
   </section>
 
+  <t-drawer v-model:visible="detailVisible" size="720px" :header="`${schema.title}详情`">
+    <ResourceDetailPanel
+      v-if="detailId"
+      :schema-key="schema.key"
+      :id="detailId"
+      @edit="editDetail"
+    />
+  </t-drawer>
+
   <t-drawer
     v-model:visible="formVisible"
     size="680px"
@@ -253,6 +262,7 @@ import { DialogPlugin, MessagePlugin, type FormInstanceFunctions, type FormRule,
 import { computed, h, nextTick, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FarmServersEditor from '@/components/FarmServersEditor.vue'
+import ResourceDetailPanel from '@/components/ResourceDetailPanel.vue'
 import {
   attributeText,
   callResourceAction,
@@ -425,6 +435,9 @@ function cellText(row: ResourceRow, field: FieldSchema): string {
       .filter((text) => text.length > 0)
       .join(cell.separator || '')
   }
+  // 详情锚点的列值可来自关联模板（如应用部署的 `{artifact.title}`）。
+  if (cell && cell.type === 'detail' && cell.text)
+    return fillTemplate(cell.text, row)
   // 图标 + 文本：列值取模板（不含图标），排序/导出/复制都拿到可读文本。
   if (cell && cell.type === 'iconText') {
     return cell.template ? fillTemplate(cell.template, row) : attributeText(fieldValue(row, field))
@@ -604,6 +617,18 @@ function renderCell(field: FieldSchema) {
         const latest = attributeText(displayValue(source, 'artifact.latestVersion'))
         return render('span', { title: `可升级至 ${latest}` }, [text, render('span', { class: 'cell-update-arrow' }, ' ↑')])
       }
+      case 'detail': {
+        const source = params.row.__row as ResourceRow | undefined
+        const label = cell.text && source ? fillTemplate(cell.text, source) : text
+        return render('a', {
+          class: 'detail-anchor',
+          href: '#',
+          onClick: (event: Event) => {
+            event.preventDefault()
+            if (source) void openDetail(source)
+          },
+        }, label)
+      }
       case 'link': {
         if (!source) return render('span', {}, text)
         const href = fillTemplate(cell.href || '', source)
@@ -749,6 +774,8 @@ async function refreshFormOptions() {
 
 const gridActions = computed<DataGridAction[]>(() => {
   const actions: DataGridAction[] = []
+  if (schema.detail)
+    actions.push({ code: 'detail', label: '详情', selection: 'one', theme: 'default' })
   if (!schema.readOnly) {
     actions.push({ code: 'edit', label: '编辑', selection: 'one', theme: 'primary', icon: EditIcon })
     actions.push({ code: 'delete', label: '删除', selection: 'one', theme: 'danger', icon: DeleteIcon })
@@ -764,6 +791,8 @@ const gridActions = computed<DataGridAction[]>(() => {
   return actions
 })
 
+const detailVisible = ref(false)
+const detailId = ref('')
 const formVisible = ref(false)
 const submitting = ref(false)
 /** 打开抽屉时先不显示校验结果；首次提交后再显示（否则新建/编辑一打开就满屏必填红字）。 */
@@ -792,7 +821,7 @@ const rules = computed<Record<string, FormRule[]>>(() => {
   const result: Record<string, FormRule[]> = {}
   formFields.forEach((field) => {
     const fieldRules: FormRule[] = []
-    if (isRequiredField(field))
+    if (isRequiredField(field) || (field.requiredWhenFilled && filterValueFilled(form[field.requiredWhenFilled])))
       fieldRules.push({ required: true, message: `请填写${field.label}` })
     if (field.type === 'number' && (field.min !== undefined || field.max !== undefined)) {
       fieldRules.push({
@@ -924,12 +953,14 @@ async function loadRows() {
 
 function reload() {
   pagination.current = 1
+  void syncListRoute()
   void loadRows()
 }
 
 function onPageChange(page: PageInfo) {
   pagination.current = page.current
   pagination.pageSize = page.pageSize
+  void syncListRoute()
   void loadRows()
 }
 
@@ -1028,11 +1059,40 @@ async function openForm() {
   formRef.value?.clearValidate()
 }
 
+function listQueryString(): string {
+  const query = new URLSearchParams()
+  query.set('page', String(pagination.current))
+  query.set('size', String(pagination.pageSize))
+  if (sort.value) query.set('sort', sort.value)
+  filterFields.forEach((field) => {
+    const value = filterValues[field.key]
+    if (value !== '' && value !== null && value !== undefined)
+      query.set(field.key, String(value))
+  })
+  return `${route.path}?${query.toString()}`
+}
+
+async function syncListRoute() {
+  const query: Record<string, string> = { ...route.query as Record<string, string> }
+  query.page = String(pagination.current)
+  query.size = String(pagination.pageSize)
+  if (sort.value) query.sort = sort.value
+  else delete query.sort
+  filterFields.forEach((field) => {
+    const value = filterValues[field.key]
+    if (value !== '' && value !== null && value !== undefined) query[field.key] = String(value)
+    else delete query[field.key]
+  })
+  await router.replace({ path: route.path, query })
+}
+
+function formPath(row?: ResourceRow): string {
+  return `/config/forms/${schema.key}/${row ? `${row.id}/edit` : 'new'}?returnTo=${encodeURIComponent(listQueryString())}`
+}
+
 async function openCreate() {
-  editingId.value = ''
-  editingRow.value = undefined
-  resetForm()
-  await openForm()
+  await syncListRoute()
+  await router.push(formPath())
 }
 
 /** 卡片墙的落点：`cardLink` 模板（如平台功能 → 详情页）优先，否则打开编辑抽屉。 */
@@ -1041,14 +1101,28 @@ function openCard(row: ResourceRow) {
     void router.push(fillTemplate(schema.cardLink, row))
     return
   }
+  if (schema.detail) {
+    openDetail(row)
+    return
+  }
   openEdit(row)
 }
 
+async function openDetail(row: ResourceRow) {
+  await syncListRoute()
+  detailId.value = row.id
+  detailVisible.value = true
+}
+
+async function editDetail() {
+  if (!detailId.value) return
+  detailVisible.value = false
+  await router.push(`/config/forms/${schema.key}/${detailId.value}/edit?returnTo=${encodeURIComponent(route.fullPath)}`)
+}
+
 async function openEdit(row: ResourceRow) {
-  editingId.value = row.id
-  editingRow.value = row
-  resetForm(row)
-  await openForm()
+  await syncListRoute()
+  await router.push(formPath(row))
 }
 
 /** 抽屉里的关联页入口：关掉抽屉再跳到目标页。 */
@@ -1067,7 +1141,9 @@ function selectedRows(payload: { selectedRows: Record<string, unknown>[] }): Res
 function onGridAction(payload: { action: DataGridAction; selectedRows: Record<string, unknown>[] }) {
   const selected = selectedRows(payload)
   const tool = (schema.tools || []).find((candidate) => candidate.code === payload.action.code)
-  if (payload.action.code === 'edit' && selected[0]) {
+  if (payload.action.code === 'detail' && selected[0]) {
+    openDetail(selected[0])
+  } else if (payload.action.code === 'edit' && selected[0]) {
     openEdit(selected[0])
   } else if (payload.action.code === 'delete' && selected[0]) {
     confirmRemove(selected[0])
@@ -1264,6 +1340,12 @@ onMounted(async () => {
     if (typeof value === 'string' && value.length > 0) filterValues[field.key] = value
   })
   // 宿主/门户下发的当前配置优先（参数名沿用 ems-app 的 EMS_URL_PARAMS.contextProjectId）。
+  const page = Number(route.query.page)
+  const size = Number(route.query.size)
+  pagination.current = Number.isInteger(page) && page > 0 ? page : 1
+  pagination.pageSize = Number.isInteger(size) && size > 0 ? size : 30
+  if (typeof route.query.sort === 'string' && route.query.sort.length > 0)
+    sort.value = route.query.sort
   const contextProject = projectId(route.query.contextProjectId)
   if (contextProject !== '') rememberProject(contextProject)
   try {
@@ -1312,6 +1394,16 @@ onMounted(async () => {
   color: var(--td-text-color-placeholder);
   font-size: 12px;
   font-weight: 400;
+}
+
+.detail-anchor {
+  color: var(--td-brand-color);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.detail-anchor:hover {
+  text-decoration: underline;
 }
 
 .drawer-hint {

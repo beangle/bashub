@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     FarmServersEditor: typeof import('./src/components/FarmServersEditor.vue')['default']
     MicdnBindingEditor: typeof import('./src/components/MicdnBindingEditor.vue')['default']
+    ResourceDetailPanel: typeof import('./src/components/ResourceDetailPanel.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StandaloneShell: typeof import('./src/components/StandaloneShell.vue')['default']
