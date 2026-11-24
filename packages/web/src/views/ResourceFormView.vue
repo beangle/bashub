@@ -23,7 +23,7 @@
         >
           <div
             class="form-page-grid"
-            :style="{ gridTemplateColumns: schema.formGrid || `repeat(${schema.formColumns || 2}, minmax(0, 1fr))` }"
+            :style="{ gridTemplateColumns: schema.formGrid || `repeat(${schema.formColumns || 3}, minmax(0, 1fr))` }"
           >
             <template v-for="(field, index) in formFields" :key="field.key">
               <div

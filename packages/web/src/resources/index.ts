@@ -313,6 +313,7 @@ export const resourceSchemas: ResourceSchema[] = [
     description: '把组件部署到配置下的若干服务',
     sort: 'contextPath',
     contextField: 'project',
+    formColumns: 3,
     tools: [
       {
         code: 'upgrade', label: '升级到最新版', action: 'upgrade',

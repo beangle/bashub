@@ -17,23 +17,31 @@
     <div class="health-summary">
       <article class="summary-card summary-card--total">
         <span>客户总数</span>
-        <strong>{{ projects.length }}</strong>
-        <small>{{ agentCount }} 个在线节点 · {{ instanceRunning }}/{{ instanceTotal }} 个实例运行</small>
+        <div class="summary-card__value">
+          <strong>{{ projects.length }}</strong>
+          <small>{{ agentCount }} 个在线节点 · {{ instanceRunning }}/{{ instanceTotal }} 个实例运行</small>
+        </div>
       </article>
       <article class="summary-card summary-card--ok">
         <span>正常</span>
-        <strong>{{ summary.ok }}</strong>
-        <small>无警告</small>
+        <div class="summary-card__value">
+          <strong>{{ summary.ok }}</strong>
+          <small>无警告</small>
+        </div>
       </article>
       <article class="summary-card summary-card--warning">
         <span>警告</span>
-        <strong>{{ summary.warning }}</strong>
-        <small>需要关注</small>
+        <div class="summary-card__value">
+          <strong>{{ summary.warning }}</strong>
+          <small>需要关注</small>
+        </div>
       </article>
       <article class="summary-card summary-card--critical">
         <span>严重</span>
-        <strong>{{ summary.critical }}</strong>
-        <small>需要处理</small>
+        <div class="summary-card__value">
+          <strong>{{ summary.critical }}</strong>
+          <small>需要处理</small>
+        </div>
       </article>
     </div>
 
@@ -327,28 +335,39 @@ onBeforeUnmount(() => {
 .summary-card {
   display: flex;
   flex-direction: column;
-  min-height: 92px;
-  padding: 14px 16px;
+  justify-content: center;
+  min-height: 66px;
+  padding: 9px 14px;
   border: 1px solid var(--td-component-stroke);
   border-radius: 8px;
   background: var(--td-bg-color-container);
 }
 
-.summary-card span {
+.summary-card > span {
   color: var(--td-text-color-secondary);
   font-size: 12px;
 }
 
+.summary-card__value {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .summary-card strong {
-  margin-top: 4px;
-  font-size: 26px;
+  flex: none;
+  font-size: 24px;
   line-height: 1.1;
 }
 
 .summary-card small {
-  margin-top: auto;
+  overflow: hidden;
   color: var(--td-text-color-placeholder);
   font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .summary-card--ok strong { color: var(--td-success-color); }

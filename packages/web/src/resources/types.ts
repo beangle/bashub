@@ -221,7 +221,7 @@ export interface ResourceSchema {
   menu?: boolean
   /** 是否提供通用详情页。 */
   detail?: boolean
-  /** 表单栅格列数，缺省两列。 */
+  /** 表单栅格列数，缺省三列。 */
   formColumns?: number
   /** 表单栅格的自定义列宽，如 `minmax(0, 2fr) minmax(0, 1fr)`。 */
   formGrid?: string
