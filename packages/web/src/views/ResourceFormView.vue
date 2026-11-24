@@ -1,5 +1,6 @@
 <template>
   <section class="page-panel">
+    <div class="form-page-frame">
     <div class="page-head">
       <div class="detail-heading">
         <div class="title-row">
@@ -20,9 +21,15 @@
           label-align="top"
           required-mark-position="right"
         >
-          <div class="form-page-grid">
+          <div
+            class="form-page-grid"
+            :style="{ gridTemplateColumns: schema.formGrid || `repeat(${schema.formColumns || 2}, minmax(0, 1fr))` }"
+          >
             <template v-for="(field, index) in formFields" :key="field.key">
-              <div v-if="field.section && (index === 0 || formFields[index - 1].section !== field.section)" class="form-section">
+              <div
+                v-if="field.section && (index === 0 || formFields[index - 1].section !== field.section)"
+                class="form-section form-section--inline-rule"
+              >
                 {{ field.section }}
               </div>
               <t-form-item :label="field.label" :name="field.key" :class="{ 'form-field-wide': isWideField(field) }">
@@ -97,6 +104,7 @@
         </t-form>
       </div>
     </t-loading>
+    </div>
   </section>
 </template>
 
@@ -360,9 +368,14 @@ onMounted(load)
 </script>
 
 <style scoped>
+.form-page-frame {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
 .form-page {
-  max-width: 960px;
-  padding: 16px;
+  margin: 12px auto 28px;
+  padding: 18px 28px;
   border: 1px solid var(--td-component-stroke);
   border-radius: 8px;
   background: var(--td-bg-color-container);
@@ -370,8 +383,20 @@ onMounted(load)
 
 .form-page-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 14px 20px;
+  gap: 10px 20px;
+}
+
+.form-page :deep(.t-form__item) {
+  min-width: 0;
+  /* TDesign 默认给 FormItem 24px 下边距；栅格已用 gap 控制间距，避免叠加。 */
+  margin-bottom: 0;
+}
+
+.form-page :deep(.t-input),
+.form-page :deep(.t-input-number),
+.form-page :deep(.t-select),
+.form-page :deep(.t-textarea) {
+  width: 100%;
 }
 
 .form-field-wide {
@@ -380,12 +405,32 @@ onMounted(load)
 
 .form-section {
   grid-column: 1 / -1;
-  margin-top: 4px;
-  padding-top: 10px;
+  margin-top: 14px;
+  padding-top: 6px;
   border-top: 1px solid var(--td-component-stroke);
   color: var(--td-text-color-secondary);
   font-size: 13px;
   font-weight: 600;
+}
+
+.form-section--inline-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 4px;
+  border-top: 0;
+}
+
+.form-section--inline-rule::after {
+  flex: 1;
+  height: 1px;
+  background: var(--td-component-stroke);
+  content: '';
+}
+
+.form-page-grid > .form-section:first-child {
+  margin-top: 0;
 }
 
 .form-page-hint {
@@ -398,8 +443,8 @@ onMounted(load)
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--td-component-stroke);
 }
 </style>

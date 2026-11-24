@@ -221,7 +221,9 @@ export interface ResourceSchema {
   menu?: boolean
   /** 是否提供通用详情页。 */
   detail?: boolean
-  /** 表单两列栅格的自定义列宽，如 `minmax(0, 2fr) minmax(0, 1fr)`。 */
+  /** 表单栅格列数，缺省两列。 */
+  formColumns?: number
+  /** 表单栅格的自定义列宽，如 `minmax(0, 2fr) minmax(0, 1fr)`。 */
   formGrid?: string
   /** 不能修改的所属项目字段：不放进表单，抽屉标题处显示。 */
   contextField?: string

@@ -119,18 +119,19 @@ export const resourceSchemas: ResourceSchema[] = [
     description: '项目级代理配置：IP、域名、引擎与 TLS；证书在项目详情的证书页维护，bundle 供代理机下载',
     sort: 'name',
     followProject: false,
+    formColumns: 3,
     filters: [{ key: 'project', label: '项目', type: 'ref', ref: projectRef }],
     fields: [
-      { key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true, column: false },
+      { key: 'project', label: '项目', type: 'ref', ref: projectRef, required: true, column: false, section: '基本信息' },
       { key: 'projectInfo', label: '项目', form: false, sortable: false, width: 150, cell: { type: 'iconText', iconField: 'project.org.logoUrl', iconKind: 'image', iconWidth: 24, iconHeight: 24, template: '{project.qualifiedName}', include: ['project', 'project.org'] } },
       { key: 'name', label: '名称', required: true, width: 160, cell: { type: 'detail' }, help: 'webapp endpoints 引用它；项目内唯一' },
       { key: 'ips', label: '内网 IP', required: true, width: 170, help: '逗号分隔；代理机内网地址，不是域名公网地址' },
       { key: 'domain', label: '域名', width: 220, help: '可选且项目内唯一；空表示无域名代理' },
-      { key: 'engine', label: '代理类型', type: 'select', required: true, width: 100, options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
+      { key: 'engine', label: '代理类型', type: 'select', required: true, width: 100, section: '代理与 TLS', options: [{ label: 'Haproxy', value: 'haproxy' }, { label: 'Nginx', value: 'nginx' }] },
       { key: 'entry', label: '入口', form: false },
       { key: 'enableHttps', label: '使用 HTTPS', type: 'boolean', column: false },
       { key: 'forceHttps', label: '强制 HTTPS', type: 'boolean', column: false },
-      { key: 'httpPort', label: 'HTTP 端口', type: 'number', column: false },
+      { key: 'httpPort', label: 'HTTP 端口', type: 'number', column: false, section: '运行参数' },
       { key: 'httpsPort', label: 'HTTPS 端口', type: 'number', column: false },
       { key: 'maxconn', label: '最大连接数', type: 'number', column: false },
       { key: 'sslCiphers', label: 'SSL 加密套件', column: false },
@@ -147,20 +148,21 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: 'Servlet 容器/引擎及其监听器与依赖 jar',
     sort: 'name',
+    formColumns: 3,
     filters: [
       { key: 'name', label: '名称' },
       { key: 'typ', label: '类型', type: 'select', options: engineTypeOptions },
     ],
     fields: [
-      { key: 'name', label: '名称', required: true, cell: { type: 'detail' } },
+      { key: 'name', label: '名称', required: true, cell: { type: 'detail' }, section: '基本信息' },
       {
         key: 'typ', label: '类型', type: 'select', required: true, options: engineTypeOptions,
       },
       { key: 'version', label: '版本', required: true },
-      { key: 'jspSupport', label: 'JSP', type: 'boolean', help: '仅 tomcat-server（发行包）带 Jasper；嵌入式引擎不支持 JSP' },
+      { key: 'jspSupport', label: 'JSP', type: 'boolean', section: '运行能力', help: '仅 tomcat-server（发行包）带 Jasper；嵌入式引擎不支持 JSP' },
       { key: 'websocketSupport', label: 'WebSocket', type: 'boolean', help: '关闭后 basctl 不再引入 websocket 依赖；tomcat-server 随发行包，不受影响' },
       { key: 'project', label: '配置', type: 'ref', ref: projectRef },
-      { key: 'listeners', label: '监听器', type: 'lines', column: false, help: '一行一个监听器类名' },
+      { key: 'listeners', label: '监听器', type: 'lines', column: false, section: '监听器与依赖', help: '一行一个监听器类名' },
       { key: 'jars', label: '依赖 Jar', type: 'lines', column: false, help: '一行一个 jar 坐标' },
     ],
   },
@@ -177,13 +179,13 @@ export const resourceSchemas: ResourceSchema[] = [
     contextField: 'project',
     filters: [{ key: 'name', label: '名称' }, { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true }],
     fields: [
-      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'detail' } },
+      { key: 'name', label: '名称', required: true, width: '10%', section: '基本信息', cell: { type: 'detail' } },
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       { key: 'engine', label: '引擎', type: 'ref', ref: { path: '/engines', type: 'engines', labelFields: ['name', 'version'] }, required: true, width: '12%' },
       { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', required: true, width: '8%' },
       // 进程参数只在表单里维护。
-      { key: 'serverOptions', label: '进程参数', column: false, help: '如 -Xss512k' },
+      { key: 'serverOptions', label: '进程参数', column: false, section: '进程参数', help: '如 -Xss512k' },
       // 与原 farm/list.ftl 一致：`服务名(主机名:端口)`，多个以空格分隔。
       {
         key: 'servers', label: '服务', type: 'refs', ref: serverRef, form: false,
@@ -193,7 +195,7 @@ export const resourceSchemas: ResourceSchema[] = [
         },
       },
       {
-        key: 'proxyOptions', label: '代理配置', type: 'textarea', column: false,
+        key: 'proxyOptions', label: '代理配置', type: 'textarea', column: false, section: '代理配置',
         help: 'HAProxy backend 级参数，例如 balance roundrobin；具体 server 行参数在群集编辑抽屉的服务表里填写。',
       },
     ],
@@ -237,11 +239,12 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '主机规格与操作系统特性',
     sort: 'name',
+    formColumns: 3,
     contextField: 'project',
     filters: [{ key: 'name', label: '名称' }, { key: 'ip', label: 'IP' }, { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true }],
     fields: [
       // 列标题与宽度对齐原 host/list.ftl：名称10% IP地址13% 操作系统12% 系统特性(auto) 内存8% 平台10% CPU核心8% CPU规格20%。
-      { key: 'name', label: '名称', required: true, width: '10%', cell: { type: 'link', href: resourceApiPath('/hosts/{id}'), text: '{name}', target: '_self' } },
+      { key: 'name', label: '名称', required: true, width: '10%', section: '基本信息', cell: { type: 'link', href: resourceApiPath('/hosts/{id}'), text: '{name}', target: '_self' } },
       { key: 'ip', label: 'IP', columnTitle: 'IP地址', required: true, width: '13%' },
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
@@ -251,7 +254,7 @@ export const resourceSchemas: ResourceSchema[] = [
       },
       // 后端 featureLogos 已按 support(platform) 过滤，只显示功能 logo（title 为功能名）。
       { key: 'featureLogos', label: '系统特性', form: false, sortable: false, cell: { type: 'icons', titleField: 'name' } },
-      { key: 'memory', label: '内存', type: 'number', required: true, width: '8%', help: '单位：GB', cell: { type: 'text', suffix: 'GB' } },
+      { key: 'memory', label: '内存', type: 'number', required: true, width: '8%', section: '运行规格', help: '单位：GB', cell: { type: 'text', suffix: 'GB' } },
       { key: 'cores', label: 'CPU 核心数', columnTitle: 'CPU核心', type: 'number', required: true, width: '8%' },
       { key: 'hardware', label: '硬件现状', form: false, column: false },
       { key: 'agentGroup', label: '组网分组', type: 'text', required: true, defaultValue: 'default_group', help: '同一分组内的 agent 自动选主；不同分组互不组网' },
@@ -267,6 +270,7 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '可部署的 jar/war 构件',
     sort: 'artifactId',
+    formColumns: 3,
     tools: [
       {
         code: 'update-version', label: '刷新最新版本', action: 'update-version',
@@ -277,10 +281,10 @@ export const resourceSchemas: ResourceSchema[] = [
     // 列序对齐原 artifact/list.ftl：标题 → GAV → 部署上下文 → 面向平台 → 需要解析 → 容器要求。
     columns: ['title', 'gav', 'contextPath', 'arch', 'resolveSupport', 'container'],
     fields: [
-      { key: 'title', label: '标题', required: true, width: '20%', cell: { type: 'link', href: '/config/artifacts/{id}' } },
+      { key: 'title', label: '标题', required: true, width: '20%', section: '基本信息', cell: { type: 'link', href: '/config/artifacts/{id}' } },
       { key: 'artifactId', label: 'artifactId', required: true, column: false },
       { key: 'groupId', label: 'groupId', required: true, column: false },
-      { key: 'packaging', label: '打包类型', type: 'select', required: true, column: false, options: ['jar', 'war', 'bin', 'tar.gz'].map((value) => ({ label: value, value })) },
+      { key: 'packaging', label: '打包类型', type: 'select', required: true, column: false, section: '构建与包', options: ['jar', 'war', 'bin', 'tar.gz'].map((value) => ({ label: value, value })) },
       { key: 'classifier', label: '分类器', column: false },
       { key: 'exec', label: '可执行文件', column: false, help: '仅 native 包：相对解压根目录；留空用 artifactId' },
       { key: 'arch', label: '面向平台', type: 'select', options: archOptions, width: '8%' },
@@ -288,14 +292,14 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'gav', label: 'GAV', form: false, sortable: false },
       { key: 'contextPath', label: '部署上下文', width: '15%' },
       { key: 'project', label: '针对配置', type: 'ref', ref: projectRef, column: false },
-      { key: 'description', label: '介绍', type: 'textarea', column: false },
-      { key: 'resolveSupport', label: '需要解析', type: 'boolean', width: '8%' },
+      { key: 'resolveSupport', label: '需要解析', type: 'boolean', width: '8%', section: '运行特征' },
       {
         key: 'container', label: '容器要求', form: false, sortable: false, width: '8%',
         cell: { type: 'flags', fields: ['jspSupport', 'websocketSupport'], labels: { jspSupport: 'jsp', websocketSupport: 'websocket' } },
       },
       { key: 'jspSupport', label: 'JSP', type: 'boolean', column: false },
       { key: 'websocketSupport', label: 'WebSocket', type: 'boolean', column: false },
+      { key: 'description', label: '介绍', type: 'textarea', rows: 3, column: false, section: '说明' },
     ],
   },
   {
@@ -327,7 +331,7 @@ export const resourceSchemas: ResourceSchema[] = [
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       { key: 'version', label: '版本', required: true, width: '12%', cell: { type: 'updatable' } },
-      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, required: true, width: '26%', optionsFilter: 'farm.project.id', refreshOptions: true, help: '至少选择一个当前配置下的服务' },
+      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, required: true, width: '26%', section: '部署目标', optionsFilter: 'farm.project.id', refreshOptions: true, help: '至少选择一个当前配置下的服务' },
       { key: 'unpack', label: '解压执行', type: 'boolean', column: false, width: 70 },
       { key: 'contextPath', label: '上下文', section: '访问与代理', allowEmpty: true, requiredWhenFilled: 'endpoints', help: '后台任务可留空；选择了代理点时必填' },
       { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, column: false, width: '12%', optionsFilter: 'endpoint.project.id', refreshOptions: true, requiredWhenFilled: 'contextPath', help: '填写上下文后必选；后台任务可留空' },
@@ -366,13 +370,14 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: 'EMS 应用登记与依赖',
     sort: 'name',
+    formColumns: 3,
     filters: [{ key: 'group', label: '分组', type: 'ref', ref: { path: '/app-groups', type: 'appGroups', labelFields: ['title'] } }, { key: 'name', label: '名称' }, { key: 'title', label: '标题' }],
     fields: [
-      { key: 'name', label: '名称', required: true, cell: { type: 'detail' } },
+      { key: 'name', label: '名称', required: true, cell: { type: 'detail' }, section: '基本信息' },
       { key: 'title', label: '标题', required: true },
       { key: 'group', label: '分组', type: 'ref', ref: { path: '/app-groups', type: 'appGroups', labelFields: ['title'] }, required: true },
-      { key: 'artifactId', label: 'artifactId', required: true, column: false },
-      { key: 'services', label: '依赖项' },
+      { key: 'artifactId', label: 'artifactId', required: true, column: false, section: '构建' },
+      { key: 'services', label: '依赖项', section: '依赖' },
     ],
   },
   {
@@ -385,13 +390,14 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '应用与菜单',
     description: '应用的部署上下文与嵌入方式',
     sort: 'base',
+    formColumns: 3,
     filters: [
       { key: 'app', label: '应用', type: 'ref', ref: appRef, required: true },
       { key: 'channelType', label: '端类型', type: 'select', options: channelTypeOptions },
       { key: 'enabled', label: '状态', type: 'boolean' },
     ],
     fields: [
-      { key: 'app', label: '应用', type: 'ref', ref: appRef, required: true, column: false },
+      { key: 'app', label: '应用', type: 'ref', ref: appRef, required: true, column: false, section: '基本信息' },
       { key: 'base', label: '上下文地址', required: true, cell: { type: 'detail' } },
       { key: 'channelType', label: '端类型', type: 'select', options: channelTypeOptions, required: true, width: 100 },
       { key: 'embedMode', label: '嵌入方式', type: 'select', options: embedModeOptions, required: true, width: 100 },
