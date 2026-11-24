@@ -302,6 +302,7 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '把组件部署到配置下的若干服务',
     sort: 'contextPath',
+    contextField: 'project',
     tools: [
       {
         code: 'upgrade', label: '升级到最新版', action: 'upgrade',
@@ -320,12 +321,12 @@ export const resourceSchemas: ResourceSchema[] = [
       // 配置是查询条件里的必填项，列表列不再重复展示。
       { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true, column: false, locked: true },
       { key: 'version', label: '版本', required: true, width: '12%', cell: { type: 'updatable' } },
-      { key: 'contextPath', label: '上下文', required: true },
-      { key: 'urls', label: '对外路径', type: 'lines', column: false, help: '一行一个 URL 前缀，代理 bundle 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
+      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, required: true, width: '26%', optionsFilter: 'farm.project.id', refreshOptions: true, help: '至少选择一个当前配置下的服务' },
       { key: 'unpack', label: '解压执行', type: 'boolean', width: 70 },
-      { key: 'targets', label: '运行在', type: 'refs', ref: serverRef, width: '26%', optionsFilter: 'farm.project.id', refreshOptions: true, help: '只能选择当前配置下的服务' },
-      { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, width: '12%', optionsFilter: 'endpoint.project.id', refreshOptions: true, help: '只能选择当前配置下的代理点；留空表示不做负载代理' },
-      { key: 'libs', label: '扩展库', type: 'textarea', rows: 6, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
+      { key: 'contextPath', label: '上下文', section: '访问与代理', allowEmpty: true, help: '后台任务可留空；Web 应用填写对外上下文路径' },
+      { key: 'endpoints', label: '代理点', type: 'refs', ref: endpointRef, width: '12%', optionsFilter: 'endpoint.project.id', refreshOptions: true, help: '可选；留空表示不经过代理点，直接由运行在的服务提供访问' },
+      { key: 'urls', label: '对外路径', type: 'lines', rows: 2, column: false, help: '一行一个 URL 前缀，代理 bundle 按它转发；留空按上下文。上下文为 / 而内部 URL 无公共前缀（如 /a、/b）时必须逐条列出' },
+      { key: 'libs', label: '扩展库', type: 'textarea', rows: 4, column: false, help: 'gav 形式，分号或逗号分割；也可一行一个，保存时自动折算' },
     ],
   },
   {

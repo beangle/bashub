@@ -317,7 +317,7 @@ private string[] requiredOf(string path) {
   case "artifacts":
     return ["title", "artifactId", "groupId", "packaging", "latestVersion"];
   case "webapps":
-    return ["artifact", "project", "version", "contextPath"];
+    return ["artifact", "project", "version"];
   case "platform-features":
     return ["name", "version", "logo"];
   case "apps":

@@ -273,6 +273,9 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
     ProxyWebapp item;
     item.id = jsonText(app["id"]);
     item.contextPath = attributeText(app, "contextPath").strip;
+    // 没有上下文的 deployments 是后台任务，不参与任何代理路由。
+    if (item.contextPath.length == 0)
+      continue;
     item.servers = targetServers(app, data);
     if (item.servers.length == 0)
       continue;

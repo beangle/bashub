@@ -82,7 +82,7 @@ comment on column bas.cfg_servers.max_heap_size is 'maxHeapSize?';
 comment on column bas.cfg_servers.name is '名称';
 comment on column bas.cfg_servers.proxy_options is 'proxyOptions?';
 comment on column bas.cfg_webapps.artifact_id is 'Artifact?ID';
-comment on column bas.cfg_webapps.context_path is 'contextPath?';
+comment on column bas.cfg_webapps.context_path is 'contextPath? 可空：空表示后台任务，不生成代理路由';
 comment on column bas.cfg_webapps.id is '非业务主键:datetime';
 comment on column bas.cfg_webapps.libs is 'libs?';
 comment on column bas.cfg_webapps.project_id is 'Project?ID';

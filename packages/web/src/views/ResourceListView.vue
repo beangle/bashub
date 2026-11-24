@@ -113,9 +113,14 @@
 
   <t-drawer
     v-model:visible="formVisible"
-    :header="editingId ? `编辑${schema.title}` : `新建${schema.title}`"
     size="680px"
   >
+    <template #header>
+      <div class="drawer-heading">
+        <span>{{ editingId ? `编辑${schema.title}` : `新建${schema.title}` }}</span>
+        <span v-if="contextLabel" class="drawer-context">项目：{{ contextLabel }}</span>
+      </div>
+    </template>
     <t-form
       ref="formRef"
       class="drawer-form"
@@ -125,10 +130,15 @@
       label-align="top"
       required-mark-position="right"
     >
-      <div class="drawer-form-grid">
+      <div class="drawer-form-grid" :style="schema.formGrid ? { gridTemplateColumns: schema.formGrid } : undefined">
+        <template v-for="(field, index) in formFields" :key="field.key">
+          <div
+            v-if="field.section && (index === 0 || formFields[index - 1].section !== field.section)"
+            class="drawer-form-section"
+          >
+            {{ field.section }}
+          </div>
         <t-form-item
-          v-for="field in formFields"
-          :key="field.key"
           :label="field.label"
           :name="field.key"
           :class="{ 'drawer-form-field-wide': isWideField(field) }"
@@ -204,6 +214,7 @@
             <span>{{ field.help }}</span>
           </template>
         </t-form-item>
+        </template>
       </div>
       <FarmServersEditor
         v-if="schema.embeddedServers && editingId"
@@ -1166,7 +1177,10 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
       return
     }
     const text = String(raw ?? '').trim()
-    if (text.length === 0) return
+    if (text.length === 0) {
+      if (field.allowEmpty) setAt(attributes, path, '')
+      return
+    }
     setAt(attributes, path, text)
   })
 
@@ -1275,6 +1289,16 @@ onMounted(async () => {
 
 .hidden-file {
   display: none;
+}
+
+.drawer-form-section {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--td-component-stroke);
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .drawer-heading {

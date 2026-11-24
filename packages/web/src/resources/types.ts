@@ -115,6 +115,10 @@ export interface FieldSchema {
   refreshOptions?: boolean
   /** 选中关联后，从关联行属性填充表单字段：目标字段 → 源属性路径。 */
   refDefaults?: Record<string, string>
+  /** 表单分组标题；标记在该组第一个字段上。 */
+  section?: string
+  /** 文本字段留空时仍提交空串（非空数据库列，如无上下文的后台任务）。 */
+  allowEmpty?: boolean
   /** 表单字段只读（如部署页的 project）。 */
   locked?: boolean
   /** 敏感值：编辑时不由服务端回填，留空表示保持原值。 */
@@ -212,6 +216,8 @@ export interface ResourceSchema {
   exportable?: boolean
   /** 是否作为独立菜单项出现；缺省 true。设为 false 用于从属资源。 */
   menu?: boolean
+  /** 表单两列栅格的自定义列宽，如 `minmax(0, 2fr) minmax(0, 1fr)`。 */
+  formGrid?: string
   /** 不能修改的所属项目字段：不放进表单，抽屉标题处显示。 */
   contextField?: string
   /** 群集编辑抽屉里内嵌服务表；保留独立 server 资源作为高级入口。 */
