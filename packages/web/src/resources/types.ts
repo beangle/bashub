@@ -45,6 +45,7 @@ export type CellType =
   | 'join'
   | 'flags'
   | 'link'
+  | 'detail'
   | 'updatable'
 
 export interface CellSchema {
@@ -137,6 +138,8 @@ export interface FieldSchema {
   column?: boolean
   /** 是否出现在表单中。 */
   form?: boolean
+  /** 条件必填：指定字段有值（文本非空/多选非空）时，本字段必填。 */
+  requiredWhenFilled?: string
   /** 条件必填：指定布尔字段为真时，本字段必填。 */
   requiredWhen?: string
   /** 条件必填：`requiredWhen` 字段取该值时必填（缺省按布尔真值判断）。 */
@@ -216,6 +219,8 @@ export interface ResourceSchema {
   exportable?: boolean
   /** 是否作为独立菜单项出现；缺省 true。设为 false 用于从属资源。 */
   menu?: boolean
+  /** 是否提供通用详情页。 */
+  detail?: boolean
   /** 表单两列栅格的自定义列宽，如 `minmax(0, 2fr) minmax(0, 1fr)`。 */
   formGrid?: string
   /** 不能修改的所属项目字段：不放进表单，抽屉标题处显示。 */

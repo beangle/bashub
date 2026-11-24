@@ -40,6 +40,16 @@ const detailRoutes = [
     meta: { title: '主机详情' },
   },
   {
+    path: '/config/forms/:schemaKey/new',
+    component: () => import('@/views/ResourceFormView.vue'),
+    meta: { title: '新建' },
+  },
+  {
+    path: '/config/forms/:schemaKey/:id/edit',
+    component: () => import('@/views/ResourceFormView.vue'),
+    meta: { title: '编辑' },
+  },
+  {
     path: '/config/projects/:id',
     component: () => import('@/views/ProjectDetailView.vue'),
     meta: { title: '配置详情' },
