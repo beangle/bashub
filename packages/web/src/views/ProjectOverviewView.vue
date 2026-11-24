@@ -64,7 +64,7 @@
               />
               <div v-else class="health-card__logo health-card__logo--fallback">{{ item.initials }}</div>
               <div>
-                <h3>{{ item.title }}</h3>
+                <h3>{{ cardTitle(item) }}</h3>
                 <span class="health-card__qualified">{{ item.qualifiedName }}</span>
               </div>
             </div>
@@ -136,6 +136,8 @@ interface ProjectHealth {
   title: string
   qualifiedName: string
   orgTitle: string
+  orgShortTitle: string
+  orgSortName: string
   logoUrl: string
   initials: string
   status: HealthLevel
@@ -166,6 +168,12 @@ function statusLabel(status: HealthLevel): string {
 
 function statusTheme(status: HealthLevel): 'success' | 'warning' | 'danger' {
   return status === 'ok' ? 'success' : status === 'warning' ? 'warning' : 'danger'
+}
+
+function cardTitle(item: ProjectHealth): string {
+  return item.orgShortTitle && !item.title.startsWith(item.orgShortTitle)
+    ? `${item.orgShortTitle} · ${item.title}`
+    : item.title
 }
 
 function initials(title: string): string {
@@ -223,6 +231,8 @@ function buildProject(project: ResourceRow, agents: AgentStatus[], endpoints: Re
   const qualifiedName = attributeText(attributes.qualifiedName)
   const title = attributeText(attributes.title) || attributeText(attributes.name) || qualifiedName || project.id
   const orgTitle = orgRow ? attributeText(orgRow.attributes.title) || attributeText(orgRow.attributes.shortTitle) : ''
+  const orgShortTitle = orgRow ? attributeText(orgRow.attributes.shortTitle) || orgTitle : ''
+  const orgSortName = orgRow ? attributeText(orgRow.attributes.name) || orgTitle : ''
   const logoUrl = orgRow ? attributeText(orgRow.attributes.logoUrl) : ''
   const relatedAgents = agents.filter((agent) => agent.projectId === project.id ||
     (!agent.projectId && (agent.project === qualifiedName || agent.project === attributeText(attributes.name))))
@@ -255,6 +265,8 @@ function buildProject(project: ResourceRow, agents: AgentStatus[], endpoints: Re
     title,
     qualifiedName,
     orgTitle: orgTitle || '未归属机构',
+    orgShortTitle: orgShortTitle || '',
+    orgSortName: orgSortName || '',
     logoUrl,
     initials: initials(title),
     status,
@@ -285,7 +297,10 @@ async function reload() {
     })
     projects.value = projectPage.rows
       .map((project) => buildProject(project, agents, endpointPage.rows, included))
-      .sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'))
+      .sort((a, b) => {
+        const byOrg = a.orgSortName.localeCompare(b.orgSortName, 'zh-CN')
+        return byOrg || a.qualifiedName.localeCompare(b.qualifiedName, 'zh-CN')
+      })
     summary.ok = projects.value.filter((item) => item.status === 'ok').length
     summary.warning = projects.value.filter((item) => item.status === 'warning').length
     summary.critical = projects.value.filter((item) => item.status === 'critical').length
@@ -318,6 +333,12 @@ onBeforeUnmount(() => {
 <style scoped>
 .health-alert {
   margin: 8px 12px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .updated-at {
