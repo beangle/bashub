@@ -898,6 +898,36 @@ class HubService {
   }
 
   /// `GET /api/bashub/config/projects/{id}/proxy`：管理台查看最终代理配置。
+  /// `GET /api/bashub/config/projects/{id}/proxy-map`：管理台查看 HAProxy 路由 map。
+  void projectProxyMapView(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found"), HTTPStatus.notFound);
+      return;
+    }
+    try {
+      auto endpoint = req.query.get("endpoint", "").strip;
+      if (endpoint.length == 0)
+        endpoint = defaultEndpointName(project);
+      if (endpoint.length == 0) {
+        res.writeBody("", HTTPStatus.notFound);
+        return;
+      }
+      auto text = renderHaproxyMapForEndpoint(store, reg, project, endpoint);
+      if (text.length == 0) {
+        res.writeBody("", HTTPStatus.notFound);
+        return;
+      }
+      res.headers["Cache-Control"] = "no-store";
+      res.writeBody(text, HTTPStatus.ok, "text/plain");
+    } catch (Exception e) {
+      logError("Render proxy map failed: %s", e.toString);
+      res.writeBody("", HTTPStatus.internalServerError);
+    }
+  }
+
   void projectProxyView(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -2877,6 +2907,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/:project/script/:host", &hub.projectHostScript);
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);
   router.get(api.config ~ "/projects/:id/proxy", &hub.projectProxyView);
+  router.get(api.config ~ "/projects/:id/proxy-map", &hub.projectProxyMapView);
   router.get(api.config ~ "/projects/:id/proxy-bundle", &hub.projectProxyBundleView);
   router.post(api.config ~ "/projects/:id/proxy/apply", &hub.applyProjectProxy);
 

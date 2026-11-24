@@ -183,6 +183,24 @@
               <pre v-else-if="proxyConfig" class="config-preview">{{ proxyConfig }}</pre>
               <p v-else class="empty-text">当前 Project 没有可生成的代理配置。</p>
             </article>
+
+            <article v-if="proxyEngine === 'haproxy'" class="detail-card">
+              <header class="detail-card__head">
+                <div>
+                  <h4>HAProxy 路由 map</h4>
+                  <p>按路径最长前缀匹配的 bas-routes.map，和代理 bundle 中的文件一致。</p>
+                </div>
+                <div class="detail-card__actions">
+                  <t-button size="small" variant="outline" :disabled="!proxyMap" @click="copyText(proxyMap, 'HAProxy 路由 map')">
+                    <template #icon><CopyIcon /></template>
+                    复制
+                  </t-button>
+                </div>
+              </header>
+              <p v-if="warnings.proxyMap" class="load-error">{{ warnings.proxyMap }}</p>
+              <pre v-else-if="proxyMap" class="config-preview">{{ proxyMap }}</pre>
+              <p v-else class="empty-text">当前 Project 没有可生成的路由 map。</p>
+            </article>
           </div>
 
           <div v-else-if="activeSection === 'certificate'" class="detail-stack">
@@ -277,6 +295,7 @@
                 <table class="detail-table service-table">
                   <thead>
                     <tr>
+                      <th class="detail-table__index">#</th>
                       <th>节点</th>
                       <th>群集</th>
                       <th>服务</th>
@@ -286,10 +305,11 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="item in serviceRows" :key="item.key">
+                    <tr v-for="(item, index) in serviceRows" :key="item.key">
+                      <td class="detail-table__index">{{ index + 1 }}</td>
                       <td class="service-table__node">
-                        <strong>{{ item.ip }}</strong>
-                        <small v-if="item.hostName">{{ item.hostName }}</small>
+                        <span class="service-table__ip">{{ item.ip }}</span>
+                        <span v-if="item.hostName" class="service-table__host">{{ item.hostName }}</span>
                         <t-tag size="small" :theme="item.online ? 'success' : 'default'" variant="light">
                           {{ item.online ? '在线' : '离线' }}
                         </t-tag>
@@ -320,10 +340,11 @@
               <p v-if="warnings.webapps" class="load-error">{{ warnings.webapps }}</p>
               <table v-else-if="webappRows.length > 0" class="detail-table">
                 <thead>
-                  <tr><th>上下文</th><th>应用</th><th>GAV</th><th>状态</th></tr>
+                  <tr><th class="detail-table__index">#</th><th>上下文</th><th>应用</th><th>GAV</th><th>状态</th></tr>
                 </thead>
                 <tbody>
-                  <tr v-for="webapp in webappRows" :key="webapp.id">
+                  <tr v-for="(webapp, index) in webappRows" :key="webapp.id">
+                    <td class="detail-table__index">{{ index + 1 }}</td>
                     <td><code>{{ attrOf(webapp, 'contextPath') || '/' }}</code></td>
                     <td>{{ webappTitle(webapp) }}</td>
                     <td><code>{{ attrOf(webapp, 'gav') || '—' }}</code></td>
@@ -535,6 +556,7 @@ import {
   downloadProjectProxyBundle,
   readEndpointCertificate,
   readProjectConfig,
+  readProjectProxyMap,
   saveEndpointCertificate,
 } from '@/api/project-detail'
 import {
@@ -597,6 +619,7 @@ const hosts = ref<ResourceRow[]>([])
 const webapps = ref<ResourceRow[]>([])
 const agents = ref<AgentStatus[]>([])
 const proxyConfig = ref('')
+const proxyMap = ref('')
 const bundleDownloading = ref(false)
 const proxyApplying = ref(false)
 const micdnReloading = ref(false)
@@ -990,6 +1013,18 @@ async function copyText(value: string, label: string) {
 /** 打开证书编辑框：公钥回填，私钥不回显（留空保持原值）。 */
 const certificateEndpointName = computed(() => attrOf(proxy.value, 'name'))
 
+async function loadProxyMap() {
+  proxyMap.value = ''
+  if (proxyEngine.value !== 'haproxy') return
+  const endpointName = attrOf(proxy.value, 'name')
+  if (!endpointName) return
+  try {
+    proxyMap.value = await readProjectProxyMap(projectId, endpointName)
+  } catch (reason) {
+    warning('proxyMap', 'HAProxy 路由 map', reason)
+  }
+}
+
 async function loadEndpointCertificate() {
   const endpointName = certificateEndpointName.value
   if (!endpointName) {
@@ -1130,6 +1165,7 @@ async function load() {
     const endpoint = rows.find((row) => attributeText(row.attributes.name) === 'default') ?? rows[0]
     proxy.value = endpoint ? endpointAsProxy(endpoint) : undefined
     await loadEndpointCertificate()
+    await loadProxyMap()
   } else {
     warning('endpoint', '代理点', endpointResult.reason)
   }
@@ -1435,27 +1471,38 @@ onMounted(load)
   line-height: 1.6;
 }
 
+.detail-table__index {
+  width: 36px;
+  color: var(--td-text-color-placeholder);
+  text-align: right;
+  white-space: nowrap;
+}
+
 .service-table {
   margin: 0;
 }
 
-.service-table__node strong,
-.service-table__node small {
-  display: block;
+.service-table th,
+.service-table td {
+  padding: 6px 10px;
+  vertical-align: middle;
 }
 
-.service-table__node strong {
+.service-table__node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.service-table__ip {
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
-.service-table__node small {
-  margin-top: 2px;
+.service-table__host {
   color: var(--td-text-color-placeholder);
   font-size: 11px;
-}
-
-.service-table__node .t-tag {
-  margin-top: 4px;
 }
 
 .service-table__name {

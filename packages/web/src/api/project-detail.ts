@@ -26,6 +26,22 @@ export async function readProjectConfig(projectId: string, kind: ProjectConfigKi
   return response.text()
 }
 
+/** HAProxy 路由 map；endpoint 缺省时由后端选择默认代理点。 */
+export async function readProjectProxyMap(projectId: string, endpointName = ''): Promise<string> {
+  const query = endpointName ? `?endpoint=${encodeURIComponent(endpointName)}` : ''
+  const url = apiClient.resolveUrl(apiPath('config', `/projects/${encodeURIComponent(projectId)}/proxy-map${query}`))
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: {
+      ...sessionService.getAuthHeaders(''),
+      Accept: 'text/plain',
+    },
+  })
+  if (response.status === 404) return ''
+  if (!response.ok) throw new Error(`HAProxy 路由 map 加载失败（HTTP ${response.status}）`)
+  return response.text()
+}
+
 export interface EndpointCertificateInfo {
   /** PEM 公钥证书（可含完整链）。 */
   certificate: string
