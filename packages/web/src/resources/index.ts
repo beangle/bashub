@@ -169,6 +169,7 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '同一配置下的引擎与进程参数',
     sort: 'name',
+    contextField: 'project',
     filters: [{ key: 'name', label: '名称' }, { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true }],
     fields: [
       { key: 'name', label: '名称', required: true, width: '10%' },
@@ -187,13 +188,12 @@ export const resourceSchemas: ResourceSchema[] = [
         },
       },
       {
-        key: 'serverLink', label: '操作', form: false, sortable: false, width: '7%',
-        cell: { type: 'link', href: `${resourceApiPath('/servers')}?farm={id}`, text: '维护', target: '_self' },
+        key: 'proxyOptions', label: '代理配置', type: 'textarea', column: false,
+        help: 'HAProxy backend 级参数，例如 balance roundrobin；具体 server 行参数在群集编辑抽屉的服务表里填写。',
       },
-      { key: 'proxyOptions', label: '代理配置', type: 'textarea', column: false },
     ],
-    // 服务是群集的从属资源（原 farm/form.ftl 的「服务配置」页签、farm/list.ftl 的「维护」链接）。
-    drawerLinks: [{ label: '维护服务', to: `${resourceApiPath('/servers')}?farm={id}` }],
+    // 服务是群集的从属资源，只在编辑抽屉内集中维护。
+    embeddedServers: true,
   },
   {
     key: 'servers',
@@ -212,8 +212,11 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'host', label: '主机', type: 'ref', ref: hostRef, required: true, optionsFilter: 'host.project.id', refreshOptions: true, help: '只能选择当前 Project 的主机' },
       { key: 'httpPort', label: 'HTTP 端口', type: 'number' },
       { key: 'maxHeapSize', label: '堆上限(MB)', type: 'number', defaultValue: 0, placeholder: '0', help: '0 表示与群集一致，可留空' },
-      { key: 'proxyOptions', label: '代理', type: 'textarea', column: true },
       { key: 'autoStart', label: '开机自启', type: 'boolean', column: false, help: '存在 auto-start 才由 basagent 自动启动' },
+      {
+        key: 'proxyOptions', label: '代理', type: 'textarea', column: true,
+        help: '追加到 HAProxy server 行的参数，例如 check inter 5s、weight 10；留空使用默认，Nginx 渲染忽略。',
+      },
       {
         key: 'waitFor', label: '启动等待', type: 'textarea', column: false,
         help: 'JSON 数组；元素为 {ref}、{url} 或 {tcp}，可带 timeout/interval 秒',
@@ -229,6 +232,7 @@ export const resourceSchemas: ResourceSchema[] = [
     group: '平台配置',
     description: '主机规格与操作系统特性',
     sort: 'name',
+    contextField: 'project',
     filters: [{ key: 'name', label: '名称' }, { key: 'ip', label: 'IP' }, { key: 'project', label: '配置', type: 'ref', ref: projectRef, required: true }],
     fields: [
       // 列标题与宽度对齐原 host/list.ftl：名称10% IP地址13% 操作系统12% 系统特性(auto) 内存8% 平台10% CPU核心8% CPU规格20%。

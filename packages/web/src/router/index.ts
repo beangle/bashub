@@ -4,8 +4,10 @@ import { resourceSchemas, resourceTabGroups } from '@/resources'
 
 const tabSchemaKeys = new Set(resourceTabGroups.flatMap((group) => group.tabs.map((tab) => tab.key)))
 
+// 服务只在群集编辑抽屉内维护，不再提供独立资源页；保留 schema 供关联和表单字段复用。
+const embeddedOnly = new Set(['servers'])
 const resourceRoutes = resourceSchemas
-  .filter((schema) => !tabSchemaKeys.has(schema.key))
+  .filter((schema) => !embeddedOnly.has(schema.key) && !tabSchemaKeys.has(schema.key))
   .map((schema) => ({
     path: resourceApiPath(schema.path),
     component: () => import('@/views/ResourceListView.vue'),

@@ -150,11 +150,8 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   （键 `bashub.filter.<schema key>.<字段 key>`，本页即 `bashub.filter.menus.app`，对应旧 cookie `menu.app.id`），
   记忆值若已不在下拉选项里（应用被删）会被丢弃；只有唯一选项时直接选中它。
   导出/导入 XML 按钮同样以「应用已选」为前置条件。
-- 从属页面：`menu: false` 的资源保留独立路由、只是不进菜单，入口放在父资源页上。
-  当前是 `servers`（服务管理）：对应原 `farm/form.ftl` 的「服务配置」页签 + `farm/list.ftl` 的「维护」链接，
-  入口在群集列表行的「维护」（`/config/servers?farm=<id>`）与群集编辑抽屉底部的「相关页面」（`schema.drawerLinks`，
-  `{属性}` 按当前行取值填充，只在编辑已有记录时出现）。子页面靠 `ResourceListView` 的 URL 查询条件预填左侧查询面板，
-  新建时同一 key 的单选 `ref` 字段也默认取该值（原 UI 用隐藏域锁定父对象，如 `server.farm.id`）。
+- 服务是群集的从属资源，不再提供独立路由：在群集编辑抽屉内用内嵌服务表维护，
+  主机下拉限定当前 Project；原 `/config/servers` 页面已移除。
 - 平台功能详情页 `/config/platform-features/:id`（`PlatformFeatureDetailView.vue`，对应原 `platformFeature/info.ftl`）：
   卡片墙由 `schema.cardLink` 指过来（卡片点击进详情，不再开抽屉），页面里功能自身「修改」就地编辑，
   每个平台一份脚本就地查看/修改、就地保存与删除，标题栏右侧「增加脚本」追加一行编辑态。

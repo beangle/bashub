@@ -205,6 +205,13 @@
           </template>
         </t-form-item>
       </div>
+      <FarmServersEditor
+        v-if="schema.embeddedServers && editingId"
+        :farm-id="editingId"
+        :project-id="projectId(form.project)"
+      />
+      <p v-else-if="schema.embeddedServers" class="drawer-hint">保存群集后即可在这里维护服务。</p>
+
       <div v-if="editingId && drawerLinks.length" class="drawer-links">
         <span class="drawer-links__label">相关页面</span>
         <t-button
@@ -234,6 +241,7 @@ import { AddIcon, DeleteIcon, EditIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin, type FormInstanceFunctions, type FormRule, type PageInfo } from 'tdesign-vue-next'
 import { computed, h, nextTick, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import FarmServersEditor from '@/components/FarmServersEditor.vue'
 import {
   attributeText,
   callResourceAction,
@@ -265,7 +273,8 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:activeTab': [value: string] }>()
 
 const schema = getSchema(props.schemaKey)
-const formFields = schema.fields.filter((field) => field.form !== false)
+const contextField = schema.contextField ? schema.fields.find((field) => field.key === schema.contextField) : undefined
+const formFields = schema.fields.filter((field) => field.form !== false && field.key !== schema.contextField)
 const filterFields = schema.filters || []
 const route = useRoute()
 const router = useRouter()
@@ -666,7 +675,8 @@ function filterOptions(field: FieldSchema): SelectOption[] {
 }
 
 function refsOf(): FieldSchema[] {
-  return [...formFields, ...filterFields].filter((field) => field.ref && (field.type === 'ref' || field.type === 'refs' || field.type === 'ids'))
+  return [...formFields, ...(contextField ? [contextField] : []), ...filterFields]
+    .filter((field) => field.ref && (field.type === 'ref' || field.type === 'refs' || field.type === 'ids'))
 }
 
 async function loadOptions(fields: FieldSchema[] = refsOf()) {
@@ -725,10 +735,6 @@ async function refreshFormOptions() {
     await loadOptions(dynamic)
 }
 
-watch(() => form.farm, () => {
-  if (formVisible.value)
-    void refreshFormOptions()
-})
 
 const gridActions = computed<DataGridAction[]>(() => {
   const actions: DataGridAction[] = []
@@ -756,6 +762,17 @@ const editingId = ref('')
 const editingRow = ref<ResourceRow>()
 const formRef = ref<FormInstanceFunctions>()
 const form = reactive<Record<string, unknown>>({})
+const contextLabel = computed(() => {
+  if (!contextField) return ''
+  const raw = String(form[contextField.key] ?? '')
+  if (!raw) return ''
+  const option = optionsCache[contextField.key]?.find((item) => String(item.value) === raw)
+  return option?.label || raw
+})
+watch(() => form.farm, () => {
+  if (formVisible.value)
+    void refreshFormOptions()
+})
 const fileInput = ref<HTMLInputElement>()
 const drawerLinks = schema.drawerLinks || []
 const cardHint = schema.readOnly ? '' : schema.cardLink ? `查看${schema.title}` : `点击编辑${schema.title}`
@@ -936,14 +953,14 @@ function seedFromFilter(field: FieldSchema): string | undefined {
 }
 
 function resetForm(row?: ResourceRow) {
-  formFields.forEach((field) => {
+  ;[...formFields, ...(contextField ? [contextField] : [])].forEach((field) => {
     if (!row) {
       // 以配置为工作域的资源：新建时配置默认取「当前配置」（原 UI 用隐藏域锁定在记忆的配置上）。
       if (projectScoped && isProjectRef(field)) {
         form[field.key] = currentProjectId.value
         return
       }
-      // 从属页面（如 /config/servers?farm=1）：新建时父对象取查询条件里的值
+      // 父资源页面的查询条件（如 farm）：新建时父对象取查询条件里的值
       // （原 UI 用隐藏域把父对象锁在 URL 传来的 id 上，如 server.farm.id）。
       const seeded = seedFromFilter(field)
       if (seeded !== undefined) {
@@ -1023,7 +1040,7 @@ async function openEdit(row: ResourceRow) {
   await openForm()
 }
 
-/** 抽屉里的关联页入口：关掉抽屉再跳到目标页（如群集 → /config/servers?farm=<id>）。 */
+/** 抽屉里的关联页入口：关掉抽屉再跳到目标页。 */
 function openDrawerLink(link: DrawerLinkSchema) {
   if (!editingRow.value) return
   const to = fillTemplate(link.to, editingRow.value)
@@ -1153,6 +1170,12 @@ function buildPayload(): { attributes: Record<string, unknown>; relationships: R
     setAt(attributes, path, text)
   })
 
+  if (contextField && form[contextField.key] !== undefined && contextField.type === 'ref') {
+    relationships[contextField.key] = {
+      data: { type: contextField.ref!.type, id: String(form[contextField.key]) },
+    }
+  }
+
   return { attributes, relationships }
 }
 
@@ -1252,6 +1275,25 @@ onMounted(async () => {
 
 .hidden-file {
   display: none;
+}
+
+.drawer-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.drawer-context {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.drawer-hint {
+  margin: 12px 0 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
 }
 
 .drawer-links {

@@ -210,8 +210,12 @@ export interface ResourceSchema {
   xmlTools?: boolean
   /** 提供列表 CSV 导出（原 `action.exportData` 的对等能力）。 */
   exportable?: boolean
-  /** 是否作为独立菜单项出现；缺省 true。设为 false 用于从属页面（如服务管理）。 */
+  /** 是否作为独立菜单项出现；缺省 true。设为 false 用于从属资源。 */
   menu?: boolean
+  /** 不能修改的所属项目字段：不放进表单，抽屉标题处显示。 */
+  contextField?: string
+  /** 群集编辑抽屉里内嵌服务表；保留独立 server 资源作为高级入口。 */
+  embeddedServers?: boolean
   /** 编辑抽屉底部的关联页入口，只在编辑已有记录时出现。 */
   drawerLinks?: DrawerLinkSchema[]
 }

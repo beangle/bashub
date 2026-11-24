@@ -15,7 +15,10 @@
           <t-button variant="outline" @click="cancelFeatureEdit">取消</t-button>
           <t-button theme="primary" :loading="savingFeature" @click="submitFeature">保存</t-button>
         </template>
-        <t-button v-else variant="outline" :disabled="!feature" @click="startFeatureEdit">修改</t-button>
+        <template v-else>
+          <t-button variant="outline" :disabled="!feature" @click="startFeatureEdit">修改</t-button>
+          <t-button variant="outline" theme="danger" :disabled="!feature" @click="removeFeature">删除</t-button>
+        </template>
       </div>
     </div>
 
@@ -116,7 +119,7 @@
 import { AddIcon } from 'tdesign-icons-vue-next'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   attributeText,
   getResource,
@@ -135,6 +138,7 @@ const SCRIPTS_ALIAS = 'platformFeatureScript'
 const NEW_SCRIPT_ID = '__new__'
 
 const route = useRoute()
+const router = useRouter()
 const featureId = String(route.params.id || '')
 /** 返回平台功能列表。 */
 const listPath = '/config/platform-ops?tab=platform-features'
@@ -240,6 +244,26 @@ onMounted(async () => {
     MessagePlugin.error(error instanceof Error ? error.message : '加载平台功能失败')
   }
 })
+
+function removeFeature() {
+  if (!feature.value) return
+  const dialog = DialogPlugin.confirm({
+    header: '删除平台功能',
+    body: `确认删除「${featureName.value}」及其关联脚本？`,
+    onConfirm: async () => {
+      try {
+        for (const script of scripts.value)
+          await removeResource(SCRIPTS_PATH, script.id)
+        await removeResource(FEATURES_PATH, feature.value!.id)
+        dialog.destroy()
+        MessagePlugin.success('平台功能已删除')
+        await router.push(listPath)
+      } catch (reason) {
+        MessagePlugin.error(reason instanceof Error ? reason.message : '删除平台功能失败')
+      }
+    },
+  })
+}
 
 function startFeatureEdit() {
   const attributes = feature.value?.attributes || {}

@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    FarmServersEditor: typeof import('./src/components/FarmServersEditor.vue')['default']
     MicdnBindingEditor: typeof import('./src/components/MicdnBindingEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

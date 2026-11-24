@@ -44,7 +44,7 @@ const tabGroupBySchema = new Map(
   resourceTabGroups.flatMap((group) => group.tabs.map((tab) => [tab.key, group])),
 )
 
-/** 概览按资源列磁贴，点击落到资源所属页签；从属页面（如服务管理）不出磁贴。 */
+/** 概览按资源列磁贴，点击落到资源所属页签；从属资源（如服务）不出磁贴。 */
 const groups = resourceGroups
   .map((name) => ({
     name,
