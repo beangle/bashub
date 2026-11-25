@@ -176,9 +176,13 @@
                           <span v-else>—</span>
                         </td>
                         <td>
-                          <div class="instance-status" :class="`is-${instanceStatusKind(instance)}`">
+                          <div
+                            class="instance-status"
+                            :class="`is-${instanceStatusKind(instance)}`"
+                            :title="instanceStateLabel(instance)"
+                            :aria-label="instanceStateLabel(instance)"
+                          >
                             <span class="instance-state-dot"></span>
-                            <span class="instance-state-label">{{ instanceStateLabel(instance) }}</span>
                           </div>
                         </td>
                         <td>{{ instance.httpPort ?? '-' }}</td>
@@ -1809,7 +1813,7 @@ onBeforeUnmount(() => {
 }
 
 .instance-col-memory {
-  width: 80px;
+  width: 60px;
   text-align: right !important;
 }
 
