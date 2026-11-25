@@ -91,7 +91,7 @@
           </div>
 
           <div v-if="item.alerts.length" class="health-card__alerts">
-            <div v-for="(alert, index) in item.alerts.slice(0, 3)" :key="`${alert.level}-${index}`" :class="`is-${alert.level}`">
+            <div v-for="(alert, index) in item.alerts.slice(0, 3)" :key="`${alert.level}-${index}`" class="health-card__alert" :class="`is-${alert.level}`">
               <span class="health-card__dot"></span>
               <span>{{ alert.text }}</span>
             </div>
@@ -397,16 +397,17 @@ onBeforeUnmount(() => {
 
 .health-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
   padding: 0 12px 24px;
 }
 
 .health-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 230px;
-  padding: 14px;
+  min-height: 150px;
+  padding: 12px 14px 14px;
   border: 1px solid var(--td-component-stroke);
   border-left: 3px solid var(--td-component-stroke);
   border-radius: 8px;
@@ -472,8 +473,8 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 14px;
-  padding: 10px 0;
+  margin-top: 10px;
+  padding: 8px 0;
   border-top: 1px solid var(--td-component-stroke);
   border-bottom: 1px solid var(--td-component-stroke);
 }
@@ -499,21 +500,25 @@ onBeforeUnmount(() => {
 
 .health-card__alerts {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-height: 34px;
+  margin-top: 8px;
+  overflow: hidden;
   font-size: 12px;
+  line-height: 16px;
 }
 
-.health-card__alerts > div {
-  display: flex;
+.health-card__alert {
+  display: inline-flex;
   min-width: 0;
   align-items: baseline;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
 }
 
-.health-card__alerts > div.is-critical { color: var(--td-error-color); }
-.health-card__alerts > div.is-warning { color: var(--td-warning-color); }
+.health-card__alert.is-critical { color: var(--td-error-color); }
+.health-card__alert.is-warning { color: var(--td-warning-color); }
 
 .health-card__dot {
   width: 5px;
@@ -529,19 +534,34 @@ onBeforeUnmount(() => {
 }
 
 .health-card__calm {
-  margin-top: 10px;
+  margin-top: 8px;
   color: var(--td-success-color);
   font-size: 12px;
+  line-height: 16px;
 }
 
 .health-card__foot {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  left: 12px;
   display: flex;
   gap: 10px;
   align-items: center;
-  margin-top: auto;
-  padding-top: 10px;
+  padding: 4px 2px;
+  border-radius: 4px;
+  background: var(--td-bg-color-container);
   color: var(--td-text-color-placeholder);
   font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.health-card:hover .health-card__foot,
+.health-card:focus-within .health-card__foot {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .health-card__foot span {
