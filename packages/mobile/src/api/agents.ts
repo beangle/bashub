@@ -36,6 +36,8 @@ export interface AgentProxySnapshot {
 export interface AgentMicdnSnapshot {
   active?: boolean
   state?: string
+  /** micdn 版本；老 agent 可能不上报。 */
+  version?: string
 }
 
 export interface AgentProxyState {

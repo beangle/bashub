@@ -33,12 +33,6 @@
       </div>
     </dl>
 
-    <div v-if="componentStates.length > 0" class="mobile-node__components">
-      <t-tag v-for="item in componentStates" :key="item.key" size="small" variant="light" :theme="item.theme">
-        {{ item.label }} {{ item.state }}
-      </t-tag>
-    </div>
-
     <div class="mobile-node__instances">
       <h4 class="mobile-node__section-title">实例</h4>
       <t-cell-group v-if="instances.length > 0" :bordered="false">
@@ -145,26 +139,6 @@ const diskDetail = computed(() => {
   if (resources.value.diskTotal === undefined) return ''
   const mount = resources.value.diskMount || '/'
   return `${mount} ${formatBytes(resources.value.diskUsed)} / ${formatBytes(resources.value.diskTotal)}`
-})
-
-interface ComponentState {
-  key: string
-  label: string
-  state: string
-  theme: 'success' | 'warning' | 'danger' | 'default'
-}
-
-function stateThemeOf(value: string, active: boolean | undefined): ComponentState['theme'] {
-  if (active === true || value === 'active' || value === 'running') return 'success'
-  if (active === false || value === 'inactive' || value === 'stopped') return 'warning'
-  return 'default'
-}
-
-const componentStates = computed<ComponentState[]>(() => {
-  const micdn = props.agent.os?.micdn
-  if (!micdn) return []
-  const state = micdn.state || (micdn.active ? 'active' : 'inactive')
-  return [{ key: 'micdn', label: 'Micdn', state, theme: stateThemeOf(state, micdn.active) }]
 })
 
 function instanceMemory(instance: AgentInstance): string {

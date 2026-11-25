@@ -319,6 +319,10 @@ function confirmService(action: AgentServiceAction): void {
   const dialog = DialogPlugin.confirm({
     title: `${label}实例`,
     content: body,
+    // TDesign Mobile 的 DialogPlugin 默认 confirmBtn/cancelBtn 是空串，
+    // 不显式传就不会渲染按钮，只剩正文。
+    confirmBtn: '确定',
+    cancelBtn: '取消',
     onConfirm: () => {
       dialog.destroy()
       void runService(current, name, action)
