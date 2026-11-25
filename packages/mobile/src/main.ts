@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import 'tdesign-vue-next/es/style/index.css'
+import 'tdesign-mobile-vue/dist/tdesign.css'
 import { initializeAuth, loadRuntimeConfig } from '@/auth'
 import App from './App.vue'
 import router from './router'

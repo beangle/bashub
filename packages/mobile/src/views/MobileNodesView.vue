@@ -16,10 +16,13 @@
       · {{ secondsLeft }} 秒后自动刷新
     </p>
 
-    <t-alert v-if="error" theme="error" :message="error" class="mobile-alert" />
-    <t-alert v-if="actionError" theme="error" :message="actionError" class="mobile-alert" />
+    <MobileNotice v-if="error" :message="error" />
+    <MobileNotice v-if="actionError" :message="actionError" />
 
-    <div v-if="!loading && statuses.length === 0" class="mobile-empty">暂无在线节点。</div>
+    <div v-if="loading && statuses.length === 0" class="mobile-loading">
+      <t-loading size="24px" text="加载中" />
+    </div>
+    <t-empty v-else-if="statuses.length === 0" description="暂无在线节点。" />
 
     <div class="mobile-node-list">
       <MobileNodeCard
@@ -56,6 +59,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { requestAgentReport, type AgentInstance, type AgentStatus } from '@/api/agents'
 import MobileLogPanel from '@/components/MobileLogPanel.vue'
+import MobileNotice from '@/components/MobileNotice.vue'
 import MobileNodeCard from '@/components/MobileNodeCard.vue'
 import { useAgentLog } from '@/composables/useAgentLog'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'

@@ -13,9 +13,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
-      // TDesign 组件按需引入（模板里的 <t-*> 自动解析），JS 产物只含实际用到的组件。
+      // TDesign Mobile 组件按需引入（模板里的 <t-*> 自动解析），JS 产物只含实际用到的组件。
       Components({
-        resolvers: [TDesignResolver({ library: 'vue-next' })],
+        resolvers: [TDesignResolver({ library: 'mobile-vue' })],
       }),
     ],
     envDir: repoRoot,

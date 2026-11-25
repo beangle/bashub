@@ -41,21 +41,23 @@
 
     <div class="mobile-node__instances">
       <h4 class="mobile-node__section-title">实例</h4>
-      <button
-        v-for="instance in instances"
-        :key="instance.id || String(instance.pid)"
-        type="button"
-        class="mobile-instance-row"
-        @click="emit('open-instance', instance)"
-      >
-        <span class="mobile-instance-row__name">{{ instance.id || '未命名实例' }}</span>
-        <t-tag size="small" variant="light" :theme="stateTheme(instanceState(instance))">
-          {{ stateLabel(instanceState(instance)) }}
-        </t-tag>
-        <span class="mobile-instance-row__memory">{{ instanceMemory(instance) }}</span>
-        <span class="mobile-instance-row__chevron" aria-hidden="true">›</span>
-      </button>
-      <p v-if="instances.length === 0" class="mobile-node__empty">暂无实例。</p>
+      <t-cell-group v-if="instances.length > 0" :bordered="false">
+        <t-cell
+          v-for="instance in instances"
+          :key="instance.id || String(instance.pid)"
+          :title="instance.id || '未命名实例'"
+          :description="instanceMemory(instance)"
+          arrow
+          @click="emit('open-instance', instance)"
+        >
+          <template #note>
+            <t-tag size="small" variant="light" :theme="stateTheme(instanceState(instance))">
+              {{ stateLabel(instanceState(instance)) }}
+            </t-tag>
+          </template>
+        </t-cell>
+      </t-cell-group>
+      <t-empty v-else description="暂无实例。" />
     </div>
 
     <footer class="mobile-node__actions">

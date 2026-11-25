@@ -1,6 +1,6 @@
 # 前端工程说明（packages/web、packages/mobile）
 
-仓库有两个互相独立的 Vite + Vue 3 + TDesign SPA：PC 管理台 `packages/web`（基址 `/bashub/`）
+仓库有两个互相独立的 Vite + Vue 3 SPA：PC 管理台 `packages/web`（基址 `/bashub/`，TDesign 桌面组件）
 与手机端监控 `packages/mobile`（基址 `/m/bashub/`）。两者各自构建、各自部署，共用 D 后端（只提供
 JSON:API）与同一套 CAS 会话。
 
@@ -95,7 +95,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 
 ## 组件与样式
 
-- TDesign 组件按需引入：`unplugin-vue-components` + `TDesignResolver`（见 `vite.config.ts`），模板里直接写 `<t-*>`；`components.d.ts` 由该插件生成，需提交。
+- TDesign 组件按需引入：`unplugin-vue-components` + `TDesignResolver`（见 `vite.config.ts`），模板里直接写 `<t-*>`；`components.d.ts` 由该插件生成，需提交。PC 用 `library: 'vue-next'`（`tdesign-vue-next`），手机端用 `library: 'mobile-vue'`（`tdesign-mobile-vue`，样式入口 `dist/tdesign.css`）。
 - 该按需引入只改写本应用的模板，覆盖不到库产物：`@beangle/bui-vue` 的 `DataGrid` 用 `resolveComponent('t-table')` 这类运行时名字取组件，
   必须在 `main.ts` 里显式全局注册它用到的 button/checkbox/input-number/loading/option/popup/select/table，
   否则表格只剩工具条与「1-30 of N」分页，不渲染表头与数据行。
@@ -201,7 +201,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   二次确认、执行中禁用与错误详情（含后端 `logTail`），最长覆盖后端 120 秒等待。
 - 手机布局契约：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，底部导航与列表行保持 44px，正文按钮用 TDesign 紧凑尺寸，
   卡片/列表替代宽表，操作常驻不依赖 hover；样式集中在 `packages/mobile/src/mobile.css`。
-  手机端只引入 TDesign 基础样式与自身 CSS，不引入 `@beangle/bui-vue` 的 DataGrid/AppShell 样式。
+  手机端使用 TDesign Mobile Vue 的 TabBar/Grid/Cell/Search/Progress/Empty/Loading/Button/Tag/Dialog 与自身 CSS，不引入桌面端 `tdesign-vue-next`，也不引入 `@beangle/bui-vue` 的 DataGrid/AppShell 样式。
 - 部署：服务器把 `/m/bashub/` 指向 `packages/mobile/dist` 并做 history fallback；CAS 的 service
   白名单需要包含 `/m/bashub/`；`/api` 与 PC 共用同一后端和会话 cookie。
 - 自动验收只覆盖路由、类型、生产构建与静态布局契约；真实手机登录态、触控与横竖屏体验由负责人

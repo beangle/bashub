@@ -35,33 +35,37 @@
       <router-view />
     </main>
 
-    <nav class="mobile-shell__nav" aria-label="手机端导航">
-      <template v-if="project">
-        <router-link class="mobile-shell__nav-item" :class="{ 'is-active': section === 'overview' }" :to="overviewPath">
-          概览
-        </router-link>
-        <router-link class="mobile-shell__nav-item" :class="{ 'is-active': section === 'nodes' }" :to="nodesPath">
-          节点
-        </router-link>
-      </template>
-      <router-link
-        v-else
-        class="mobile-shell__nav-item"
-        :class="{ 'is-active': section === 'projects' }"
-        to="/"
-      >
+    <t-tab-bar
+      :value="activeTab"
+      :fixed="false"
+      :bordered="true"
+      :safe-area-inset-bottom="true"
+      @change="onTabChange"
+    >
+      <t-tab-bar-item v-if="project" value="overview">
+        <template #icon><HomeIcon /></template>
+        概览
+      </t-tab-bar-item>
+      <t-tab-bar-item v-if="project" value="nodes">
+        <template #icon><ServerIcon /></template>
+        节点
+      </t-tab-bar-item>
+      <t-tab-bar-item v-if="!project" value="projects">
+        <template #icon><ViewModuleIcon /></template>
         项目
-      </router-link>
-      <router-link class="mobile-shell__nav-item" :class="{ 'is-active': section === 'me' }" to="/me">
+      </t-tab-bar-item>
+      <t-tab-bar-item value="me">
+        <template #icon><UserIcon /></template>
         我的
-      </router-link>
-    </nav>
+      </t-tab-bar-item>
+    </t-tab-bar>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { HomeIcon, ServerIcon, UserIcon, ViewModuleIcon } from 'tdesign-icons-vue-next'
 import { auth } from '@/auth'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 
@@ -69,6 +73,7 @@ type MobileSection = 'projects' | 'overview' | 'nodes' | 'me'
 
 const { currentUser, handleLogin, handleLogout } = auth.useAuth()
 const route = useRoute()
+const router = useRouter()
 const catalog = useProjectCatalog()
 
 const project = computed(() => String(route.params.project ?? ''))
@@ -93,6 +98,17 @@ const section = computed<MobileSection>(() => {
   if (path.includes('/nodes') || path.includes('/instances/')) return 'nodes'
   return 'overview'
 })
+
+const activeTab = computed(() => section.value)
+
+function onTabChange(payload: string | number | { value: string | number }): void {
+  // TDesign Mobile 的 onChange 实际回调是值本身（d.ts 写的是 {value}），两种都兼容。
+  const value = String(typeof payload === 'object' ? payload.value : payload)
+  if (value === 'overview') void router.push(overviewPath.value)
+  else if (value === 'nodes') void router.push(nodesPath.value)
+  else if (value === 'projects') void router.push('/')
+  else if (value === 'me') void router.push('/me')
+}
 
 onMounted(() => {
   void catalog.load()

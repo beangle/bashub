@@ -1,9 +1,33 @@
+/* 正文按钮保持紧凑：TDesign Mobile small 默认 32px，这里收到 28px。 */
+:root {
+  --td-button-small-height: 28px;
+  --td-button-small-padding-horizontal: 10px;
+}
+
 /*
  * 独立手机端监控 SPA 的样式。
  *
  * 页面挂在 `/m/bashub/`，只服务手机端：卡片/列表布局、安全区与触控尺寸。
- * PC 控制台的壳层与页面样式不受影响；本文件不依赖任何新的 UI 库。
+ * 组件样式来自 tdesign-mobile-vue，本文件只做布局、色板与紧凑按钮覆盖。
  */
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--td-bg-color-page);
+  color: var(--td-text-color-primary);
+}
 
 .mobile-shell {
   display: flex;
@@ -104,32 +128,10 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.mobile-shell__nav {
-  display: flex;
+.mobile-shell .t-tab-bar {
   flex: none;
-  align-items: stretch;
-  padding: 4px 6px calc(env(safe-area-inset-bottom) + 4px);
-  border-top: 1px solid var(--td-component-stroke);
-  background: var(--td-bg-color-container);
 }
 
-.mobile-shell__nav-item {
-  display: flex;
-  flex: 1;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  color: var(--td-text-color-secondary);
-  font-size: 14px;
-  text-decoration: none;
-}
-
-.mobile-shell__nav-item.is-active {
-  color: var(--td-brand-color);
-  font-weight: 600;
-  background: var(--td-brand-color-light);
-}
 
 /* ---------------------------------------------------------------- 页面骨架 */
 
@@ -166,24 +168,38 @@
   overflow-wrap: anywhere;
 }
 
-.mobile-alert {
+.mobile-notice {
   margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mobile-notice.is-error {
+  color: var(--td-error-color);
+  background: var(--td-error-color-1);
+}
+
+.mobile-notice.is-success {
+  color: var(--td-success-color);
+  background: var(--td-success-color-1);
+}
+
+.mobile-notice.is-warning {
+  color: var(--td-warning-color);
+  background: var(--td-warning-color-1);
+}
+
+.mobile-notice.is-info {
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-1);
 }
 
 .mobile-updated {
   margin: 0;
   color: var(--td-text-color-placeholder);
   font-size: 11px;
-}
-
-.mobile-empty {
-  margin: 0;
-  padding: 28px 16px;
-  border: 1px dashed var(--td-component-stroke);
-  border-radius: 10px;
-  color: var(--td-text-color-placeholder);
-  font-size: 13px;
-  text-align: center;
 }
 
 .mobile-hint {
@@ -193,43 +209,7 @@
   line-height: 1.6;
 }
 
-.mobile-search {
-  width: 100%;
-}
-
 /* ---------------------------------------------------------------- 汇总与卡片 */
-
-.mobile-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.mobile-summary__item {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 8px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 10px;
-  background: var(--td-bg-color-container);
-  text-align: center;
-}
-
-.mobile-summary__item strong {
-  font-size: 20px;
-  line-height: 1.15;
-}
-
-.mobile-summary__item span {
-  color: var(--td-text-color-placeholder);
-  font-size: 11px;
-}
-
-.mobile-summary__item strong.is-danger {
-  color: var(--td-error-color);
-}
 
 .mobile-card {
   display: flex;
@@ -252,6 +232,77 @@
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.mobile-stat-grid {
+  overflow: hidden;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+  background: var(--td-bg-color-container);
+}
+
+.mobile-stat-grid .t-grid-item {
+  padding: 10px 4px;
+}
+
+.mobile-stat-grid .t-grid-item__image {
+  margin-bottom: 2px;
+  color: var(--td-brand-color);
+}
+
+.mobile-stat-grid .t-grid-item__title strong {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.mobile-stat-grid .t-grid-item__title strong.is-danger {
+  color: var(--td-error-color);
+}
+
+.mobile-stat-grid .t-grid-item__description {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+}
+
+.mobile-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.mobile-page .t-empty {
+  padding: 24px 0;
+}
+
+.mobile-facts {
+  overflow: hidden;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+  background: var(--td-bg-color-container);
+}
+
+.mobile-facts .t-cell {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.mobile-facts .t-cell__title-text {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.mobile-facts .t-cell__description {
+  color: var(--td-text-color-primary);
+  font-size: 13px;
+}
+
+.mobile-node__instances .t-cell-group {
+  background: transparent;
+}
+
+.mobile-node__instances .t-cell {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .mobile-list {
@@ -291,7 +342,7 @@
   flex: none;
   border-radius: 8px;
   object-fit: contain;
-  background: var(--td-bg-color-container-hover);
+  background: var(--td-bg-color-container-active);
 }
 
 .mobile-project-card__logo--fallback {
@@ -432,56 +483,10 @@
   gap: 4px;
 }
 
-.mobile-node__empty {
-  margin: 0;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-}
-
 .mobile-node__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.mobile-instance-row {
-  display: flex;
-  width: 100%;
-  min-height: 44px;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  border: 0;
-  border-bottom: 1px solid var(--td-component-stroke);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
-
-.mobile-instance-row:last-child {
-  border-bottom: 0;
-}
-
-.mobile-instance-row__name {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-instance-row__memory {
-  flex: none;
-  color: var(--td-text-color-placeholder);
-  font-size: 11px;
-}
-
-.mobile-instance-row__chevron {
-  flex: none;
-  color: var(--td-text-color-placeholder);
-  font-size: 16px;
 }
 
 .mobile-agent-choice {
@@ -572,30 +577,8 @@
   font-weight: 600;
 }
 
-.mobile-metric__track {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--td-bg-color-component);
-}
-
-.mobile-metric__fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--td-brand-color);
-}
-
-.mobile-metric.is-warning .mobile-metric__fill {
-  background: var(--td-warning-color);
-}
-
-.mobile-metric.is-danger .mobile-metric__fill {
-  background: var(--td-error-color);
-}
-
-.mobile-metric.is-unknown .mobile-metric__fill {
-  width: 0;
+.mobile-metric__progress {
+  margin-top: 2px;
 }
 
 .mobile-metric__detail {
@@ -627,7 +610,7 @@
   overflow: hidden;
   padding: 2px;
   border-radius: 6px;
-  background: var(--td-bg-color-container-hover);
+  background: var(--td-bg-color-container-active);
 }
 
 .mobile-history__cell {
@@ -764,7 +747,7 @@
   overflow-x: auto;
   overflow-y: auto;
   border-radius: 8px;
-  background: var(--td-bg-color-container-hover);
+  background: var(--td-bg-color-container-active);
   color: var(--td-text-color-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -781,28 +764,6 @@
   color: var(--td-brand-color);
   font-size: 13px;
   text-decoration: none;
-}
-
-.mobile-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px 14px;
-  margin: 0;
-}
-
-.mobile-facts div {
-  min-width: 0;
-}
-
-.mobile-facts dt {
-  color: var(--td-text-color-placeholder);
-  font-size: 11px;
-}
-
-.mobile-facts dd {
-  margin: 2px 0 0;
-  font-size: 13px;
-  overflow-wrap: anywhere;
 }
 
 .mobile-actions {
@@ -866,32 +827,6 @@
   color: #fff;
 }
 
-.mobile-webapps {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.mobile-webapps li {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.mobile-webapps__context {
-  color: var(--td-text-color-placeholder);
-}
-
-.mobile-webapps__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ---------------------------------------------------------------- 我的 */
 
 .mobile-profile {
@@ -941,10 +876,6 @@
 /* ---------------------------------------------------------------- 窄屏 */
 
 @media (max-width: 420px) {
-  .mobile-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .mobile-page__head {
     align-items: stretch;
     flex-direction: column;

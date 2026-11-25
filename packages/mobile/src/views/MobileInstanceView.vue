@@ -10,10 +10,12 @@
       <router-link class="mobile-back" :to="nodesPath">返回节点</router-link>
     </header>
 
-    <t-alert v-if="error" theme="error" :message="error" class="mobile-alert" />
-    <t-alert v-if="serviceResult" theme="success" :message="serviceResult" class="mobile-alert" />
+    <MobileNotice v-if="error" :message="error" />
+    <MobileNotice v-if="serviceResult" theme="success" :message="serviceResult" />
 
-    <div v-if="statusesLoading && !agent && agents.length === 0" class="mobile-empty">正在加载节点状态…</div>
+    <div v-if="statusesLoading && !agent && agents.length === 0" class="mobile-loading">
+      <t-loading size="24px" text="加载中" />
+    </div>
 
     <section v-else-if="ambiguous" class="mobile-card">
       <header class="mobile-card__head">
@@ -31,9 +33,9 @@
       </button>
     </section>
 
-    <div v-else-if="!agent" class="mobile-empty">目标节点不在线。</div>
+    <t-empty v-else-if="!agent" description="目标节点不在线。" />
 
-    <div v-else-if="!instance" class="mobile-empty">实例 {{ instanceId }} 不存在。</div>
+    <t-empty v-else-if="!instance" :description="`实例 ${instanceId} 不存在。`" />
 
     <template v-else>
       <section class="mobile-card">
@@ -44,14 +46,9 @@
           </t-tag>
         </header>
 
-        <dl class="mobile-facts">
-          <div><dt>PID</dt><dd>{{ instance.pid ?? '—' }}</dd></div>
-          <div><dt>端口</dt><dd>{{ instance.httpPort ?? '—' }}</dd></div>
-          <div><dt>内存</dt><dd>{{ instanceMemory }}</dd></div>
-          <div><dt>引擎</dt><dd>{{ instance.engine || '—' }}</dd></div>
-          <div><dt>启动时间</dt><dd>{{ instance.started || '—' }}</dd></div>
-          <div><dt>Agent 心跳</dt><dd>{{ relativeTime(agent.lastSeenAt) }}</dd></div>
-        </dl>
+        <t-cell-group :bordered="false" class="mobile-facts">
+          <t-cell v-for="fact in instanceFacts" :key="fact.label" :title="fact.label" :description="fact.value" />
+        </t-cell-group>
 
         <div class="mobile-actions">
           <t-button
@@ -104,21 +101,25 @@
             <button type="button" :class="{ 'is-active': days === 180 }" @click="setDays(180)">180 天</button>
           </div>
         </header>
-        <div v-if="historyLoading" class="mobile-empty">正在加载运行历史…</div>
-        <t-alert v-else-if="historyError" theme="error" :message="historyError" />
+        <div v-if="historyLoading" class="mobile-loading">
+          <t-loading size="24px" text="加载中" />
+        </div>
+        <MobileNotice v-else-if="historyError" :message="historyError" />
         <MobileHistoryStrip v-else-if="history" :history="history" :days="days" />
-        <p v-else class="mobile-empty">暂无运行历史采样。</p>
+        <t-empty v-else description="暂无运行历史采样。" />
       </section>
 
       <section class="mobile-card">
         <h3 class="mobile-card__title">应用</h3>
-        <ul v-if="webapps.length > 0" class="mobile-webapps">
-          <li v-for="app in webapps" :key="app.id || app.uri">
-            <span class="mobile-webapps__context">{{ app.context || '/' }}</span>
-            <span class="mobile-webapps__title">{{ app.title || '未命名应用' }}</span>
-          </li>
-        </ul>
-        <p v-else class="mobile-empty">暂无应用。</p>
+        <t-cell-group v-if="webapps.length > 0" :bordered="false">
+          <t-cell
+            v-for="app in webapps"
+            :key="app.id || app.uri"
+            :title="app.title || '未命名应用'"
+            :description="app.context || '/'"
+          />
+        </t-cell-group>
+        <t-empty v-else description="暂无应用。" />
       </section>
 
       <section class="mobile-card">
@@ -141,7 +142,7 @@
 
 <script setup lang="ts">
 import { JsonApiRequestError } from '@beangle/ems-app'
-import { DialogPlugin } from 'tdesign-vue-next'
+import { DialogPlugin } from 'tdesign-mobile-vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -151,6 +152,7 @@ import {
   type AgentStatus,
 } from '@/api/agents'
 import MobileHistoryStrip from '@/components/MobileHistoryStrip.vue'
+import MobileNotice from '@/components/MobileNotice.vue'
 import MobileLogPanel from '@/components/MobileLogPanel.vue'
 import { useAgentLog } from '@/composables/useAgentLog'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'
@@ -220,6 +222,19 @@ const instanceMemory = computed(() => {
   const target = instance.value
   if (!target || !isInstanceRunning(target) || typeof target.rssBytes !== 'number') return '—'
   return formatBytes(target.rssBytes)
+})
+
+const instanceFacts = computed(() => {
+  const target = instance.value
+  if (!target) return []
+  return [
+    { label: 'PID', value: String(target.pid ?? '—') },
+    { label: '端口', value: String(target.httpPort ?? '—') },
+    { label: '内存', value: instanceMemory.value },
+    { label: '引擎', value: target.engine || '—' },
+    { label: '启动时间', value: target.started || '—' },
+    { label: 'Agent 心跳', value: relativeTime(agent.value?.lastSeenAt) },
+  ]
 })
 
 const capabilityHint = computed(() => {
@@ -294,8 +309,8 @@ function confirmService(action: AgentServiceAction): void {
       ? `确定启动 ${name}？`
       : `确定重启 ${name}？实例会短暂中断。`
   const dialog = DialogPlugin.confirm({
-    header: `${label}实例`,
-    body,
+    title: `${label}实例`,
+    content: body,
     onConfirm: () => {
       dialog.destroy()
       void runService(current, name, action)

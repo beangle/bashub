@@ -16,40 +16,47 @@
       · {{ secondsLeft }} 秒后自动刷新
     </p>
 
-    <t-alert v-if="error" theme="error" :message="error" class="mobile-alert" />
-    <t-alert v-if="catalogError" theme="error" :message="catalogError" class="mobile-alert" />
+    <MobileNotice v-if="error" :message="error" />
+    <MobileNotice v-if="catalogError" :message="catalogError" />
 
-    <div v-if="catalogLoading && !projectInfo" class="mobile-empty">正在加载项目信息…</div>
-    <div v-else-if="!projectInfo" class="mobile-empty">
-      {{ catalogError ? '项目目录加载失败。' : `项目 ${project} 不存在或无权访问。` }}
+    <div v-if="catalogLoading && !projectInfo" class="mobile-loading">
+      <t-loading size="24px" text="加载中" />
     </div>
+    <t-empty
+      v-else-if="!projectInfo"
+      :description="catalogError ? '项目目录加载失败。' : `项目 ${project} 不存在或无权访问。`"
+    />
 
     <template v-if="projectInfo">
-      <div class="mobile-summary">
-        <div class="mobile-summary__item">
-          <strong>{{ health.nodeCount }}</strong>
-          <span>在线节点</span>
-        </div>
-        <div class="mobile-summary__item">
-          <strong>{{ health.running }}</strong>
-          <span>运行实例</span>
-        </div>
-        <div class="mobile-summary__item">
-          <strong>{{ health.stopped }}</strong>
-          <span>停止</span>
-        </div>
-        <div class="mobile-summary__item">
-          <strong :class="{ 'is-danger': health.error > 0 }">{{ health.error }}</strong>
-          <span>异常</span>
-        </div>
-      </div>
+      <t-grid :column="4" :border="false" class="mobile-stat-grid">
+        <t-grid-item>
+          <template #icon><ServerIcon /></template>
+          <template #text><strong>{{ health.nodeCount }}</strong></template>
+          <template #description>在线节点</template>
+        </t-grid-item>
+        <t-grid-item>
+          <template #icon><PlayCircleIcon /></template>
+          <template #text><strong>{{ health.running }}</strong></template>
+          <template #description>运行实例</template>
+        </t-grid-item>
+        <t-grid-item>
+          <template #icon><StopCircleIcon /></template>
+          <template #text><strong>{{ health.stopped }}</strong></template>
+          <template #description>停止</template>
+        </t-grid-item>
+        <t-grid-item>
+          <template #icon><ErrorCircleIcon /></template>
+          <template #text><strong :class="{ 'is-danger': health.error > 0 }">{{ health.error }}</strong></template>
+          <template #description>异常</template>
+        </t-grid-item>
+      </t-grid>
 
       <section class="mobile-card">
         <header class="mobile-card__head">
           <h3 class="mobile-card__title">节点健康</h3>
         </header>
 
-        <div v-if="agents.length === 0" class="mobile-empty">暂无在线节点。</div>
+        <t-empty v-if="agents.length === 0" description="暂无在线节点。" />
         <div v-else class="mobile-node-list">
           <article
             v-for="agent in agents"
@@ -104,8 +111,10 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ErrorCircleIcon, PlayCircleIcon, ServerIcon, StopCircleIcon } from 'tdesign-icons-vue-next'
 import type { AgentStatus } from '@/api/agents'
 import MobileMetricBar from '@/components/MobileMetricBar.vue'
+import MobileNotice from '@/components/MobileNotice.vue'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 import {

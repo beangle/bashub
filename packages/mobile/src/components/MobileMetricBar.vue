@@ -4,16 +4,13 @@
       <span class="mobile-metric__label">{{ props.label }}</span>
       <span class="mobile-metric__value">{{ props.value === undefined ? '—' : `${percent}%` }}</span>
     </div>
-    <div
-      class="mobile-metric__track"
-      role="progressbar"
-      :aria-label="props.label"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      :aria-valuenow="percent"
-    >
-      <span class="mobile-metric__fill" :style="{ width: `${percent}%` }"></span>
-    </div>
+    <t-progress
+      class="mobile-metric__progress"
+      :percentage="percent"
+      :label="false"
+      :stroke-width="6"
+      :status="progressStatus"
+    />
     <span v-if="props.detail" class="mobile-metric__detail">{{ props.detail }}</span>
   </div>
 </template>
@@ -38,5 +35,11 @@ const level = computed(() => {
   if (percent.value >= 90) return 'danger'
   if (percent.value >= 80) return 'warning'
   return 'normal'
+})
+
+const progressStatus = computed<'active' | 'warning' | 'error'>(() => {
+  if (level.value === 'danger') return 'error'
+  if (level.value === 'warning') return 'warning'
+  return 'active'
 })
 </script>

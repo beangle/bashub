@@ -7,26 +7,28 @@
       <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
     </header>
 
-    <t-alert v-if="error" theme="error" :message="error" class="mobile-alert" />
+    <MobileNotice v-if="error" :message="error" />
 
-    <div class="mobile-summary">
-      <div class="mobile-summary__item">
-        <strong>{{ onlineProjects }}</strong>
-        <span>在线项目</span>
-      </div>
-      <div class="mobile-summary__item">
-        <strong>{{ totalNodes }}</strong>
-        <span>在线节点</span>
-      </div>
-      <div class="mobile-summary__item">
-        <strong>{{ totalRunning }}/{{ totalInstances }}</strong>
-        <span>运行实例</span>
-      </div>
-    </div>
+    <t-grid :column="3" :border="false" class="mobile-stat-grid">
+      <t-grid-item>
+        <template #icon><ViewModuleIcon /></template>
+        <template #text><strong>{{ onlineProjects }}</strong></template>
+        <template #description>在线项目</template>
+      </t-grid-item>
+      <t-grid-item>
+        <template #icon><ServerIcon /></template>
+        <template #text><strong>{{ totalNodes }}</strong></template>
+        <template #description>在线节点</template>
+      </t-grid-item>
+      <t-grid-item>
+        <template #icon><PlayCircleIcon /></template>
+        <template #text><strong>{{ totalRunning }}/{{ totalInstances }}</strong></template>
+        <template #description>运行实例</template>
+      </t-grid-item>
+    </t-grid>
 
-    <t-input v-model="keyword" class="mobile-search" placeholder="搜索项目 / 机构" clearable />
+    <t-search v-model="keyword" placeholder="搜索项目 / 机构" shape="round" />
 
-    <t-loading :loading="busy" show-overlay>
       <div class="mobile-list">
         <button
           v-for="project in visibleProjects"
@@ -60,11 +62,14 @@
             </span>
           </span>
         </button>
-        <p v-if="!busy && visibleProjects.length === 0" class="mobile-empty">
-          {{ keyword ? '没有匹配的项目。' : '暂无 Project。' }}
-        </p>
+        <t-empty
+          v-if="!busy && visibleProjects.length === 0"
+          :description="keyword ? '没有匹配的项目。' : '暂无 Project。'"
+        />
+        <div v-if="busy && mergedProjects.length === 0" class="mobile-loading">
+          <t-loading size="24px" text="加载中" />
+        </div>
       </div>
-    </t-loading>
 
   </section>
 </template>
@@ -72,6 +77,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { PlayCircleIcon, ServerIcon, ViewModuleIcon } from 'tdesign-icons-vue-next'
+import MobileNotice from '@/components/MobileNotice.vue'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 import {

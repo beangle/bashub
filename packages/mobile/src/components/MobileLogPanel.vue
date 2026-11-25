@@ -34,7 +34,7 @@
       </div>
     </header>
 
-    <t-alert v-if="props.error" theme="error" :message="props.error" class="mobile-log__error" />
+    <MobileNotice v-if="props.error" :message="props.error" class="mobile-log__error" />
 
     <pre class="mobile-log__body">{{ text }}</pre>
   </section>
@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import MobileNotice from '@/components/MobileNotice.vue'
 
 const props = withDefaults(
   defineProps<{

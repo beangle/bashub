@@ -17,7 +17,7 @@
           <p class="mobile-profile__code">{{ currentUser.code || '' }}</p>
         </div>
       </div>
-      <div v-else class="mobile-empty">未登录。</div>
+      <t-empty v-else description="未登录。" />
       <div class="mobile-actions">
         <t-button v-if="!currentUser" size="small" theme="primary" @click="handleLogin">登录</t-button>
         <t-button v-else size="small" variant="outline" @click="handleLogout()">退出登录</t-button>
