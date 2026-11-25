@@ -4,7 +4,7 @@
       <div class="mobile-page__heading">
         <h2 class="mobile-page__title">项目</h2>
       </div>
-      <t-button class="mobile-touch" size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
+      <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
     </header>
 
     <t-alert v-if="error" theme="error" :message="error" class="mobile-alert" />

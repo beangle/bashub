@@ -7,7 +7,7 @@
           {{ projectQualified || project }}<template v-if="orgTitle"> · {{ orgTitle }}</template>
         </p>
       </div>
-      <t-button class="mobile-touch" size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
+      <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
     </header>
 
     <p class="mobile-updated">

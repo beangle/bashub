@@ -59,11 +59,11 @@
     </div>
 
     <footer class="mobile-node__actions">
-      <t-button class="mobile-touch" variant="outline" :loading="props.refreshing" @click="emit('refresh')">
+      <t-button size="small" variant="outline" :loading="props.refreshing" @click="emit('refresh')">
         刷新节点
       </t-button>
       <t-button
-        class="mobile-touch"
+        size="small"
         variant="outline"
         :disabled="!canReadAgentLog"
         @click="emit('agent-log')"

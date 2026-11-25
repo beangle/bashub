@@ -18,14 +18,14 @@
         </router-link>
         <t-button
           v-if="currentUser"
-          class="mobile-touch mobile-shell__logout"
+          class="mobile-shell__logout"
           size="small"
           variant="text"
           @click="handleLogout()"
         >
           退出
         </t-button>
-        <t-button v-else class="mobile-touch mobile-shell__login" size="small" theme="primary" @click="handleLogin">
+        <t-button v-else class="mobile-shell__login" size="small" theme="primary" @click="handleLogin">
           登录
         </t-button>
       </div>

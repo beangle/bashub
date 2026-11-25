@@ -19,8 +19,8 @@
       </div>
       <div v-else class="mobile-empty">未登录。</div>
       <div class="mobile-actions">
-        <t-button v-if="!currentUser" class="mobile-touch" theme="primary" @click="handleLogin">登录</t-button>
-        <t-button v-else class="mobile-touch" variant="outline" @click="handleLogout()">退出登录</t-button>
+        <t-button v-if="!currentUser" size="small" theme="primary" @click="handleLogin">登录</t-button>
+        <t-button v-else size="small" variant="outline" @click="handleLogout()">退出登录</t-button>
       </div>
     </section>
 

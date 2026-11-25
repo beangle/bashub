@@ -5,7 +5,7 @@
         <h2 class="mobile-page__title">节点</h2>
         <p class="mobile-page__subtitle">{{ project }} · {{ statuses.length }} 台在线</p>
       </div>
-      <t-button class="mobile-touch" size="small" variant="outline" :loading="loading" @click="refresh()">
+      <t-button size="small" variant="outline" :loading="loading" @click="refresh()">
         刷新
       </t-button>
     </header>

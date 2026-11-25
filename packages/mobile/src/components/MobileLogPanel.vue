@@ -10,12 +10,11 @@
         </p>
       </div>
       <div class="mobile-log__actions">
-        <t-button class="mobile-touch" size="small" variant="outline" :loading="props.loading" @click="emit('read')">
+        <t-button size="small" variant="outline" :loading="props.loading" @click="emit('read')">
           读取尾部
         </t-button>
         <t-button
           v-if="!props.following"
-          class="mobile-touch"
           size="small"
           variant="outline"
           :disabled="props.loading || !props.canFollow"
@@ -25,7 +24,6 @@
         </t-button>
         <t-button
           v-else
-          class="mobile-touch"
           size="small"
           theme="danger"
           variant="outline"

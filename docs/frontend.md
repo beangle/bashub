@@ -199,7 +199,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   且同项目有多台在线节点时先给出节点选择，不调用会 409 的歧义接口。
 - 日志先读尾部再按需跟随；`useAgentLog` 统一处理 `reset`、错误状态与卸载时的流关闭。维护操作用
   二次确认、执行中禁用与错误详情（含后端 `logTail`），最长覆盖后端 120 秒等待。
-- 手机布局契约：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，触控目标至少 44px，
+- 手机布局契约：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，底部导航与列表行保持 44px，正文按钮用 TDesign 紧凑尺寸，
   卡片/列表替代宽表，操作常驻不依赖 hover；样式集中在 `packages/mobile/src/mobile.css`。
   手机端只引入 TDesign 基础样式与自身 CSS，不引入 `@beangle/bui-vue` 的 DataGrid/AppShell 样式。
 - 部署：服务器把 `/m/bashub/` 指向 `packages/mobile/dist` 并做 history fallback；CAS 的 service

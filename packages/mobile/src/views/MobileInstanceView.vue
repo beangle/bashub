@@ -56,8 +56,8 @@
         <div class="mobile-actions">
           <t-button
             v-if="!running"
-            class="mobile-touch"
             theme="primary"
+            size="small"
             :disabled="!canService('start') || serviceLoading"
             :loading="serviceLoading"
             @click="confirmService('start')"
@@ -66,8 +66,8 @@
           </t-button>
           <t-button
             v-if="running"
-            class="mobile-touch"
             variant="outline"
+            size="small"
             :disabled="!canService('restart') || serviceLoading"
             :loading="serviceLoading"
             @click="confirmService('restart')"
@@ -76,9 +76,9 @@
           </t-button>
           <t-button
             v-if="running"
-            class="mobile-touch"
             theme="danger"
             variant="outline"
+            size="small"
             :disabled="!canService('stop') || serviceLoading"
             :loading="serviceLoading"
             @click="confirmService('stop')"
