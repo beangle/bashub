@@ -315,26 +315,67 @@ body {
   padding: 24px 0;
 }
 
-.mobile-facts {
-  overflow: hidden;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 12px;
-  background: var(--td-bg-color-container);
+.mobile-instance-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin: 0;
 }
 
-.mobile-facts .t-cell {
-  padding-top: 8px;
-  padding-bottom: 8px;
+.mobile-instance-fact {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.mobile-facts .t-cell__title-text {
+.mobile-instance-fact dt {
+  flex: none;
   color: var(--td-text-color-placeholder);
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.mobile-facts .t-cell__description {
-  color: var(--td-text-color-primary);
+.mobile-instance-fact dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-apps .t-cell {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mobile-apps .t-cell__title {
+  margin-right: 8px;
+}
+
+.mobile-apps .t-cell__title-text {
+  overflow: hidden;
   font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-apps .t-cell__description {
+  margin-top: 2px;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.mobile-apps .t-cell__note {
+  flex: none;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
 }
 
 .mobile-node__instances .t-cell-group {
@@ -342,8 +383,34 @@ body {
 }
 
 .mobile-node__instances .t-cell {
+  padding-top: 6px;
+  padding-bottom: 6px;
   padding-left: 0;
   padding-right: 0;
+}
+
+.mobile-node__instances .t-cell__title {
+  margin-right: 8px;
+}
+
+.mobile-node__instances .t-cell__title-text {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-instance-note {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.mobile-instance-note__memory {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .mobile-list {

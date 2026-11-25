@@ -46,14 +46,16 @@
           v-for="instance in instances"
           :key="instance.id || String(instance.pid)"
           :title="instance.id || '未命名实例'"
-          :description="instanceMemory(instance)"
           arrow
           @click="emit('open-instance', instance)"
         >
           <template #note>
-            <t-tag size="small" variant="light" :theme="stateTheme(instanceState(instance))">
-              {{ stateLabel(instanceState(instance)) }}
-            </t-tag>
+            <span class="mobile-instance-note">
+              <span class="mobile-instance-note__memory">{{ instanceMemory(instance) }}</span>
+              <t-tag size="small" variant="light" :theme="stateTheme(instanceState(instance))">
+                {{ stateLabel(instanceState(instance)) }}
+              </t-tag>
+            </span>
           </template>
         </t-cell>
       </t-cell-group>
@@ -159,24 +161,10 @@ function stateThemeOf(value: string, active: boolean | undefined): ComponentStat
 }
 
 const componentStates = computed<ComponentState[]>(() => {
-  const os = props.agent.os
-  const result: ComponentState[] = []
-  if (os?.micdn) {
-    const state = os.micdn.state || (os.micdn.active ? 'active' : 'inactive')
-    result.push({ key: 'micdn', label: 'Micdn', state, theme: stateThemeOf(state, os.micdn.active) })
-  }
-  const proxy = os?.proxyState
-  const proxyEntries: { key: 'haproxy' | 'nginx'; label: string }[] = [
-    { key: 'haproxy', label: 'HAProxy' },
-    { key: 'nginx', label: 'Nginx' },
-  ]
-  for (const entry of proxyEntries) {
-    const item = proxy?.[entry.key]
-    if (!item) continue
-    const state = item.state || (item.active ? 'active' : 'inactive')
-    result.push({ key: entry.key, label: entry.label, state, theme: stateThemeOf(state, item.active) })
-  }
-  return result
+  const micdn = props.agent.os?.micdn
+  if (!micdn) return []
+  const state = micdn.state || (micdn.active ? 'active' : 'inactive')
+  return [{ key: 'micdn', label: 'Micdn', state, theme: stateThemeOf(state, micdn.active) }]
 })
 
 function instanceMemory(instance: AgentInstance): string {

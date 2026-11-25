@@ -53,8 +53,8 @@
             class="mobile-overview-node"
             role="button"
             tabindex="0"
-            @click="openNodes"
-            @keydown.enter="openNodes"
+            @click="openHost(agent)"
+            @keydown.enter="openHost(agent)"
           >
             <header class="mobile-overview-node__head">
               <div>
@@ -182,8 +182,13 @@ function diskDetail(agent: AgentStatus): string {
   return `${resources.diskMount || '/'} ${formatBytes(resources.diskUsed)} / ${formatBytes(resources.diskTotal)}`
 }
 
-function openNodes(): void {
-  void router.push(`/projects/${encodeURIComponent(project.value)}/nodes`)
+function openHost(agent: AgentStatus): void {
+  const host = agent.ip || ''
+  if (!host) {
+    void router.push(`/projects/${encodeURIComponent(project.value)}/nodes`)
+    return
+  }
+  void router.push(`/projects/${encodeURIComponent(project.value)}/nodes/${encodeURIComponent(host)}`)
 }
 
 async function reload(): Promise<void> {

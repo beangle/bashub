@@ -46,9 +46,12 @@
           </t-tag>
         </header>
 
-        <t-cell-group :bordered="false" class="mobile-facts">
-          <t-cell v-for="fact in instanceFacts" :key="fact.label" :title="fact.label" :description="fact.value" />
-        </t-cell-group>
+        <dl class="mobile-instance-facts">
+          <div v-for="fact in instanceFacts" :key="fact.label" class="mobile-instance-fact">
+            <dt>{{ fact.label }}</dt>
+            <dd :title="fact.value">{{ fact.value }}</dd>
+          </div>
+        </dl>
 
         <div class="mobile-actions">
           <t-button
@@ -111,13 +114,15 @@
 
       <section class="mobile-card">
         <h3 class="mobile-card__title">应用</h3>
-        <t-cell-group v-if="webapps.length > 0" :bordered="false">
+        <t-cell-group v-if="webapps.length > 0" :bordered="false" class="mobile-apps">
           <t-cell
             v-for="app in webapps"
             :key="app.id || app.uri"
             :title="app.title || '未命名应用'"
-            :description="app.context || '/'"
-          />
+            :description="app.uri || ''"
+          >
+            <template #note>{{ app.context || '/' }}</template>
+          </t-cell>
         </t-cell-group>
         <t-empty v-else description="暂无应用。" />
       </section>
@@ -216,7 +221,10 @@ const ambiguous = computed(() => agentIp.value === '' && agents.value.length > 1
 const running = computed(() => (instance.value ? isInstanceRunning(instance.value) : false))
 const webapps = computed(() => instance.value?.webapps ?? [])
 const agentIdentity = computed(() => (agent.value ? agentKey(agent.value) : ''))
-const nodesPath = computed(() => `/projects/${encodeURIComponent(project.value)}/nodes`)
+const nodesPath = computed(() => {
+  const base = `/projects/${encodeURIComponent(project.value)}/nodes`
+  return agentIp.value ? `${base}/${encodeURIComponent(agentIp.value)}` : base
+})
 
 const instanceMemory = computed(() => {
   const target = instance.value

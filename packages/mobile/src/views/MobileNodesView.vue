@@ -2,19 +2,25 @@
   <section class="mobile-page">
     <header class="mobile-page__head">
       <div class="mobile-page__heading">
-        <h2 class="mobile-page__title">节点</h2>
-        <p class="mobile-page__subtitle">{{ project }} · {{ statuses.length }} 台在线</p>
+        <h2 class="mobile-page__title">{{ isHostDetail ? (focusedAgent?.ip || host) : '节点' }}</h2>
+        <p class="mobile-page__subtitle">
+          <template v-if="isHostDetail">{{ project }}</template>
+          <template v-else>{{ project }} · {{ statuses.length }} 台在线</template>
+        </p>
       </div>
+      <router-link v-if="isHostDetail" class="mobile-back" :to="overviewPath">返回概览</router-link>
+    </header>
+
+    <div class="mobile-page__toolbar">
+      <span class="mobile-updated">
+        <template v-if="updatedAt">更新于 {{ updatedAt }}</template>
+        <template v-else>等待首次上报</template>
+        · {{ secondsLeft }} 秒后自动刷新
+      </span>
       <t-button size="small" variant="outline" :loading="loading" @click="refresh()">
         刷新
       </t-button>
-    </header>
-
-    <p class="mobile-updated">
-      <template v-if="updatedAt">更新于 {{ updatedAt }}</template>
-      <template v-else>等待首次上报</template>
-      · {{ secondsLeft }} 秒后自动刷新
-    </p>
+    </div>
 
     <MobileNotice v-if="error" :message="error" />
     <MobileNotice v-if="actionError" :message="actionError" />
@@ -22,11 +28,11 @@
     <div v-if="loading && statuses.length === 0" class="mobile-loading">
       <t-loading size="24px" text="加载中" />
     </div>
-    <t-empty v-else-if="statuses.length === 0" description="暂无在线节点。" />
+    <t-empty v-else-if="visibleAgents.length === 0" :description="isHostDetail ? '该主机不在线。' : '暂无在线节点。'" />
 
     <div class="mobile-node-list">
       <MobileNodeCard
-        v-for="agent in orderedAgents"
+        v-for="agent in visibleAgents"
         :key="agentKey(agent)"
         :agent="agent"
         :refreshing="refreshingNodes[agentKey(agent)] === true"
@@ -63,11 +69,14 @@ import MobileNotice from '@/components/MobileNotice.vue'
 import MobileNodeCard from '@/components/MobileNodeCard.vue'
 import { useAgentLog } from '@/composables/useAgentLog'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'
-import { agentKey, compareAgentHealth, errorText } from '@/monitor-model'
+import { agentKey, compareAgentHealth, errorText, findAgent } from '@/monitor-model'
 
 const route = useRoute()
 const router = useRouter()
 const project = computed(() => String(route.params.project ?? ''))
+const host = computed(() => String(route.params.host ?? ''))
+const isHostDetail = computed(() => host.value !== '')
+const overviewPath = computed(() => `/projects/${encodeURIComponent(project.value)}`)
 const {
   statuses,
   loading,
@@ -93,6 +102,8 @@ const actionError = ref('')
 const activeLogAgent = ref<AgentStatus | null>(null)
 
 const orderedAgents = computed(() => [...statuses.value].sort(compareAgentHealth))
+const focusedAgent = computed(() => (isHostDetail.value ? findAgent(statuses.value, project.value, host.value) : undefined))
+const visibleAgents = computed(() => (isHostDetail.value ? (focusedAgent.value ? [focusedAgent.value] : []) : orderedAgents.value))
 const logTitle = computed(() => {
   const agent = activeLogAgent.value
   if (!agent) return 'Agent 日志'

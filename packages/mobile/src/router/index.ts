@@ -19,6 +19,11 @@ const router = createRouter({
       meta: { title: '项目节点' },
     },
     {
+      path: '/projects/:project/nodes/:host',
+      component: () => import('@/views/MobileNodesView.vue'),
+      meta: { title: '主机详情' },
+    },
+    {
       path: '/projects/:project/instances/:instance',
       component: () => import('@/views/MobileInstanceView.vue'),
       meta: { title: '实例详情' },
