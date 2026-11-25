@@ -104,6 +104,32 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 主机详情页的脚本下载使用机器端点，不在 `/config/hosts` 资源下；这里的 `{project}` 是配置的
 `qualifiedName`，`{hostIp}` 是该主机的 IP。
 
+### 手机端监控台（独立 SPA）
+
+手机端是 `packages/mobile` 里的独立 SPA，与 `packages/web` 平级，部署在 `/m/bashub/`
+（`VITE_APP_BASE`）。它有自己的 `index.html`、router、构建产物与部署目录，不挂在 PC 路由下；
+PC 路由、PC 页面和 PC 的全局项目选择器保持不变。选定项目后 URL 始终携带 `:project`
+（配置的 `qualifiedName`），项目工作区内不再提供全局下拉；顶部项目标题可回到项目列表切换。
+
+| 前端路由（含基址） | 页面 | 后端 API |
+|---|---|---|
+| `/m/bashub/` | 项目列表（唯一项目切换入口），`MobileProjectsView` | `GET /api/bashub/config/projects/search?include=org`<br>`GET /api/bashub/monitor/agents/summary` |
+| `/m/bashub/projects/:project` | 项目概览，`MobileOverviewView` | `GET /api/bashub/monitor/agents/summary`<br>`GET /api/bashub/monitor/agents/status` |
+| `/m/bashub/projects/:project/nodes` | 项目节点，`MobileNodesView` | `GET /api/bashub/monitor/agents/status`<br>`POST /api/bashub/monitor/agents/{project}/report[?agent=<ip>]`<br>`GET /api/bashub/monitor/agents/{project}/agent-log[?agent=<ip>]` |
+| `/m/bashub/projects/:project/instances/:instance` | 实例详情，`MobileInstanceView` | `GET /api/bashub/monitor/agents/{project}/history?days=30\|180`<br>`GET /api/bashub/monitor/agents/{project}/log?instance=...[&agent=<ip>]`<br>SSE：`GET /api/bashub/monitor/agents/{project}/log/follow?instance=...&tail=...[&agent=<ip>]`<br>`POST /api/bashub/monitor/agents/{project}/service/{action}[?agent=<ip>]`，`action` 为 `start` / `stop` / `restart` |
+| `/m/bashub/me` | 当前用户、登录/退出，`MobileMeView` | `GET /api/bashub/ems/sessions`<br>`POST /api/bashub/ems/sessions/logout`（由现有 auth 封装） |
+
+`{project}` 是配置的 `qualifiedName`。同一 project 有多台在线节点时，实例日志、agent 日志、立即上报和
+启停都必须带 `?agent=<ip>`（`ip` 来自 `/agents/status`）；实例页缺少 agent 且存在多台节点时先让用户
+选择，不调用会返回 409 的歧义接口。项目历史按 project 查询，不带 agent。手机端不新增后端接口，
+也不新增 token 存储；写操作权限仍由后端 `/monitor/agents` 私有资源或显式权限串判定。
+
+服务器需要把 `/m/bashub/` 指向 `packages/mobile/dist`，并对 `/m/bashub/*` 做 history fallback
+到该目录的 `index.html`；`/api` 仍反代到同一个 D 后端，CAS 会话 cookie 同源共用，CAS 的 service
+白名单需要包含 `/m/bashub/`。
+手机端自动验收只覆盖路由、类型、生产构建与静态布局契约；真实手机上的登录态、触控与横竖屏
+体验需要按上表做人工 UAT，自动通过不代表真机已验证。
+
 ## 通用资源 CRUD
 
 平台配置资源使用 `config` 域：

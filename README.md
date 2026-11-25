@@ -7,11 +7,14 @@ BAS 控制台这一个产品的 monorepo，两部分各自独立构建：
 
 | 部分 | 位置 | 构建 | 产物 |
 |---|---|---|---|
-| 前端 SPA | `packages/web` | pnpm + vite | `packages/web/dist`、`release/bashub-web.zip` |
+| PC 前端 SPA | `packages/web` | pnpm + vite | `packages/web/dist`、`release/bashub-web.zip` |
+| 手机端 SPA | `packages/mobile` | pnpm + vite | `packages/mobile/dist`、`release/bashub-mobile.zip`（部署到 `/m/bashub/`） |
 | D 后端 | `src/beangle`、`src/bashub` | dub | `target/d/bashub`（`/api/bashub/{ems,config,micdn,monitor}`） |
 
 ```bash
-pnpm build:web                              # 前端 → packages/web/dist
+pnpm build:web                              # PC 前端 → packages/web/dist
+pnpm build:mobile                           # 手机端 → packages/mobile/dist
+pnpm run package                            # 两个前端 build + 打包 → packages/*/release/*.zip
 dub test --compiler=ldc2                    # D 后端：跑测试
 dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
 ./target/d/bashub --ems.profile=bas         # 起 D 后端（从 ems profile 读取部署配置）
@@ -37,6 +40,11 @@ dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
 
 前端页面路由与后端 API 的逐页对应见
 [`docs/frontend-routes.md`](docs/frontend-routes.md)。
+
+手机端监控台是平级的独立 SPA `packages/mobile`（部署在 `/m/bashub/`），与 PC 共用 CAS 会话和
+监控 API：先选择项目，再在项目工作区查看概览、节点、实例历史/日志并执行启停。手机端不读取 PC 的
+全局项目选择器，也不新增后端接口或前端依赖；路由、多 agent 约定与人工 UAT 边界见
+[`docs/frontend-routes.md`](docs/frontend-routes.md) 的「手机端监控台（独立 SPA）」。
 
 D 代码分两块：**`beangle.*` 是可复用的框架**（数据面「资源注册表 → 查询计划 → SQL」、协议面
 「JSON:API 文档渲染 → 服务层 → CRUD 路由」、会话面「会话模型 → 内存缓存 → CAS 客户端」），

@@ -1,6 +1,8 @@
-# 前端工程说明（packages/web）
+# 前端工程说明（packages/web、packages/mobile）
 
-管理台是 Vite + Vue 3 + TDesign 的独立 SPA，与 D 后端（只提供 JSON:API）分开构建、分开部署。
+仓库有两个互相独立的 Vite + Vue 3 + TDesign SPA：PC 管理台 `packages/web`（基址 `/bashub/`）
+与手机端监控 `packages/mobile`（基址 `/m/bashub/`）。两者各自构建、各自部署，共用 D 后端（只提供
+JSON:API）与同一套 CAS 会话。
 
 ## 依赖管理
 
@@ -8,10 +10,13 @@
 
 ```bash
 pnpm install              # 安装依赖（根 + packages/*）
-pnpm dev:web              # 本地开发，vite --host 0.0.0.0
-pnpm typecheck            # 类型检查
-pnpm build:web            # 产物到 packages/web/dist
-pnpm --filter @beangle/bashub-web package   # build + 打包 release/bashub-web.zip
+pnpm dev:web              # PC 本地开发，vite --host 0.0.0.0
+pnpm dev:mobile           # 手机端本地开发，vite --host 0.0.0.0
+pnpm typecheck            # 两个 SPA 的类型检查（pnpm -r typecheck）
+pnpm build:web            # PC 产物到 packages/web/dist
+pnpm build:mobile         # 手机端产物到 packages/mobile/dist
+pnpm run package          # 两个前端 build + 打包 → packages/*/release/*.zip
+pnpm --filter @beangle/bashub-web package   # 只打 PC 包（release/bashub-web.zip）
 ```
 
 ## 依赖约定：`@beangle/ems-app`、`@beangle/bui-vue` 都跟正式版
@@ -169,6 +174,38 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `engines`、`artifacts`、`webapps` 和从属页面 `servers`。Micdn 聚合页使用
   `/micdn/projects/:id`、`/micdn/components`，监控使用 `/monitor/agents`。
   旧的无域页签组路径和资源独立页面入口都不注册，也没有重定向。
+
+## 手机端监控（独立 SPA）
+
+手机端不在 `packages/web` 内，而是平级的 `packages/mobile`：独立 `package.json`、`vite.config.ts`、
+`index.html`、router 与构建产物，部署在 `/m/bashub/`（`VITE_APP_BASE` 控制）。PC 的壳层、路由与页面
+完全不参与手机端渲染，`packages/web` 不引用任何手机端文件。
+
+- 认证与请求：`packages/mobile/src/auth.ts` 用与 PC 相同的 `@beangle/ems-app` 创建运行时配置和
+  `createEmsAuth`；请求走同一套 `EmsJsonApiClient`，依赖同源 CAS cookie，不保存第二套 token。
+  两个 SPA 都不新增后端接口，`/api/bashub/ems/configs.json` 与 `/api/bashub/ems/sessions` 共用。
+- 路由：`/` 项目列表、`/projects/:project` 项目概览、`/projects/:project/nodes` 节点、
+  `/projects/:project/instances/:instance` 实例、`/me` 我的。公开 URL 为基址 + 上述路径
+  （例如 `/m/bashub/projects/org.proj/nodes`）。
+- `MobileShell` 只负责布局：顶部固定当前项目（点击回 `/` 项目列表切换）、底部“概览 / 节点 / 我的”，
+  并复用 `auth` 的登录/退出。项目列表与“我的”不显示概览/节点入口。
+- 项目上下文只由 URL 的 `:project`（配置 `qualifiedName`）决定，不读写 PC 的
+  `current_project_id`，也不提供全局 Project 下拉；刷新、深链和浏览器返回都保持当前项目。
+- 页面分工：`MobileProjectsView`（项目列表，合并 `/config/projects` 与 `/agents/summary`）、
+  `MobileOverviewView`（当前项目健康与节点资源条，30 秒可见轮询）、`MobileNodesView`
+  （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
+  实例日志与跟随、启停）、`MobileMeView`（用户、登录/退出）。
+- 多 agent：实例启停、实例日志、agent 日志、节点立即刷新都显式传 `?agent=<ip>`；实例页缺少 agent
+  且同项目有多台在线节点时先给出节点选择，不调用会 409 的歧义接口。
+- 日志先读尾部再按需跟随；`useAgentLog` 统一处理 `reset`、错误状态与卸载时的流关闭。维护操作用
+  二次确认、执行中禁用与错误详情（含后端 `logTail`），最长覆盖后端 120 秒等待。
+- 手机布局契约：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，触控目标至少 44px，
+  卡片/列表替代宽表，操作常驻不依赖 hover；样式集中在 `packages/mobile/src/mobile.css`。
+  手机端只引入 TDesign 基础样式与自身 CSS，不引入 `@beangle/bui-vue` 的 DataGrid/AppShell 样式。
+- 部署：服务器把 `/m/bashub/` 指向 `packages/mobile/dist` 并做 history fallback；CAS 的 service
+  白名单需要包含 `/m/bashub/`；`/api` 与 PC 共用同一后端和会话 cookie。
+- 自动验收只覆盖路由、类型、生产构建与静态布局契约；真实手机登录态、触控与横竖屏体验由负责人
+  按 [`frontend-routes.md`](frontend-routes.md) 的手机端表格做人工 UAT，自动通过不代表真机已验证。
 
 ## 接口
 
