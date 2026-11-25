@@ -94,7 +94,9 @@
 
 .data-region {
   min-width: 0;
-  overflow: hidden;
+  padding-right: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* 必填查询条件（菜单管理的「应用」）未选时的占位提示：此时不查列表。 */
