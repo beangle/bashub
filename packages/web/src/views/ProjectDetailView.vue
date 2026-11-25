@@ -124,6 +124,9 @@
                   <p>负载均衡器监听、TLS 与连接数设置。</p>
                 </div>
                 <div class="detail-card__actions">
+                  <t-button size="small" variant="outline" @click="router.push(`/config/projects/${projectId}/external-routes`)">
+                    外部路由
+                  </t-button>
                   <t-button size="small" variant="outline" @click="editProxyEndpoint">
                     编辑代理设置
                   </t-button>
@@ -600,7 +603,7 @@ interface ServerRunEntry {
 
 const sectionItems: SectionItem[] = [
   { key: 'overview', label: '概览', hint: 'Project 的归属、版本与部署概况', icon: DashboardIcon },
-  { key: 'proxy', label: 'Haproxy / Nginx', hint: '负载均衡监听与渲染后的代理配置', icon: InternetIcon },
+  { key: 'proxy', label: 'Proxy', hint: '负载均衡监听与渲染后的代理配置', icon: InternetIcon },
   { key: 'certificate', label: '证书', hint: 'HTTPS、公钥证书与私钥保护', icon: CertificateIcon },
   { key: 'bas', label: 'BAS 服务', hint: '群集、服务、应用、在线实例与 server.xml', icon: ServerIcon },
   { key: 'micdn', label: 'Micdn', hint: '静态挂载、仓库、Blob 与 Micdn 节点', icon: CloudIcon },
