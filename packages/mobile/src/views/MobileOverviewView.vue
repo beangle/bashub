@@ -1,20 +1,13 @@
 <template>
   <section class="mobile-page">
-    <header class="mobile-page__head">
-      <div class="mobile-page__heading">
-        <h2 class="mobile-page__title">{{ projectTitle }}</h2>
-        <p class="mobile-page__subtitle">
-          {{ projectQualified || project }}<template v-if="orgTitle"> · {{ orgTitle }}</template>
-        </p>
-      </div>
+    <div class="mobile-page__toolbar">
+      <span class="mobile-updated">
+        <template v-if="updatedAt">更新于 {{ updatedAt }}</template>
+        <template v-else>等待首次上报</template>
+        · {{ secondsLeft }} 秒后自动刷新
+      </span>
       <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
-    </header>
-
-    <p class="mobile-updated">
-      <template v-if="updatedAt">更新于 {{ updatedAt }}</template>
-      <template v-else>等待首次上报</template>
-      · {{ secondsLeft }} 秒后自动刷新
-    </p>
+    </div>
 
     <MobileNotice v-if="error" :message="error" />
     <MobileNotice v-if="catalogError" :message="catalogError" />
@@ -30,22 +23,18 @@
     <template v-if="projectInfo">
       <t-grid :column="4" :border="false" class="mobile-stat-grid">
         <t-grid-item>
-          <template #icon><ServerIcon /></template>
           <template #text><strong>{{ health.nodeCount }}</strong></template>
           <template #description>在线节点</template>
         </t-grid-item>
         <t-grid-item>
-          <template #icon><PlayCircleIcon /></template>
           <template #text><strong>{{ health.running }}</strong></template>
           <template #description>运行实例</template>
         </t-grid-item>
         <t-grid-item>
-          <template #icon><StopCircleIcon /></template>
           <template #text><strong>{{ health.stopped }}</strong></template>
           <template #description>停止</template>
         </t-grid-item>
         <t-grid-item>
-          <template #icon><ErrorCircleIcon /></template>
           <template #text><strong :class="{ 'is-danger': health.error > 0 }">{{ health.error }}</strong></template>
           <template #description>异常</template>
         </t-grid-item>
@@ -111,7 +100,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ErrorCircleIcon, PlayCircleIcon, ServerIcon, StopCircleIcon } from 'tdesign-icons-vue-next'
 import type { AgentStatus } from '@/api/agents'
 import MobileMetricBar from '@/components/MobileMetricBar.vue'
 import MobileNotice from '@/components/MobileNotice.vue'
@@ -143,9 +131,6 @@ const {
 } = useAgentMonitor({ project: () => project.value, mode: 'both' })
 
 const projectInfo = computed(() => catalog.projectOf(project.value))
-const projectTitle = computed(() => projectInfo.value?.title || project.value)
-const projectQualified = computed(() => projectInfo.value?.qualifiedName || '')
-const orgTitle = computed(() => projectInfo.value?.orgTitle || '')
 const catalogLoading = computed(() => catalog.loading.value)
 const catalogError = computed(() => catalog.error.value)
 const busy = computed(() => loading.value || catalogLoading.value)

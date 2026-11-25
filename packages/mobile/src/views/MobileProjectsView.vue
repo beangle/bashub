@@ -11,17 +11,14 @@
 
     <t-grid :column="3" :border="false" class="mobile-stat-grid">
       <t-grid-item>
-        <template #icon><ViewModuleIcon /></template>
         <template #text><strong>{{ onlineProjects }}</strong></template>
         <template #description>在线项目</template>
       </t-grid-item>
       <t-grid-item>
-        <template #icon><ServerIcon /></template>
         <template #text><strong>{{ totalNodes }}</strong></template>
         <template #description>在线节点</template>
       </t-grid-item>
       <t-grid-item>
-        <template #icon><PlayCircleIcon /></template>
         <template #text><strong>{{ totalRunning }}/{{ totalInstances }}</strong></template>
         <template #description>运行实例</template>
       </t-grid-item>
@@ -49,8 +46,11 @@
               {{ initials(project.title) }}
             </span>
             <span class="mobile-project-card__text">
-              <span class="mobile-project-card__title">{{ project.title }}</span>
-              <span class="mobile-project-card__meta">{{ project.orgTitle }} · {{ project.qualifiedName }}</span>
+              <span class="mobile-project-card__title-row">
+                <span class="mobile-project-card__title">{{ project.title }}</span>
+                <span class="mobile-project-card__qualified">{{ project.qualifiedName }}</span>
+              </span>
+              <span class="mobile-project-card__meta">{{ project.orgTitle }}</span>
             </span>
           </span>
           <span class="mobile-project-card__side">
@@ -77,7 +77,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { PlayCircleIcon, ServerIcon, ViewModuleIcon } from 'tdesign-icons-vue-next'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'

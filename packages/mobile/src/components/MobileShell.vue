@@ -2,10 +2,22 @@
   <div class="mobile-shell">
     <header class="mobile-shell__header">
       <router-link v-if="project" class="mobile-shell__context" to="/">
-        <span class="mobile-shell__context-title">{{ projectTitle }}</span>
-        <span class="mobile-shell__context-subtitle">
-          <span v-if="projectSubtitle">{{ projectSubtitle }}</span>
-          <span class="mobile-shell__context-switch">切换项目</span>
+        <img
+          v-if="projectLogo && !logoFailed"
+          class="mobile-shell__context-logo"
+          :src="projectLogo"
+          :alt="projectTitle"
+          @error="logoFailed = true"
+        />
+        <span v-else class="mobile-shell__context-logo mobile-shell__context-logo--fallback">
+          {{ projectInitial }}
+        </span>
+        <span class="mobile-shell__context-text">
+          <span class="mobile-shell__context-title">{{ projectTitle }}</span>
+          <span class="mobile-shell__context-subtitle">
+            <span v-if="projectSubtitle">{{ projectSubtitle }}</span>
+            <span class="mobile-shell__context-switch">切换项目</span>
+          </span>
         </span>
       </router-link>
       <div v-else class="mobile-shell__brand">
@@ -63,11 +75,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { HomeIcon, ServerIcon, UserIcon, ViewModuleIcon } from 'tdesign-icons-vue-next'
 import { auth } from '@/auth'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
+import { initials } from '@/monitor-model'
 
 type MobileSection = 'projects' | 'overview' | 'nodes' | 'me'
 
@@ -79,6 +92,12 @@ const catalog = useProjectCatalog()
 const project = computed(() => String(route.params.project ?? ''))
 const projectInfo = computed(() => catalog.projectOf(project.value))
 const projectTitle = computed(() => projectInfo.value?.title || project.value)
+const projectLogo = computed(() => projectInfo.value?.logoUrl || '')
+const projectInitial = computed(() => initials(projectTitle.value))
+const logoFailed = ref(false)
+watch(project, () => {
+  logoFailed.value = false
+})
 const projectSubtitle = computed(() => {
   const info = projectInfo.value
   if (!info) return ''
