@@ -83,6 +83,7 @@
       <section class="mobile-card">
         <header class="mobile-card__head">
           <h3 class="mobile-card__title">节点健康</h3>
+          <router-link class="mobile-card__link" :to="nodesPath">全部节点</router-link>
         </header>
 
         <t-empty v-if="agents.length === 0" description="暂无在线节点。" />
@@ -181,6 +182,7 @@ const {
 } = useAgentMonitor({ project: () => project.value, mode: 'both' })
 
 const projectInfo = computed(() => catalog.projectOf(project.value))
+const nodesPath = computed(() => `/projects/${encodeURIComponent(project.value)}/nodes`)
 const catalogLoading = computed(() => catalog.loading.value)
 const catalogError = computed(() => catalog.error.value)
 const busy = computed(() => loading.value || catalogLoading.value)
@@ -209,16 +211,19 @@ interface ProjectComponentRow {
   action: 'micdn' | 'proxy'
 }
 
-function summarizeComponent(
-  label: string,
-  states: AgentComponentState[],
-  alwaysShow = false,
-): Pick<ProjectComponentRow, 'text' | 'theme'> | null {
-  if (states.length === 0) return alwaysShow ? { text: '未上报', theme: 'default' } : null
-  const active = states.filter((item) => item.active === true || item.state === 'active' || item.state === 'running').length
-  if (active === states.length) return { text: `正常 ${active}/${states.length}`, theme: 'success' }
-  if (active > 0) return { text: `部分停用 ${active}/${states.length}`, theme: 'warning' }
-  return { text: `停用 0/${states.length}`, theme: 'warning' }
+function summarizeService(
+  states: (AgentComponentState | undefined)[],
+  configured: boolean,
+  allOnline: boolean,
+  isActive: (state: AgentComponentState) => boolean,
+): Pick<ProjectComponentRow, 'text' | 'theme'> {
+  if (!configured) return { text: '未登记', theme: 'default' }
+  if (!allOnline) return { text: '节点离线', theme: 'warning' }
+  const active = states.filter((state): state is AgentComponentState => state !== undefined && isActive(state)).length
+  if (states.length > 0 && active === states.length) return { text: '在线', theme: 'success' }
+  if (states.some((state) => state === undefined)) return { text: '状态未知', theme: 'warning' }
+  if (active > 0) return { text: '部分停止', theme: 'warning' }
+  return { text: '已停止', theme: 'warning' }
 }
 
 function firstVersion(values: (string | undefined)[]): string {
@@ -371,35 +376,33 @@ watch(() => projectInfo.value?.id, (projectId) => {
 }, { immediate: true })
 
 const componentSummary = computed<ProjectComponentRow[]>(() => {
-  const micdnStates = statuses.value
-    .map((agent) => agent.os?.micdn)
-    .filter((item): item is AgentComponentState => item !== undefined)
-  const micdn = summarizeComponent('Micdn', micdnStates, true)
-  const engine = proxyEngine.value
+  const engine = proxyEngineValid.value ? (proxyEngine.value as 'haproxy' | 'nginx') : undefined
   const engineLabel = engine === 'haproxy' ? 'HAProxy' : engine === 'nginx' ? 'Nginx' : '代理'
-  const proxyStates = engine
-    ? statuses.value
-      .map((agent) => agent.os?.proxyState?.[engine])
-      .filter((item): item is AgentComponentState => item !== undefined)
+  const micdnStates = micdnHosts.value.map((host) => agentForHost(host)?.os?.micdn)
+  const micdn = summarizeService(micdnStates, micdnHosts.value.length > 0, micdnAllOnline.value,
+    (state) => state.state === 'active')
+  const proxyStates = engine && proxyHosts.value.length > 0
+    ? proxyHosts.value.map((host) => agentForHost(host)?.os?.proxyState?.[engine])
     : []
-  const proxy = engine
-    ? summarizeComponent(engineLabel, proxyStates, true)
-    : { text: '未配置', theme: 'default' as const }
+  const proxy = summarizeService(proxyStates, Boolean(engine) && proxyHosts.value.length > 0, proxyAllOnline.value,
+    (state) => state.active === true)
   return [
     {
       key: 'micdn',
       label: 'Micdn',
-      version: firstVersion(micdnStates.map((item) => item.version)),
-      text: micdn?.text || '未上报',
-      theme: micdn?.theme || 'default',
+      version: micdnHosts.value.length > 0 ? firstVersion(micdnStates.map((state) => state?.version)) : '—',
+      text: micdn.text,
+      theme: micdn.theme,
       action: 'micdn',
     },
     {
       key: 'proxy',
       label: engineLabel,
-      version: engine ? firstVersion(statuses.value.map((agent) => agent.os?.proxy?.[engine])) : '—',
-      text: proxy?.text || '未上报',
-      theme: proxy?.theme || 'default',
+      version: engine && proxyHosts.value.length > 0
+        ? firstVersion(proxyHosts.value.map((host) => agentForHost(host)?.os?.proxy?.[engine]))
+        : '—',
+      text: proxy.text,
+      theme: proxy.theme,
       action: 'proxy',
     },
   ]

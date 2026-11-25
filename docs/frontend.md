@@ -187,7 +187,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 - 路由：`/` 项目列表、`/projects/:project` 项目概览、`/projects/:project/nodes` 节点、
   `/projects/:project/instances/:instance` 实例、`/me` 我的。公开 URL 为基址 + 上述路径
   （例如 `/m/bashub/projects/org.proj/nodes`）。
-- `MobileShell` 只负责布局：顶部固定当前项目（点击回 `/` 项目列表切换）、底部“概览 / 节点 / 我的”，
+- `MobileShell` 只负责布局：顶部固定当前项目（点击回 `/` 项目列表切换）、底部固定“监控 / 我的”；概览、节点作为监控内的层级，
   并复用 `auth` 的登录/退出。项目列表与“我的”不显示概览/节点入口。
 - 项目上下文只由 URL 的 `:project`（配置 `qualifiedName`）决定，不读写 PC 的
   `current_project_id`，也不提供全局 Project 下拉；刷新、深链和浏览器返回都保持当前项目。

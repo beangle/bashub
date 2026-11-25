@@ -136,17 +136,6 @@ body {
   gap: 2px;
 }
 
-.mobile-shell__user {
-  max-width: 28vw;
-  overflow: hidden;
-  padding: 10px 6px;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .mobile-shell__main {
   flex: 1;
   min-height: 0;

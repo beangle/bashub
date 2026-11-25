@@ -8,7 +8,7 @@
           <template v-else>{{ project }} · {{ statuses.length }} 台在线</template>
         </p>
       </div>
-      <router-link v-if="isHostDetail" class="mobile-back" :to="overviewPath">返回概览</router-link>
+      <router-link class="mobile-back" :to="overviewPath">返回概览</router-link>
     </header>
 
     <div class="mobile-page__toolbar">
