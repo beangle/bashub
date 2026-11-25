@@ -10,7 +10,9 @@
   "scripts": {
     "preinstall": "node scripts/check-pnpm.cjs",
     "dev:web": "pnpm --filter @beangle/bashub-web dev",
+    "dev:mobile": "pnpm --filter @beangle/bashub-mobile dev",
     "build:web": "pnpm --filter @beangle/bashub-web build",
+    "build:mobile": "pnpm --filter @beangle/bashub-mobile build",
     "package": "pnpm -r run package",
     "typecheck": "pnpm -r typecheck"
   },
