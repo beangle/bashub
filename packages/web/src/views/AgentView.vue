@@ -1998,7 +1998,8 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: var(--td-bg-color-container-hover);
   font-family: 'Andale Mono', ui-monospace, monospace;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
 }
