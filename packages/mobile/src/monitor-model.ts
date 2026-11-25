@@ -195,7 +195,9 @@ export function mergeProjects(projects: ProjectInfo[], summaries: AgentSummary[]
 }
 
 function compareInstances(left: AgentInstance, right: AgentInstance): number {
+  // 与 PC 的 AgentView 一致：运行中的实例在前，停止/异常在后，同组内按实例名排序。
   return (
+    Number(!isInstanceRunning(left)) - Number(!isInstanceRunning(right)) ||
     (left.id || '').localeCompare(right.id || '', 'zh-CN', { numeric: true, sensitivity: 'base' }) ||
     (left.pid ?? 0) - (right.pid ?? 0)
   )
