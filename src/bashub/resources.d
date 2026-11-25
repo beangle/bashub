@@ -186,6 +186,20 @@ Registry hubRegistry() {
       [ManyRelation("targets", "servers", "bas.cfg_webapps_targets", "webapp_id", "server_id"),
        ManyRelation("endpoints", "endpoints", "bas.cfg_webapps_endpoints", "webapp_id", "endpoint_id")]),
     Resource(
+      "external-routes", "externalRoutes", "bas.cfg_external_routes", "id",
+      [
+        Column("path", "path", Kind.text),
+        Column("target", "target", Kind.text),
+        Column("description", "description", Kind.text),
+        Column("enabled", "enabled", Kind.boolean),
+      ],
+      [
+        Relation("project", "project_id", "projects"),
+        Relation("endpoint", "endpoint_id", "endpoints"),
+      ],
+      [],
+      "path"),
+    Resource(
       "platform-features", "platformFeatures", "bas.cfg_platform_features", "id",
       [
         Column("name", "name", Kind.text),
@@ -319,6 +333,8 @@ private string[] requiredOf(string path) {
     return ["title", "artifactId", "groupId", "packaging", "latestVersion"];
   case "webapps":
     return ["artifact", "project", "version"];
+  case "external-routes":
+    return ["path", "target"];
   case "platform-features":
     return ["name", "version", "logo"];
   case "apps":
@@ -345,6 +361,8 @@ private string aliasOf(string path) {
   switch (path) {
   case "platform-features":
     return "platformFeature";
+  case "external-routes":
+    return "externalRoute";
   case "platform-feature-scripts":
     return "platformFeatureScript";
   case "app-groups":

@@ -28,6 +28,7 @@ struct ProjectData {
   Json[] hosts;
   Json[] endpoints;
   Json[] webapps;
+  Json[] externalRoutes;
   Json[] servers;
   Json[] engines;
   Json[] artifacts;
@@ -52,6 +53,7 @@ ProjectData loadProjectData(Store store, Registry reg, const ProjectContext cont
     if (!hasAttribute(webapp, "enabled") || attributeBool(webapp, "enabled"))
       webapps ~= webapp;
   data.webapps = webapps;
+  data.externalRoutes = loadAll(store, reg.find("external-routes"), ["project": context.id]);
 
   auto engineIds = referencedIds(data.farms, "engine", false);
   auto serverIds = referencedIds(data.farms, "servers", true);

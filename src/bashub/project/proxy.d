@@ -53,6 +53,12 @@ struct ProxyWebapp {
   ProxyServer[] servers;
 }
 
+/// 不经过 webapp/受管 server 的外部系统路由。
+struct ExternalRoute {
+  string path;
+  string backend;
+}
+
 /// 一个 upstream / backend。
 struct ProxyBackend {
   string name;
@@ -73,6 +79,7 @@ struct ProxyModel {
   /// HAProxy 路由 map 的部署路径。
   string routeMap;
   ProxyWebapp[] webapps;
+  ExternalRoute[] externalRoutes;
   ProxyBackend[] backends;
   string[string] backendByWebapp;
   /// 每个 endpoint 都追加同一份 micdn 代理，路径来自 Project 的 micdn 配置。
@@ -262,6 +269,31 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   if (wanted.length && endpointId.length == 0)
     throw new Exception("unknown endpoint " ~ wanted);
 
+  foreach (route; data.externalRoutes) {
+    if (hasAttribute(route, "enabled") && !attributeBool(route, "enabled"))
+      continue;
+    if (endpointId.length && relationshipId(route, "endpoint") != endpointId)
+      continue;
+    auto path = attributeText(route, "path").strip;
+    if (!path.startsWith("/"))
+      path = "/" ~ path;
+    if (path.length < 2)
+      throw new Exception("external route path must not be root");
+    string host;
+    long port;
+    if (!parseExternalTarget(attributeText(route, "target"), host, port))
+      throw new Exception("invalid external route target: " ~ attributeText(route, "target"));
+    auto id = jsonText(route["id"]);
+    ProxyBackend backend;
+    backend.name = "ext_" ~ id;
+    backend.servers ~= ProxyServer("", "external", "", "", host, "", port);
+    model.backends ~= backend;
+    ExternalRoute item;
+    item.path = path;
+    item.backend = backend.name;
+    model.externalRoutes ~= item;
+  }
+
   auto apps = data.webapps.dup;
   sort!((a, b) => attributeText(a, "contextPath") < attributeText(b, "contextPath"))(apps);
 
@@ -343,6 +375,35 @@ ProxyModel buildProxyModel(ProjectData data, string endpointName = "") {
   return model;
 }
 
+/// 解析 external route 的 host:port；IPv6 使用 [addr]:port。
+private bool parseExternalTarget(string raw, out string host, out long port) {
+  auto value = raw.strip;
+  if (value.length == 0)
+    return false;
+  string hostPart, portPart;
+  if (value.startsWith("[")) {
+    auto close = value.indexOf("]");
+    if (close <= 1 || close + 2 > value.length || value[close + 1] != ':')
+      return false;
+    hostPart = value[1 .. close];
+    portPart = value[close + 2 .. $];
+  } else {
+    auto colon = value.lastIndexOf(":");
+    if (colon <= 0 || colon + 1 >= value.length)
+      return false;
+    hostPart = value[0 .. colon];
+    portPart = value[colon + 1 .. $];
+  }
+  host = hostPart.strip;
+  if (host.length == 0 || host.canFind("/") || host.canFind("://"))
+    return false;
+  try
+    port = cast(long) portPart.to!ushort;
+  catch (Exception)
+    return false;
+  return port > 0;
+}
+
 private ProxyServer[] targetServers(Json webapp, const ProjectData data) {
   ProxyServer[] servers;
   bool[string] seen;
@@ -411,6 +472,7 @@ private ServerGroup* findServerGroup(ref FarmGroup farm, string key) {
 private struct ProxyRoute {
   string path;
   string backend;
+  int priority;
 }
 
 /// 所有代理路径按“最长前缀优先”排序：HAProxy 的 use_backend 是首个匹配生效，
@@ -422,8 +484,16 @@ private ProxyRoute[] proxyRoutes(ProxyModel model) {
       ProxyRoute route;
       route.path = path;
       route.backend = "micdn";
+      route.priority = 2;
       routes ~= route;
     }
+  foreach (external; model.externalRoutes) {
+    ProxyRoute route;
+    route.path = external.path;
+    route.backend = external.backend;
+    route.priority = 0;
+    routes ~= route;
+  }
   foreach (webapp; model.webapps) {
     auto backend = model.backendByWebapp.get(webapp.id, "");
     if (backend.length == 0)
@@ -432,11 +502,13 @@ private ProxyRoute[] proxyRoutes(ProxyModel model) {
       ProxyRoute route;
       route.path = path;
       route.backend = backend;
+      route.priority = 1;
       routes ~= route;
     }
   }
   sort!((a, b) => a.path.length != b.path.length
-      ? a.path.length > b.path.length : a.path < b.path)(routes);
+      ? a.path.length > b.path.length
+      : (a.priority != b.priority ? a.priority < b.priority : a.path < b.path))(routes);
   return routes;
 }
 

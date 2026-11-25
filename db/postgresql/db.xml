@@ -251,6 +251,23 @@
             <index name="idx_j2s4cn47mq1a9qjtl9h44lo93" columns="farm_id"/>
           </indexes>
         </table>
+        <table name="cfg_external_routes" comment="外部系统代理路由：path -> host:port">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="主键"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project?ID"/>
+            <column name="endpoint_id" type="bigint" nullable="false" comment="Endpoint?ID"/>
+            <column name="path" type="varchar(255)" nullable="false" comment="路径前缀"/>
+            <column name="target" type="varchar(255)" nullable="false" comment="host:port；支持 [IPv6]:port"/>
+            <column name="description" type="varchar(255)" comment="说明"/>
+            <column name="enabled" type="boolean" nullable="false" defaultValue="true" comment="是否启用"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_cfg_external_routes" columns="id"/>
+            <unique-key name="uk_cfg_external_routes_path" columns="endpoint_id,path"/>
+            <foreign-key name="fk_cfg_external_routes_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
+            <foreign-key name="fk_cfg_external_routes_endpoint" column="endpoint_id" referenced-table="bas.cfg_endpoints" referenced-column="id"/>
+          </constraints>
+        </table>
         <table name="cfg_webapps" comment="Webapp?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>

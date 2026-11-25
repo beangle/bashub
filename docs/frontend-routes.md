@@ -89,6 +89,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 
 | 前端路由 | 页面 | 后端 API |
 |---|---|---|
+| `/config/projects/:id/external-routes` | 外部路由，`ExternalRoutesView` | 从代理详情进入；`GET/POST/PATCH/DELETE /api/bashub/config/external-routes` |
 | `/config/projects/:id` | 配置详情，`ProjectDetailView` | `GET /api/bashub/config/projects/{id}?include=org`<br>`GET /api/bashub/config/farms/search?filter[farm.project.id]={id}&include=engine`<br>`GET /api/bashub/config/hosts/search?filter[host.project.id]={id}`<br>`GET /api/bashub/config/webapps/search?filter[webapp.project.id]={id}&include=artifact`<br>`GET /api/bashub/config/servers/search?filter[server.farm.id]={farmIds}&include=farm,host`<br>`GET /api/bashub/monitor/agents/status`<br>`GET /api/bashub/config/projects/{id}/proxy`<br>`POST /api/bashub/config/projects/{id}/proxy/apply`<br>`POST /api/bashub/micdn/projects/{id}/reload`<br>`GET /api/bashub/config/projects/{id}/server`<br>`GET /api/bashub/config/projects/{id}/certificate`<br>`PATCH /api/bashub/config/projects/{id}/certificate`<br>`GET /api/bashub/micdn/projects/{id}` |
 | `/micdn/projects/:id` | Micdn 配置，`MicdnProjectView` | `GET /api/bashub/micdn/projects/{id}`<br>`PATCH /api/bashub/micdn/projects/{id}`<br>`GET /api/bashub/micdn/projects/{id}/micdn.xml` |
 | `/micdn/components` | Micdn 组件目录，`CdnComponentsView` | `GET /api/bashub/micdn/components`<br>`POST /api/bashub/micdn/components`<br>`PATCH /api/bashub/micdn/components/{id}`<br>`DELETE /api/bashub/micdn/components/{id}` |

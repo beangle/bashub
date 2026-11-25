@@ -8,6 +8,7 @@
 - **JSON 多行字段提交修复**：引擎的监听器/依赖 Jar、应用部署的对外路径按 JSON 数组提交，避免后端 JSON 列校验失败。
 - **项目总览排序**：按组织名称分组，同组织内按 `qualifiedName` 排序。
 - **全局 Project 上下文**：顶部栏增加 Project 选择器，所有以 Project 为工作域的页面共用同一个当前 Project；切换功能后仍保持同一选择。
+- **外部路由**：新增 `/config/projects/{id}/external-routes`（不占菜单，从代理详情进入），按 `path -> host:port` 把外部系统接入 HAProxy map / Nginx location；支持启用/停用。
 - **HAProxy 路由 map 预览**：Project 详情的代理页在 HAProxy 类型下增加 `bas-routes.map` 只读预览和复制，内容与代理 bundle 一致。
 - **应用部署临时下线**：新增 `cfg_webapps.enabled`（默认 true，界面名「启用」）；关闭后保留配置和端口，但不再生成 server.xml/代理路由，也不参与告警和统计。新增迁移 `20261124-02-webapp-enabled.sql`。
 - **应用部署自动带入代理点**：选择组件并自动填入上下文后，如果当前 Project 只有一个代理点则自动选中；有多个代理点时留空，要求用户明确选择。

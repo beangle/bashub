@@ -84,6 +84,14 @@ comment on column bas.cfg_servers.proxy_options is 'proxyOptions?';
 comment on column bas.cfg_webapps.artifact_id is 'Artifact?ID';
 comment on column bas.cfg_webapps.context_path is 'contextPath? 可空：空表示后台任务，不生成代理路由';
 comment on column bas.cfg_webapps.enabled is '是否启用；false 表示临时下线，保留配置但不运行、不参与告警和统计';
+comment on table bas.cfg_external_routes is '外部系统代理路由：path -> host:port';
+comment on column bas.cfg_external_routes.project_id is 'Project?ID';
+comment on column bas.cfg_external_routes.endpoint_id is 'Endpoint?ID';
+comment on column bas.cfg_external_routes.path is '路径前缀';
+comment on column bas.cfg_external_routes.target is 'host:port；支持 [IPv6]:port';
+comment on column bas.cfg_external_routes.description is '说明';
+comment on column bas.cfg_external_routes.enabled is '是否启用；false 不生成代理路由';
+
 comment on column bas.cfg_webapps.id is '非业务主键:datetime';
 comment on column bas.cfg_webapps.libs is 'libs?';
 comment on column bas.cfg_webapps.project_id is 'Project?ID';

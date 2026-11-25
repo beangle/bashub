@@ -50,6 +50,11 @@ const detailRoutes = [
     meta: { title: '编辑' },
   },
   {
+    path: '/config/projects/:id/external-routes',
+    component: () => import('@/views/ExternalRoutesView.vue'),
+    meta: { title: '外部路由' },
+  },
+  {
     path: '/config/projects/:id',
     component: () => import('@/views/ProjectDetailView.vue'),
     meta: { title: '配置详情' },

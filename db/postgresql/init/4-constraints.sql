@@ -4,6 +4,10 @@ alter table bas.cfg_farms add constraint fk_emp368rqvkf0kwugk8calggkq foreign ke
 alter table bas.cfg_farms add constraint fk_o5hjxilgy98qkpctvs832b9ua foreign key (engine_id) references bas.cfg_engines (id);
 alter table bas.cfg_hosts add constraint fk_ink15ixrk8phkxswi12nq21am foreign key (platform_id) references bas.cfg_platforms (id);
 alter table bas.cfg_hosts add constraint fk_jc0d7xlflxli8uc7j0r0xp9jo foreign key (project_id) references bas.cfg_projects (id);
+alter table bas.cfg_external_routes add constraint pk_cfg_external_routes primary key (id);
+alter table bas.cfg_external_routes add constraint uk_cfg_external_routes_path unique (endpoint_id, path);
+alter table bas.cfg_external_routes add constraint fk_cfg_external_routes_project foreign key (project_id) references bas.cfg_projects (id);
+alter table bas.cfg_external_routes add constraint fk_cfg_external_routes_endpoint foreign key (endpoint_id) references bas.cfg_endpoints (id);
 alter table bas.cfg_platform_feature_scripts add constraint fk_jog57ijvhnujc2n1vb889cx8c foreign key (feature_id) references bas.cfg_platform_features (id);
 alter table bas.cfg_platform_feature_scripts add constraint fk_tn5avaugjeejhifxstb9ro16h foreign key (platform_id) references bas.cfg_platforms (id);
 alter table bas.cfg_project_micdn add constraint fk_cfg_project_micdn_project foreign key (project_id) references bas.cfg_projects (id);

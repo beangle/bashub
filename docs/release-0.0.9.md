@@ -145,6 +145,10 @@ Project 详情的「概览」、各详情卡片的标题与说明，以及 Micdn
 
 应用部署填写上下文后必须选择代理点；选择代理点后必须填写上下文。列表不再显示代理点、解压执行两列。
 
+### 外部路由
+
+Project 代理详情增加外部路由入口，页面为独立路由 `/config/projects/{id}/external-routes`，不占菜单。每条路由配置 `path -> host:port`，可启用/停用；启用的路由进入 HAProxy map 和 Nginx location。
+
 ### HAProxy 路由 map 预览
 
 Project 详情的代理页在 HAProxy 类型下增加 `bas-routes.map` 只读预览和复制。后端新增管理台接口 `GET /api/bashub/config/projects/{id}/proxy-map`。
