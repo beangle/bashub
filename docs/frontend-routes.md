@@ -73,7 +73,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 | `/config/engines` | 引擎管理，`engines` | `/api/bashub/config/engines` | — |
 | `/config/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 批量刷新版本：`POST /api/bashub/config/artifacts/update-version` |
 | `/config/artifacts/:id` | 组件详情，`ArtifactDetailView` | `GET /api/bashub/config/artifacts/{id}`、`GET /api/bashub/config/artifacts/{id}/webapps?include=project` |
-| `/config/webapps` | 应用部署，`webapps` | `/api/bashub/config/webapps` | 批量升级：`POST /api/bashub/config/webapps/upgrade` |
+| `/config/webapps` | 应用部署，`webapps` | `/api/bashub/config/webapps` | 批量升级：`POST /api/bashub/config/webapps/upgrade`；单条版本编辑：版本单元格或「编辑版本」，候选版本见 `GET /api/bashub/config/artifacts/{id}/versions` |
 | `/ems/app-config?tab=apps` | 应用管理，`apps` | `/api/bashub/ems/apps` | — |
 | `/ems/app-config?tab=channels` | 应用端，`channels` | `/api/bashub/ems/channels` | — |
 | `/ems/app-config?tab=app-groups` | 应用分组，`app-groups` | `/api/bashub/ems/app-groups` | — |
@@ -104,7 +104,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 主机详情页的脚本下载使用机器端点，不在 `/config/hosts` 资源下；这里的 `{project}` 是配置的
 `qualifiedName`，`{hostIp}` 是该主机的 IP。
 
-### 手机端监控台（独立 SPA）
+### 手机端监控台与管理系统（独立 SPA）
 
 手机端是 `packages/mobile` 里的独立 SPA，与 `packages/web` 平级，部署在 `/m/bashub/`
 （`VITE_APP_BASE`）。它有自己的 `index.html`、router、构建产物与部署目录，不挂在 PC 路由下；
@@ -117,12 +117,21 @@ PC 路由、PC 页面和 PC 的全局项目选择器保持不变。选定项目�
 | `/m/bashub/projects/:project` | 项目概览，`MobileOverviewView` | `GET /api/bashub/monitor/agents/summary`<br>`GET /api/bashub/monitor/agents/status` |
 | `/m/bashub/projects/:project/nodes` | 项目节点，`MobileNodesView` | `GET /api/bashub/monitor/agents/status`<br>`POST /api/bashub/monitor/agents/{project}/report[?agent=<ip>]`<br>`GET /api/bashub/monitor/agents/{project}/agent-log[?agent=<ip>]` |
 | `/m/bashub/projects/:project/instances/:instance` | 实例详情，`MobileInstanceView` | `GET /api/bashub/monitor/agents/{project}/history?days=30\|180`<br>`GET /api/bashub/monitor/agents/{project}/log?instance=...[&agent=<ip>]`<br>SSE：`GET /api/bashub/monitor/agents/{project}/log/follow?instance=...&tail=...[&agent=<ip>]`<br>`POST /api/bashub/monitor/agents/{project}/service/{action}[?agent=<ip>]`，`action` 为 `start` / `stop` / `restart` |
+| `/m/bashub/manage` | 管理首页：按项目汇总待升级应用与到期证书，`MobileManageView` | `GET /api/bashub/config/webapps/search?include=artifact`（逐页取全量）<br>`GET /api/bashub/config/endpoints/search`<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:post,/config/artifacts:post`<br>`POST /api/bashub/config/artifacts/update-version` |
+| `/m/bashub/manage/projects/:project` | 项目管理：应用部署升级与证书现状，`MobileManageProjectView` | `GET /api/bashub/config/webapps/search?include=artifact`<br>`GET /api/bashub/config/endpoints/search`<br>`POST /api/bashub/config/webapps/upgrade`（`{"ids":[...]}`）<br>`PATCH /api/bashub/config/webapps/{id}`（只提交 `{"data":{"type":"webapps","id":...,"attributes":{"version":"..."}}}`，用于指定版本）<br>`GET /api/bashub/config/artifacts/{id}/versions`（编辑版本时的候选，取不到 metadata 返回空列表）<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:post,/config/webapps:patch` |
 | `/m/bashub/me` | 当前用户、登录/退出，`MobileMeView` | `GET /api/bashub/ems/sessions`<br>`POST /api/bashub/ems/sessions/logout`（由现有 auth 封装） |
 
 `{project}` 是配置的 `qualifiedName`。同一 project 有多台在线节点时，实例日志、agent 日志、立即上报和
 启停都必须带 `?agent=<ip>`（`ip` 来自 `/agents/status`）；实例页缺少 agent 且存在多台节点时先让用户
-选择，不调用会返回 409 的歧义接口。项目历史按 project 查询，不带 agent。手机端不新增后端接口，
-也不新增 token 存储；写操作权限仍由后端 `/monitor/agents` 私有资源或显式权限串判定。
+选择，不调用会返回 409 的歧义接口。项目历史按 project 查询，不带 agent，也不新增 token 存储。
+监控类写操作权限仍由后端 `/monitor/agents` 私有资源或显式权限串判定。
+
+「管理」只用既有端点，另加一个只读能力查询 `GET /api/bashub/ems/authorizations?checks=resource:action,...`
+（一次最多 20 项，返回每项 `allowed`）。它复用路由 guard 的同一份 `authorize`，所以「界面显示可做」
+与「后端实际放行」不会分叉；未登记的资源仍是「登录即可」，与 `unknownIsProtected` 一致。管理页据此
+隐藏无权动作，不做前端角色推断。手机端不展示 Project key、证书私钥，也不提供删除、reset-key、
+bundle 下载与跨项目批量。升级与「指定版本」都只改 `cfg_webapps.version` 一个字段（`PATCH` 只提交 `version`），只更新配置并通知在线节点重新拉取，不触发重启（重启实例后才生效），也不做部署承诺；
+版本是自由文本，不校验仓库里是否存在（与 PC 表单一致）。
 
 服务器需要把 `/m/bashub/` 指向 `packages/mobile/dist`，并对 `/m/bashub/*` 做 history fallback
 到该目录的 `index.html`；`/api` 仍反代到同一个 D 后端，CAS 会话 cookie 同源共用，CAS 的 service
@@ -165,6 +174,7 @@ EMS 自身资源使用 `ems` 域：
 |---|---|---|
 | `POST /api/bashub/config/artifacts/update-version` | `/config/artifacts` | Body 为 `{"ids":[...]}`，从 Maven Central 刷新所选组件的最新版本 |
 | `POST /api/bashub/config/webapps/upgrade` | `/config/webapps` | Body 为 `{"ids":[...]}`，把所选应用版本提升到组件的 `latestVersion` |
+| `GET /api/bashub/config/artifacts/{id}/versions` | `/config/webapps` | 返回 `{"latest":"...","versions":[...]}`，供「编辑版本」列出组件已发布版本；取不到 metadata 时为空列表，仍可手输任意版本 |
 | `GET /api/bashub/config/hosts/{id}/webapps?include=artifact` | `/config/hosts/:id` | 查询部署到该主机上的应用；主机详情同时展示该主机的 setline listen 与 admin 端口 |
 | `GET /api/bashub/ems/menus/export?app={appId}` | `/ems/menu-config?tab=menus` | 返回 `{"xml":"..."}` |
 | `POST /api/bashub/ems/menus/import` | `/ems/menu-config?tab=menus` | `multipart/form-data`，字段 `app` + `menufile` |

@@ -1,7 +1,7 @@
 <template>
   <div class="mobile-shell">
     <header class="mobile-shell__header">
-      <router-link v-if="project" class="mobile-shell__context" to="/">
+      <router-link v-if="project" class="mobile-shell__context" :to="contextTarget">
         <img
           v-if="projectLogo && !logoFailed"
           class="mobile-shell__context-logo"
@@ -51,6 +51,10 @@
         <template #icon><ChartIcon /></template>
         监控
       </t-tab-bar-item>
+      <t-tab-bar-item value="manage">
+        <template #icon><SettingIcon /></template>
+        管理
+      </t-tab-bar-item>
       <t-tab-bar-item value="me">
         <template #icon><UserIcon /></template>
         我的
@@ -62,7 +66,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChartIcon, UserIcon } from 'tdesign-icons-vue-next'
+import { ChartIcon, SettingIcon, UserIcon } from 'tdesign-icons-vue-next'
 import { canInstall, installApp, isStandalone } from '@/pwa'
 import { auth } from '@/auth'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
@@ -90,12 +94,19 @@ const projectSubtitle = computed(() => {
   return parts.filter((part) => part.length > 0).join(' · ')
 })
 
-const activeTab = computed(() => (route.path.startsWith('/me') ? 'me' : 'monitor'))
+/** 三个标签各占一个路由前缀；管理页的项目上下文仍要回管理列表，不回监控首页。 */
+const activeTab = computed(() => {
+  if (route.path.startsWith('/manage')) return 'manage'
+  return route.path.startsWith('/me') ? 'me' : 'monitor'
+})
+
+const contextTarget = computed(() => (route.path.startsWith('/manage') ? '/manage' : '/'))
 
 function onTabChange(payload: string | number | { value: string | number }): void {
   // TDesign Mobile 的 onChange 实际回调是值本身（d.ts 写的是 {value}），两种都兼容。
   const value = String(typeof payload === 'object' ? payload.value : payload)
   if (value === 'me') void router.push('/me')
+  else if (value === 'manage') void router.push('/manage')
   else if (value === 'monitor') void router.push('/')
 }
 

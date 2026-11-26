@@ -28,6 +28,16 @@ const router = createRouter({
       component: () => import('@/views/MobileInstanceView.vue'),
       meta: { title: '实例详情' },
     },
+    {
+      path: '/manage',
+      component: () => import('@/views/MobileManageView.vue'),
+      meta: { title: '管理' },
+    },
+    {
+      path: '/manage/projects/:project',
+      component: () => import('@/views/MobileManageProjectView.vue'),
+      meta: { title: '项目管理' },
+    },
     { path: '/me', component: () => import('@/views/MobileMeView.vue'), meta: { title: '我的' } },
   ],
 })
