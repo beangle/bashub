@@ -167,18 +167,12 @@ export function summarizeProjects(
   return pending
 }
 
-/** 有事项的项目排前面，其次按 `qualifiedName` 固定顺序。 */
-export function sortProjectsByPending(
-  projects: ProjectInfo[],
-  pending: Record<string, ProjectPending>,
-): ProjectInfo[] {
-  const score = (project: ProjectInfo): number => {
-    const entry = pending[project.id]
-    return entry ? entry.upgrades + entry.expiring : 0
-  }
+/** 与监控首页同一套顺序：先按机构名、再按 project 的 `qualifiedName`（zh-CN），项目不随待办数量跳动。 */
+export function sortProjects(projects: ProjectInfo[]): ProjectInfo[] {
   return [...projects].sort(
     (left, right) =>
-      score(right) - score(left) || left.qualifiedName.localeCompare(right.qualifiedName, 'zh-CN'),
+      left.orgName.localeCompare(right.orgName, 'zh-CN') ||
+      left.qualifiedName.localeCompare(right.qualifiedName, 'zh-CN'),
   )
 }
 

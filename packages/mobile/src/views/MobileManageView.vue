@@ -61,41 +61,21 @@
       </button>
     </div>
 
-    <section class="mobile-card">
-      <header class="mobile-card__head">
-        <h3 class="mobile-card__title">组件版本</h3>
-      </header>
-      <p class="mobile-hint">从仓库刷新所有组件的最新版本，应用部署升级时按它比较。</p>
-      <div class="mobile-actions">
-        <t-button
-          v-if="canRefresh"
-          size="small"
-          theme="primary"
-          :loading="refreshing"
-          :disabled="refreshing"
-          @click="confirmRefresh"
-        >
-          刷新最新版本
-        </t-button>
-        <p v-else class="mobile-hint">{{ capabilityHint }}</p>
-      </div>
-    </section>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { DialogPlugin } from 'tdesign-mobile-vue'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
-import { MANAGE_CHECKS, loadManageCatalog, readCapabilities, refreshArtifactVersions } from '@/api/manage'
+import { loadManageCatalog } from '@/api/manage'
 import type { ResourcePage } from '@/api/resource'
 import { errorText, initials, type ProjectInfo } from '@/monitor-model'
 import {
   buildApps,
   buildCerts,
-  sortProjectsByPending,
+  sortProjects,
   summarizeProjects,
   totalPending,
   type ProjectPending,
@@ -108,11 +88,8 @@ const webapps = ref<ResourcePage['rows']>([])
 const included = ref<ResourcePage['included']>([])
 const endpoints = ref<ResourcePage['rows']>([])
 const loading = ref(false)
-const refreshing = ref(false)
 const error = ref('')
 const message = ref('')
-const capabilities = ref<Record<string, boolean>>({})
-const capabilityError = ref(false)
 const failedLogos = reactive<Record<string, boolean>>({})
 
 const busy = computed(() => loading.value || catalog.loading.value)
@@ -121,12 +98,7 @@ const apps = computed(() => buildApps(webapps.value, included.value))
 const certs = computed(() => buildCerts(endpoints.value))
 const pending = computed(() => summarizeProjects(catalog.projects.value, apps.value, certs.value))
 const total = computed(() => totalPending(pending.value))
-const projects = computed(() => sortProjectsByPending(catalog.projects.value, pending.value))
-
-const canRefresh = computed(() => capabilities.value[MANAGE_CHECKS.artifacts] === true)
-const capabilityHint = computed(() =>
-  capabilityError.value ? '无法确认变更权限，已隐藏写操作。' : '当前账户无变更权限，仅展示现状。',
-)
+const projects = computed(() => sortProjects(catalog.projects.value))
 
 function pendingOf(projectId: string): ProjectPending {
   return pending.value[projectId] ?? { apps: 0, upgrades: 0, certificates: 0, expiring: 0 }
@@ -145,23 +117,10 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const [data, caps] = await Promise.all([
-      loadManageCatalog(),
-      readCapabilities([MANAGE_CHECKS.deploy, MANAGE_CHECKS.artifacts]).then(
-        (value) => ({ ok: true as const, value }),
-        (reason: unknown) => ({ ok: false as const, reason }),
-      ),
-    ])
+    const data = await loadManageCatalog()
     webapps.value = data.webapps
     included.value = data.included
     endpoints.value = data.endpoints
-    if (caps.ok) {
-      capabilities.value = caps.value
-      capabilityError.value = false
-    } else {
-      capabilities.value = {}
-      capabilityError.value = true
-    }
   } catch (reason) {
     error.value = `管理数据加载失败：${errorText(reason)}`
   } finally {
@@ -172,35 +131,6 @@ async function load(): Promise<void> {
 async function reload(): Promise<void> {
   message.value = ''
   await Promise.all([catalog.load(true), load()])
-}
-
-function confirmRefresh(): void {
-  if (!canRefresh.value || refreshing.value) return
-  const dialog = DialogPlugin.confirm({
-    title: '刷新组件最新版本',
-    content: '将从仓库读取所有组件的最新版本；只更新版本信息，不改任何应用部署。',
-    confirmBtn: '确定',
-    cancelBtn: '取消',
-    onConfirm: () => {
-      dialog.destroy()
-      void runRefresh()
-    },
-  })
-}
-
-async function runRefresh(): Promise<void> {
-  refreshing.value = true
-  error.value = ''
-  message.value = ''
-  try {
-    await refreshArtifactVersions()
-    message.value = '组件最新版本已刷新。'
-    await load()
-  } catch (reason) {
-    error.value = `刷新失败：${errorText(reason)}`
-  } finally {
-    refreshing.value = false
-  }
 }
 
 onMounted(() => {
