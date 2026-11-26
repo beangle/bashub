@@ -1049,6 +1049,8 @@ async function loadEndpointCertificate() {
 function openCertificateEditor() {
   certificateDraft.value = certificateText.value
   privateKeyDraft.value = ''
+  // 必须预填：以前这里没初始化，保存时会把「证书过期时间」当成空串提交。
+  certificateNotAfterDraft.value = certificateNotAfter.value
   certificateError.value = ''
   certificateVisible.value = true
 }
