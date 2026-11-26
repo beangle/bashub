@@ -98,7 +98,7 @@
             <span v-if="item.alerts.length > 3" class="health-card__more">+{{ item.alerts.length - 3 }} 项</span>
           </div>
           <div v-else class="health-card__calm">
-            运行平稳 · 内存 {{ item.memoryPercent === undefined ? '未上报' : `${item.memoryPercent}%` }} · CPU {{ item.cpuText }}
+            运行平稳<template v-if="item.diskPercent !== undefined"> · 磁盘 {{ item.diskPercent }}%</template>
           </div>
 
           <footer class="health-card__foot">
@@ -110,6 +110,11 @@
       </div>
       <p v-if="!loading && projects.length === 0" class="health-empty">暂无 Project。</p>
     </t-loading>
+
+    <div class="health-notes">
+      <strong>指标说明</strong>
+      <p>数据来自 Agent 最近一次上报，页面每 30 秒刷新。磁盘使用率 ≥80% 为警告、≥90% 为严重；内存使用率 ≥90% 为警告；实例未启动为警告、实例异常为严重；证书 30 天内到期为警告、已过期为严重；无在线节点为警告。</p>
+    </div>
   </section>
 </template>
 
@@ -145,6 +150,7 @@ interface ProjectHealth {
   instanceTotal: number
   running: number
   memoryPercent?: number
+  diskPercent?: number
   cpuText: string
   alerts: HealthAlert[]
 }
@@ -188,6 +194,7 @@ function memoryUsage(agent: AgentStatus): number | undefined {
 
 function diskUsage(agent: AgentStatus): number | undefined {
   const values = (agent.os?.disk ?? [])
+    .filter((disk) => disk.mount !== '/boot' && !disk.mount?.startsWith('/boot/'))
     .filter((disk): disk is { total: number; available: number } => typeof disk.total === 'number' && typeof disk.available === 'number' && disk.total > 0)
     .map((disk) => (disk.total - disk.available) / disk.total)
   return values.length ? Math.round(Math.max(...values) * 100) : undefined
@@ -274,6 +281,7 @@ function buildProject(project: ResourceRow, agents: AgentStatus[], endpoints: Re
     instanceTotal: stats.total,
     running: stats.running,
     memoryPercent: maxMemory,
+    diskPercent: maxDisk,
     cpuText: cpu.length ? `${Math.max(...cpu).toFixed(1)}` : '—',
     alerts,
   }
@@ -580,6 +588,25 @@ onBeforeUnmount(() => {
   padding: 48px;
   color: var(--td-text-color-placeholder);
   text-align: center;
+}
+
+.health-notes {
+  margin: 0 12px 24px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--td-component-stroke);
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.health-notes strong {
+  color: var(--td-text-color-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.health-notes p {
+  margin: 3px 0 0;
 }
 
 @media (max-width: 900px) {

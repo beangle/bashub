@@ -165,7 +165,7 @@ final class AgentSession {
     case "report:health":
       health = parseHealth(message.body, healthKnown);
       if (healthKnown)
-        healthAt = channel.now();
+        healthAt = message.at.length > 0 ? message.at : channel.now();
       // health 也带轻量 cpu/mem 动态指标；保留 os/disk 静态信息，只刷新这两项。
       if (message.body.type == Json.Type.object) {
         if (osReport.type != Json.Type.object)

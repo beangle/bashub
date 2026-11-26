@@ -265,11 +265,17 @@
                   </div>
                   <div class="agent-conn-row">
                     <dt>磁盘</dt>
-                    <dd>{{ diskCountText(agent) }}</dd>
+                    <dd class="agent-conn-disk">
+                      <span v-for="disk in diskEntries(agent)" :key="disk.mount">
+                        {{ disk.mount }} {{ diskCapacityText(disk) }}
+                      </span>
+                      <span v-if="diskEntries(agent).length === 0">详情未加载</span>
+                    </dd>
                   </div>
                 </dl>
-                <div v-if="agent.supports?.includes('agent:log')" class="agent-conn-actions">
-                  <t-button size="small" variant="outline" @click="openAgentLog(agent)">Agent 日志</t-button>
+                <div class="agent-conn-actions">
+                  <t-button v-if="agent.supports?.includes('agent:log')" size="small" variant="outline" @click="openAgentLog(agent)">Agent 日志</t-button>
+                  <span class="agent-capture" :title="stateCaptureTitle(agent)">状态抓取 {{ stateCaptureText(agent) }}</span>
                 </div>
               </aside>
             </div>
@@ -1266,6 +1272,23 @@ function osText(agent: AgentStatus): string {
   return [os.name, os.kernel].filter(Boolean).join(' · ') || '系统信息未上报'
 }
 
+/** 实例状态来自 health；服务动作后的即时快照来自 bas，二者按最新来源显示。 */
+function stateCaptureTime(agent: AgentStatus): string {
+  return agent.healthAt || agent.basAt || ''
+}
+
+function stateCaptureText(agent: AgentStatus): string {
+  const value = stateCaptureTime(agent)
+  return value ? heartbeatText(value) : '暂无上报'
+}
+
+function stateCaptureTitle(agent: AgentStatus): string {
+  const value = stateCaptureTime(agent)
+  if (!value) return '还没有收到 health 或 bas 状态上报'
+  const source = agent.healthAt ? 'health' : 'bas'
+  return `${source} · ${value}`
+}
+
 /** 心跳时间：近期显示相对时间，较早时退回绝对时间。 */
 function heartbeatText(value?: string): string {
   if (!value) return '-'
@@ -1302,17 +1325,25 @@ function memoryText(agent: AgentStatus): string {
   return `${formatBytes(used)} / ${formatBytes(mem.total)}`
 }
 
-function diskCountText(agent: AgentStatus): string {
-  const disks = agent.os?.disk ?? []
-  if (disks.length === 0) return '详情未加载'
-  const root = disks.find((disk) => disk.mount === '/') ?? disks[0]
-  return `${disks.length} 个挂载点 · ${diskText(root)}`
+/** 磁盘按同一单位显示「已用/总量」，单位只写在末尾。 */
+function diskCapacityText(disk: AgentDiskInfo): string {
+  if (typeof disk.total !== 'number' || disk.total <= 0) return '—'
+  const useGigabytes = disk.total >= 1024 ** 3
+  const divisor = useGigabytes ? 1024 ** 3 : 1024 ** 2
+  const unit = useGigabytes ? 'GB' : 'MB'
+  const available = typeof disk.available === 'number' ? disk.available : disk.total
+  const used = Math.max(0, disk.total - available)
+  const format = (value: number) => {
+    const amount = value / divisor
+    return amount >= 10 ? amount.toFixed(0) : amount.toFixed(1)
+  }
+  return `${format(used)}/${format(disk.total)} ${unit}`
 }
 
-function diskText(disk: AgentDiskInfo): string {
-  if (typeof disk.total !== 'number') return disk.mount || '不可用'
-  const available = typeof disk.available === 'number' ? `，可用 ${formatBytes(disk.available)}` : ''
-  return `${disk.mount || '-'} ${formatBytes(disk.total)}${available}`
+function diskEntries(agent: AgentStatus): AgentDiskInfo[] {
+  return (agent.os?.disk ?? [])
+    .filter((disk) => disk.mount !== '/boot' && !disk.mount?.startsWith('/boot/'))
+    .sort((a, b) => (a.mount === '/' ? -1 : b.mount === '/' ? 1 : (a.mount || '').localeCompare(b.mount || '')))
 }
 
 function formatBytes(value: number): string {
@@ -1722,9 +1753,28 @@ onBeforeUnmount(() => {
 }
 
 .ip-card__agent .agent-conn-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 0 0;
   border-top: 0;
   background: none;
+}
+
+.agent-capture {
+  margin-left: auto;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.agent-conn-disk {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  white-space: nowrap;
 }
 
 /* BAS_HOME 的值：等宽字体便于辨认路径，过长时省略。 */
