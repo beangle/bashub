@@ -1159,12 +1159,40 @@ body {
   white-space: nowrap;
 }
 
+.mobile-manage-app.is-tappable {
+  cursor: pointer;
+}
+
+.mobile-manage-app.is-tappable:active {
+  background: var(--td-bg-color-container-active);
+}
+
 .mobile-manage-app__side {
   display: flex;
   flex: none;
-  flex-direction: row;
   align-items: center;
   gap: 6px;
+}
+
+.mobile-manage-app__arrow {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--td-warning-color);
+}
+
+.mobile-manage-app__chevron {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-manage-targets__summary {
+  margin: 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .mobile-manage-cert__side {
@@ -1188,36 +1216,6 @@ body {
   font-weight: 400;
 }
 
-.mobile-manage-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
-  border-radius: 12px 12px 0 0;
-  background: var(--td-bg-color-container);
-}
-
-.mobile-manage-editor__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.mobile-manage-editor__title {
-  overflow: hidden;
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-manage-editor__meta {
-  flex: none;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-}
 
 .mobile-manage-editor__versions {
   display: flex;
@@ -1227,6 +1225,29 @@ body {
 }
 
 .mobile-manage-editor__latest {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.mobile-manage-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-manage-actions {
+  justify-content: flex-end;
+  padding: 4px 0 8px;
+}
+
+/* 版本输入框跟随卡片字号（TDesign 默认 16px，比周围 12–14px 的正文大一号）。 */
+.mobile-manage-version .t-input {
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.mobile-manage-version .t-input__label:not(:empty) {
+  margin-right: 8px;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
 }

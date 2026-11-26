@@ -33,29 +33,28 @@
           </t-button>
         </header>
 
-        <p v-if="!canDeploy" class="mobile-hint">{{ capabilityHint }}</p>
         <t-empty v-if="apps.length === 0" description="该项目还没有部署应用。" />
         <div v-else class="mobile-manage-list">
-          <article v-for="app in apps" :key="app.id" class="mobile-manage-app">
+          <article
+            v-for="app in apps"
+            :key="app.id"
+            class="mobile-manage-app is-tappable"
+            role="button"
+            tabindex="0"
+            @click="openApp(app)"
+            @keydown.enter="openApp(app)"
+          >
             <div class="mobile-manage-app__text">
               <p class="mobile-manage-app__title">{{ app.title }}</p>
-              <p class="mobile-manage-app__meta">
-                {{ app.contextPath || '无上下文' }} · 目标 {{ app.targets }} · {{ app.enabled ? '启用' : '已停用' }}
-              </p>
+              <p class="mobile-manage-app__meta">{{ app.contextPath || '无上下文' }}</p>
             </div>
-            <div v-if="app.upgradable || canEdit" class="mobile-manage-app__side">
-              <t-button v-if="canEdit" size="small" variant="text" :disabled="saving" @click="openEditor(app)">
-                编辑
-              </t-button>
-              <t-button
-                v-if="app.upgradable && canDeploy"
-                size="small"
-                variant="outline"
-                :disabled="upgrading"
-                @click="confirmUpgrade(app)"
-              >
-                升级
-              </t-button>
+            <div class="mobile-manage-app__side">
+              <ArrowUpIcon
+                v-if="app.upgradable"
+                class="mobile-manage-app__arrow"
+                title="有可用的新版本"
+              />
+              <ArrowRightIcon class="mobile-manage-app__chevron" />
             </div>
           </article>
         </div>
@@ -89,82 +88,23 @@
         </div>
       </section>
     </template>
-
-    <t-popup v-model:visible="editorOpen" placement="bottom" @visible-change="onEditorVisible">
-      <div class="mobile-manage-editor">
-        <header class="mobile-manage-editor__head">
-          <h3 class="mobile-manage-editor__title">{{ editing?.title }}</h3>
-          <span class="mobile-manage-editor__meta">{{ editing?.contextPath || '无上下文' }}</span>
-        </header>
-        <t-input v-model="editVersion" label="版本" placeholder="例如 1.2.3" clearable />
-        <div class="mobile-manage-editor__versions">
-          <t-button
-            v-if="versionOptions.length > 0"
-            size="small"
-            variant="outline"
-            @click="pickerOpen = true"
-          >
-            从已发布版本选择
-          </t-button>
-          <span v-else-if="versionsLoading" class="mobile-hint">正在读取已发布版本…</span>
-          <span v-else class="mobile-hint">未读取到已发布版本，可直接输入版本号。</span>
-          <span v-if="versionLatest" class="mobile-manage-editor__latest">组件最新 {{ versionLatest }}</span>
-        </div>
-        <p class="mobile-hint">只改配置版本并通知在线节点重新拉取，不会重启实例；重启实例后才生效。</p>
-        <div class="mobile-actions">
-          <t-button size="small" variant="outline" :disabled="saving" @click="closeEditor">取消</t-button>
-          <t-button
-            size="small"
-            theme="primary"
-            :loading="saving"
-            :disabled="saving || editVersion.trim().length === 0"
-            @click="saveVersion"
-          >
-            保存
-          </t-button>
-        </div>
-      </div>
-    </t-popup>
-
-    <t-popup v-model:visible="pickerOpen" placement="bottom">
-      <t-picker
-        :columns="pickerColumns"
-        :model-value="pickerValue"
-        title="选择已发布版本"
-        cancel-btn="取消"
-        confirm-btn="确定"
-        @confirm="onPickVersion"
-        @cancel="pickerOpen = false"
-      />
-    </t-popup>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { DialogPlugin } from 'tdesign-mobile-vue'
+import { ArrowRightIcon, ArrowUpIcon } from 'tdesign-icons-vue-next'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
-import {
-  MANAGE_CHECKS,
-  editWebappVersion,
-  loadManageCatalog,
-  readArtifactVersions,
-  readCapabilities,
-  upgradeWebapps,
-} from '@/api/manage'
+import { MANAGE_CHECKS, loadManageCatalog, readCapabilities, upgradeWebapps } from '@/api/manage'
 import type { ResourcePage } from '@/api/resource'
 import { errorText } from '@/monitor-model'
-import {
-  buildApps,
-  buildCerts,
-  certAlerted,
-  certLabel,
-  type ManageApp,
-} from '@/manage-model'
+import { buildApps, buildCerts, certAlerted, certLabel, type ManageApp } from '@/manage-model'
 
 const route = useRoute()
+const router = useRouter()
 const catalog = useProjectCatalog()
 
 const project = computed(() => String(route.params.project ?? ''))
@@ -179,15 +119,6 @@ const upgrading = ref(false)
 const error = ref('')
 const message = ref('')
 const capabilities = ref<Record<string, boolean>>({})
-const editorOpen = ref(false)
-const editing = ref<ManageApp | null>(null)
-const editVersion = ref('')
-const saving = ref(false)
-const pickerOpen = ref(false)
-const versionOptions = ref<string[]>([])
-const versionLatest = ref('')
-const versionsLoading = ref(false)
-const capabilityError = ref(false)
 
 const busy = computed(() => loading.value || catalog.loading.value)
 const allApps = computed(() => buildApps(webapps.value, included.value))
@@ -203,10 +134,6 @@ const certs = computed(() => {
 const upgradable = computed(() => apps.value.filter((app) => app.upgradable))
 
 const canDeploy = computed(() => capabilities.value[MANAGE_CHECKS.deploy] === true)
-const canEdit = computed(() => capabilities.value[MANAGE_CHECKS.deployEdit] === true)
-const capabilityHint = computed(() =>
-  capabilityError.value ? '无法确认变更权限，已隐藏升级操作。' : '当前账户无变更权限，仅展示现状。',
-)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -222,98 +149,11 @@ async function load(): Promise<void> {
     webapps.value = data.webapps
     included.value = data.included
     endpoints.value = data.endpoints
-    if (caps.ok) {
-      capabilities.value = caps.value
-      capabilityError.value = false
-    } else {
-      capabilities.value = {}
-      capabilityError.value = true
-    }
+    capabilities.value = caps.ok ? caps.value : {}
   } catch (reason) {
     error.value = `管理数据加载失败：${errorText(reason)}`
   } finally {
     loading.value = false
-  }
-}
-
-function openEditor(app: ManageApp): void {
-  if (!canEdit.value || saving.value) return
-  editing.value = app
-  editVersion.value = app.version
-  editorOpen.value = true
-  void loadVersions(app)
-}
-
-/** 读取组件已发布版本；失败只收起候选，不挡手工输入。 */
-async function loadVersions(app: ManageApp): Promise<void> {
-  versionOptions.value = []
-  versionLatest.value = app.latestVersion
-  if (!app.artifactId) return
-  versionsLoading.value = true
-  try {
-    const info = await readArtifactVersions(app.artifactId)
-    versionOptions.value = [...new Set(info.versions.map(String).filter(Boolean))].sort((left, right) =>
-      right.localeCompare(left, undefined, { numeric: true }),
-    )
-    if (info.latest) versionLatest.value = String(info.latest)
-  } catch {
-    versionOptions.value = []
-  } finally {
-    versionsLoading.value = false
-  }
-}
-
-const pickerColumns = computed(() =>
-  versionOptions.value.map((value) => ({
-    label:
-      value === versionLatest.value
-        ? `${value}（最新）`
-        : value === editing.value?.version
-          ? `${value}（当前）`
-          : value,
-    value,
-  })),
-)
-
-const pickerValue = computed<string[]>(() => {
-  const first = pickerColumns.value[0]?.value
-  return [editVersion.value || first || '']
-})
-
-function onPickVersion(value: Array<string | number>): void {
-  const picked = value?.[0]
-  if (picked !== undefined && picked !== null && String(picked).length > 0) editVersion.value = String(picked)
-  pickerOpen.value = false
-}
-
-function closeEditor(): void {
-  if (saving.value) return
-  editorOpen.value = false
-  editing.value = null
-}
-
-function onEditorVisible(visible: boolean): void {
-  if (!visible && !saving.value) editing.value = null
-}
-
-async function saveVersion(): Promise<void> {
-  const app = editing.value
-  const version = editVersion.value.trim()
-  if (!app || !version || saving.value) return
-  saving.value = true
-  error.value = ''
-  message.value = ''
-  try {
-    await editWebappVersion(app.id, version)
-    const title = app.title
-    editorOpen.value = false
-    editing.value = null
-    message.value = `已把「${title}」的版本改为 ${version}；未重启实例，重启后生效。`
-    await load()
-  } catch (reason) {
-    error.value = `版本修改失败：${errorText(reason)}`
-  } finally {
-    saving.value = false
   }
 }
 
@@ -322,18 +162,8 @@ async function reload(): Promise<void> {
   await Promise.all([catalog.load(true), load()])
 }
 
-function confirmUpgrade(app: ManageApp): void {
-  if (!canDeploy.value || upgrading.value) return
-  const dialog = DialogPlugin.confirm({
-    title: '升级应用',
-    content: `把「${app.title}」的配置版本从 ${app.version || '—'} 改为 ${app.latestVersion}；只更新配置、不重启实例，重启后生效。`,
-    confirmBtn: '升级',
-    cancelBtn: '取消',
-    onConfirm: () => {
-      dialog.destroy()
-      void runUpgrade([app.id], 1)
-    },
-  })
+function openApp(app: ManageApp): void {
+  void router.push(`/manage/projects/${encodeURIComponent(project.value)}/apps/${encodeURIComponent(app.id)}`)
 }
 
 function confirmUpgradeAll(): void {
@@ -366,14 +196,6 @@ async function runUpgrade(ids: string[], count: number): Promise<void> {
     upgrading.value = false
   }
 }
-
-watch(
-  () => projectInfo.value?.id,
-  (id) => {
-    if (!id || loading.value || webapps.value.length > 0) return
-    void load()
-  },
-)
 
 onMounted(() => {
   void catalog.load()

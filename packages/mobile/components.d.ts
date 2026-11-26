@@ -22,6 +22,8 @@ declare module 'vue' {
     TButton: typeof import('tdesign-mobile-vue')['Button']
     TCell: typeof import('tdesign-mobile-vue')['Cell']
     TCellGroup: typeof import('tdesign-mobile-vue')['CellGroup']
+    TCheckbox: typeof import('tdesign-mobile-vue')['Checkbox']
+    TCheckboxGroup: typeof import('tdesign-mobile-vue')['CheckboxGroup']
     TEmpty: typeof import('tdesign-mobile-vue')['Empty']
     TGrid: typeof import('tdesign-mobile-vue')['Grid']
     TGridItem: typeof import('tdesign-mobile-vue')['GridItem']

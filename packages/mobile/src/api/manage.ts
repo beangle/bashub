@@ -7,7 +7,7 @@
  */
 import { apiClient } from './client'
 import { apiPath } from './prefix'
-import { callResourceAction, listResource, saveResource, type ResourcePage } from './resource'
+import { attributeText, callResourceAction, indexIncluded, listResource, relationshipIds, saveResource, type ResourcePage } from './resource'
 
 /** 管理页用到的能力项；键与 `resource:action` 完全一致，便于直接查表。 */
 export const MANAGE_CHECKS = {
@@ -83,9 +83,34 @@ export async function readArtifactVersions(artifactId: string): Promise<Artifact
   )
 }
 
-/** 指定应用部署的版本（不限于最新）；只改 `version` 一个字段，不重启实例，重启后生效。 */
-export async function editWebappVersion(id: string, version: string): Promise<void> {
-  await saveResource('/webapps', 'webapps', { version }, {}, id)
+/** 保存应用部署的版本与运行目标；只提交 `version` 与 `targets` 两项，不重启实例，重启后生效。 */
+export async function saveWebapp(id: string, version: string, targetIds: string[]): Promise<void> {
+  await saveResource(
+    '/webapps',
+    'webapps',
+    { version },
+    { targets: { data: targetIds.map((target) => ({ type: 'servers', id: target })) } },
+    id,
+  )
+}
+
+export interface ServerOption {
+  id: string
+  label: string
+}
+
+/** 当前 Project 下可作为运行目标的服务；标签用后端派生的 `displayName`（群集.服务 (IP)）。 */
+export async function listProjectServers(projectId: string): Promise<ServerOption[]> {
+  const page = await listResource('/servers', { pageSize: 500, include: ['farm'] })
+  const farms = indexIncluded(page.included)
+  return page.rows
+    .filter((row) => {
+      const farmId = relationshipIds(row, 'farm')[0] ?? ''
+      const farm = farms.get(farmId)
+      return farm ? (relationshipIds(farm, 'project')[0] ?? '') === projectId : false
+    })
+    .map((row) => ({ id: row.id, label: attributeText(row.attributes.displayName) || attributeText(row.attributes.name) }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))
 }
 
 /** 从仓库刷新所有组件的最新版本元数据。 */

@@ -134,7 +134,7 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 | `farms` | Farm | 群集 |
 | `servers` | Server | 群集实例；派生 `qualifiedName`（`群集.服务`）、`hostIp` 与 `displayName`（`群集.服务 (IP)`）；主机只能选当前 Project，代理统一使用 `httpPort`，不再有代理端口 |
 | `hosts` | Host | 详细系统版本、CPU 型号和体系结构存在只读 `hardware` JSON；表单只提交名称/IP/Project/组网分组/操作系统/内存/核心数/特性；`POST /api/bashub/config/hosts/{id}/adopt-agent` 从在线 Agent 回填 `hardware`，只回填空的 memory/cores；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
-| `artifacts` | Artifact | 下发计算属性 `gav`；`GET /api/bashub/config/artifacts/{id}/webapps?include=artifact` 返回使用该组件的部署；`GET /api/bashub/config/artifacts/{id}/versions` 返回 `{latest, versions}`（Maven metadata，供应用部署选版本）；`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[..]}`）从 Maven Central 的 `maven-metadata.xml` 刷新 `latestVersion` |
+| `artifacts` | Artifact | 下发计算属性 `gav`；`GET /api/bashub/config/artifacts/{id}/webapps?include=artifact` 返回使用该组件的部署；`GET /api/bashub/config/artifacts/{id}/versions` 返回 `{latest, versions}`（Maven metadata，供手机端编辑应用部署版本时选版本）；`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[..]}`）从 Maven Central 的 `maven-metadata.xml` 刷新 `latestVersion` |
 | `webapps` | Webapp | `enabled=false` 表示临时下线：保留配置和端口，但不生成 server.xml/代理路由、不参与告警和统计；允许 `contextPath` 为空（后台任务），空值不参与代理路由； `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 选择运行 server；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
 | `platform-features` | PlatformFeature | 菜单是 `平台与功能` 页签组里的「平台功能」页签 |
 | `platform-feature-scripts` | PlatformFeatureScript | 无独立列表页，在平台功能详情页维护；`scripts` 写入时去掉 `\r` |

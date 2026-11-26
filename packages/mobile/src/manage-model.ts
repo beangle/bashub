@@ -19,7 +19,8 @@ export interface ManageApp {
   contextPath: string
   version: string
   latestVersion: string
-  enabled: boolean
+  /** 运行目标（服务）id；编辑页用它预选，列表只关心数量。 */
+  targetIds: string[]
   /** 运行目标（服务）数量。 */
   targets: number
   /** 后端判定的「可升级」，前端不自行比较版本号。 */
@@ -67,7 +68,8 @@ export function daysUntil(expires: string, now: Date = new Date()): number | nul
 
 export function buildApps(rows: ResourceRow[], included: ResourceRow[] = []): ManageApp[] {
   const artifacts = indexIncluded(included)
-  const apps = rows.map((row) => {
+  // 已停用的部署不在手机端展示：它们不运行、也不参与待升级统计，避免列表里出现一堆不可操作的行。
+  const apps = rows.filter((row) => (row.attributes.enabled === undefined ? true : truthy(row.attributes.enabled))).map((row) => {
     const artifactId = relationshipIds(row, 'artifact')[0] ?? ''
     const artifact = artifacts.get(artifactId)
     const attributes = row.attributes
@@ -82,15 +84,14 @@ export function buildApps(rows: ResourceRow[], included: ResourceRow[] = []): Ma
       contextPath: attributeText(attributes.contextPath),
       version: attributeText(attributes.version),
       latestVersion: artifact ? attributeText(artifact.attributes.latestVersion) : '',
-      enabled: attributes.enabled === undefined ? true : truthy(attributes.enabled),
+      targetIds: relationshipIds(row, 'targets'),
       targets: relationshipIds(row, 'targets').length,
       upgradable: truthy(attributes.updatable),
     }
   })
-  // 先分「待升级 / 已最新」两块，块内按上下文根排序；上下文相同再按组件标题，保证顺序稳定。
+  // 顺序只跟部署上下文有关：升级/改版后行不会跳动，上下文相同再按组件标题兜底。
   return apps.sort(
     (left, right) =>
-      Number(right.upgradable) - Number(left.upgradable) ||
       left.contextPath.localeCompare(right.contextPath) ||
       left.title.localeCompare(right.title, 'zh-CN'),
   )

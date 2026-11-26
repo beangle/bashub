@@ -195,8 +195,9 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 - 页面分工：`MobileProjectsView`（项目列表，合并 `/config/projects` 与 `/agents/summary`）、
   `MobileOverviewView`（当前项目健康与节点资源条，30 秒可见轮询）、`MobileNodesView`
   （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
-  实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView`（管理：整库汇总待升级与到期证书、
-  项目内升级到组件最新版本、为单个应用指定版本（候选来自 `/config/artifacts/{id}/versions`，也可手输）、只读证书状态）、`MobileMeView`（用户、登录/退出）。
+  实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（管理：整库汇总待升级与到期证书、
+  项目内列表与批量升级、点应用进详情页改版本（候选来自 `/config/artifacts/{id}/versions`，也可手输）与部署目标、
+  只读证书状态）、`MobileMeView`（用户、登录/退出）。
 - 管理边界：只读配置现状 + 三个窄写操作（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `version`、
   `artifacts/update-version`）。可升级判定用
   后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供删除、reset-key、
