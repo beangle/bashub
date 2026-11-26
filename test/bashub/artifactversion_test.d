@@ -8,8 +8,9 @@
 
 module test.bashub.artifactversion_test;
 
-import bashub.artifactversion : ArtifactMetadataLoader, artifactMetadataUrl, latestFromMetadata,
-  refreshAllArtifactVersions, refreshArtifactVersions;
+import bashub.artifactversion : ArtifactMetadataLoader, artifactMetadataUrl,
+  latestFromMetadata, readArtifactVersions, refreshAllArtifactVersions, refreshArtifactVersions,
+  versionsFromMetadata;
 
 import beangle.data.dao.memory : MemoryDao;
 import beangle.data.resource : Column, Kind, Registry, Resource;
@@ -39,6 +40,50 @@ unittest {
 unittest {
   assert(artifactMetadataUrl("org.beangle", "beangle-webmvc") ==
       "https://repo1.maven.org/maven2/org/beangle/beangle-webmvc/maven-metadata.xml");
+}
+
+@("all published versions are read from versioning/versions")
+unittest {
+  auto xml = `<metadata>
+      <versioning>
+        <latest>4.6.0</latest>
+        <versions>
+          <version>4.4.0</version>
+          <version>4.5.0</version>
+          <version>4.6.0</version>
+        </versions>
+      </versioning>
+    </metadata>`;
+  assert(versionsFromMetadata(xml) == ["4.4.0", "4.5.0", "4.6.0"]);
+  assert(versionsFromMetadata("<metadata/>").length == 0);
+  assert(latestFromMetadata(xml) == "4.6.0");
+}
+
+@("readArtifactVersions returns latest and versions, or empty on failure")
+unittest {
+  string[] requested;
+  ArtifactMetadataLoader loader = (string url) {
+    requested ~= url;
+    return `<metadata><versioning><latest>2.0.0</latest>
+        <versions><version>1.0.0</version><version>2.0.0</version></versions>
+      </versioning></metadata>`;
+  };
+  auto info = readArtifactVersions("org.example", "demo", loader);
+  assert(info.latest == "2.0.0");
+  assert(info.versions == ["1.0.0", "2.0.0"]);
+  assert(requested.length == 1);
+
+  ArtifactMetadataLoader missing = (string url) { return ""; };
+  auto empty = readArtifactVersions("org.example", "demo", missing);
+  assert(empty.latest == "");
+  assert(empty.versions.length == 0);
+
+  ArtifactMetadataLoader broken = (string url) { return "<metadata>"; };
+  auto fallback = readArtifactVersions("org.example", "demo", broken);
+  assert(fallback.latest == "");
+  assert(fallback.versions.length == 0);
+
+  assert(readArtifactVersions("", "demo", loader).versions.length == 0);
 }
 
 @("refresh updates changed versions and skips failures or unchanged rows")

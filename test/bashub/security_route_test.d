@@ -380,3 +380,68 @@ unittest {
   assert(ex.contentTypeOptions == "nosniff");
   assert(ex.cacheControl == "no-store");
 }
+
+@("能力查询：未登录 401，不泄露任何判定")
+unittest {
+  auto repo = new StaticSessionRepo();
+  auto router = securedRouter(authConfig(), repo, testDomain());
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/ems/authorizations?checks=/config/projects:post");
+  assert(ex.status == 401, ex.body);
+}
+
+@("能力查询：Private 资源按角色判定，管理员 true / 普通用户 false")
+unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
+  repo.put(sessionOf("user", ["ROLE_USER"]));
+  auto router = securedRouter(authConfig(), repo, testDomain());
+  auto url = "http://localhost/api/bashub/ems/authorizations?checks=/config/projects:post";
+
+  auto admin = call(router, HTTPMethod.GET, url, "EMS_SID=admin");
+  assert(admin.status == 200, admin.body);
+  assert(parseJson(admin.body)["checks"][0]["allowed"].get!bool);
+
+  auto user = call(router, HTTPMethod.GET, url, "EMS_SID=user");
+  assert(user.status == 200, user.body);
+  assert(!parseJson(user.body)["checks"][0]["allowed"].get!bool);
+}
+
+@("能力查询：未登记资源与 guard 一致（登录即可），不冒充受控资源")
+unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("user", ["ROLE_USER"]));
+  auto router = securedRouter(authConfig(), repo, testDomain());
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/ems/authorizations?checks=/config/webapps:post,/config/artifacts:post",
+      "EMS_SID=user");
+  assert(ex.status == 200, ex.body);
+  auto checks = parseJson(ex.body)["checks"];
+  assert(checks[0]["allowed"].get!bool);
+  assert(checks[1]["allowed"].get!bool);
+}
+
+@("能力查询：非法或缺失 checks 返回 400")
+unittest {
+  auto repo = new StaticSessionRepo();
+  repo.put(sessionOf("admin", ["ROLE_ADMIN"]));
+  auto router = securedRouter(authConfig(), repo, testDomain());
+  auto bad = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/ems/authorizations?checks=config/projects:post", "EMS_SID=admin");
+  assert(bad.status == 400, bad.body);
+  auto missing = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/ems/authorizations", "EMS_SID=admin");
+  assert(missing.status == 400, missing.body);
+}
+
+@("能力查询：未开启登录时如实回答可做")
+unittest {
+  auto cfg = authConfig();
+  cfg.authRequired = false;
+  auto repo = new StaticSessionRepo();
+  auto router = securedRouter(cfg, repo, testDomain());
+  auto ex = call(router, HTTPMethod.GET,
+      "http://localhost/api/bashub/ems/authorizations?checks=/config/projects:post");
+  assert(ex.status == 200, ex.body);
+  assert(parseJson(ex.body)["checks"][0]["allowed"].get!bool);
+}

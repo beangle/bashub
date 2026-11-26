@@ -23,7 +23,7 @@ import beangle.data.value : Row, jsonGet, jsonText, rowGet;
 import beangle.commons.net.curl : curlGet;
 import beangle.security.session : Session, SessionRepo, nowSeconds;
 
-import bashub.artifactversion : refreshArtifactVersions;
+import bashub.artifactversion : readArtifactVersions, refreshArtifactVersions;
 import bashub.agent.channel : bearer;
 import bashub.agent.registry : AgentRegistry, AgentSession, RequestOutcome;
 import bashub.agent.socket : HealthSchedule, HeartbeatInterval, serveAgentSocket;
@@ -77,6 +77,8 @@ private enum int ServiceTimeoutSeconds = 120;
 private enum long MaxAgentLogLines = 2000;
 private enum size_t MaxAgentLogLineBytes = 4096;
 private enum size_t MaxAgentLogBytes = 256 * 1024;
+/// 能力查询一次最多问几项；前端只问当前页面上的动作，不需要枚举整个授权域。
+private enum size_t MaxAuthorizationChecks = 20;
 
 /// `log:read` 的解包结果；只保留跟随需要的那几个字段。
 private struct AgentLogWindow {
@@ -2233,6 +2235,66 @@ class HubService {
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
+  /// `GET /api/bashub/ems/authorizations?checks=/config/webapps:post,/config/artifacts:post`
+  ///
+  /// 只回答「当前会话在这几项上能不能做」，给手机端决定是否展示写操作；判定直接复用
+  /// `HubSecurity.can`（与路由 guard 同一份 `authorize`），因此不会出现「界面说能做、后端 403」
+  /// 或反过来的情况。不缓存、不落库，也不枚举整个授权域。
+  void authorizations(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+
+    string[][] checks;
+    foreach (raw; req.query.get("checks", "").split(",")) {
+      auto text = raw.strip;
+      if (text.length == 0)
+        continue;
+      auto colon = text.indexOf(':');
+      auto resource = colon > 0 ? text[0 .. colon].strip : "";
+      auto action = colon > 0 ? text[colon + 1 .. $].strip.toLower : "";
+      if (!resource.startsWith("/") || resource.length > 120
+          || (action != "get" && action != "post" && action != "put" && action != "patch" && action != "delete")) {
+        writeJsonApi(res, errorDocument(400, "请求参数非法",
+            "checks must be resource:action, e.g. /config/webapps:post: " ~ text, "checks"),
+            HTTPStatus.badRequest);
+        return;
+      }
+      checks ~= [resource, action];
+    }
+    if (checks.length == 0) {
+      writeJsonApi(res, errorDocument(400, "请求参数缺失", "checks is required", "checks"),
+          HTTPStatus.badRequest);
+      return;
+    }
+    if (checks.length > MaxAuthorizationChecks) {
+      writeJsonApi(res, errorDocument(400, "请求参数过多",
+          "at most " ~ MaxAuthorizationChecks.to!string ~ " checks per request", "checks"),
+          HTTPStatus.badRequest);
+      return;
+    }
+
+    bool[] allowed;
+    if (security is null) {
+      // 未开启登录（预演/本地）：路由本身放行，能力查询也如实回答「可做」。
+      allowed.length = checks.length;
+      allowed[] = true;
+    } else {
+      allowed = security.can(req, checks);
+    }
+
+    Json[] rows;
+    foreach (index, check; checks) {
+      auto row = Json.emptyObject;
+      row["resource"] = Json(check[0]);
+      row["action"] = Json(check[1]);
+      row["allowed"] = Json(allowed[index]);
+      rows ~= row;
+    }
+    auto doc = Json.emptyObject;
+    doc["checks"] = Json(rows);
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
   /// 请求里的会话：从 cookie 取 sid 并 `access` 一次（续期、过期则作废）。
   private Session sessionOf(HTTPServerRequest req) {
     if (sessions is null)
@@ -2540,6 +2602,32 @@ class HubService {
 
     refreshArtifactVersions(reg, store, ids, toDelegate(&mavenMetadata));
     writeJsonApi(res, okDocument(), HTTPStatus.ok);
+  }
+
+  /// `GET /api/bashub/config/artifacts/:id/versions`：组件在 Maven Central 上已发布的版本。
+  ///
+  /// 应用部署的「编辑版本」据此给出候选；取不到 metadata 时返回空列表，前端回退到
+  /// `latestVersion` 与手工输入，不影响指定任意版本。
+  void artifactVersions(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto id = req.params.get("id", "");
+    Json artifact;
+    if (!store.fetch(reg.find("artifacts"), id, Query.init, artifact)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "no artifacts with id " ~ id), HTTPStatus.notFound);
+      return;
+    }
+    auto attrs = jsonGet(jsonGet(artifact, "data"), "attributes");
+    auto info = readArtifactVersions(jsonText(jsonGet(attrs, "groupId")),
+        jsonText(jsonGet(attrs, "artifactId")), toDelegate(&mavenMetadata));
+
+    auto items = appender!(Json[])();
+    foreach (each; info.versions)
+      items.put(Json(each));
+    auto doc = Json.emptyObject;
+    doc["latest"] = Json(info.latest);
+    doc["versions"] = Json(items.data);
+    writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
   /// `GET /api/bashub/ems/menus/export?app={id}`：导出应用的资源与菜单为 XML。
@@ -2938,6 +3026,8 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.ems ~ "/configs", &hub.configs);
   router.get(api.ems ~ "/sessions", &hub.currentSession);
   router.post(api.ems ~ "/sessions/logout", &hub.logout);
+  // 能力查询：只回当前会话对指定 resource:action 的判定，供前端隐藏无权动作。
+  router.get(api.ems ~ "/authorizations", &hub.authorizations);
   router.get(api.ems ~ "/:project/menus/:appName", &hub.projectEmsMenus);
   router.post(api.config ~ "/projects/:id/reset-key", &hub.resetKey);
   router.post(api.config ~ "/webapps/upgrade", &hub.upgradeWebapps);
@@ -2945,6 +3035,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.post(api.config ~ "/hosts/:id/adopt-agent", &hub.adoptHostHardware);
   router.get(api.config ~ "/hosts/:id/webapps", &hub.hostWebapps);
   router.get(api.config ~ "/artifacts/:id/webapps", &hub.artifactWebapps);
+  router.get(api.config ~ "/artifacts/:id/versions", &hub.artifactVersions);
   router.get(api.ems ~ "/resources/:id/menus", &hub.resourceMenus);
   router.get(api.ems ~ "/menus/export", &hub.exportMenusXml);
   router.post(api.ems ~ "/menus/import", &hub.importMenusXml);

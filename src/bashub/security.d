@@ -115,6 +115,24 @@ class HubSecurity {
     return http.authenticate(req, cfg.sessionIdName);
   }
 
+  /// 当前会话在若干 `{resource, action}` 上的判定结果。
+  ///
+  /// 与 `guard` 共用 `HttpSecurity.authorize`，所以「前端看到的能力」和「后端实际放行」
+  /// 是同一份判定（含 `unknownIsProtected`、`isRoot` 与未加载授权域的情况），不会漂移。
+  bool[] can(HTTPServerRequest req, string[][] checks) {
+    bool[] allowed;
+    if (!cfg.authRequired) {
+      allowed.length = checks.length;
+      allowed[] = true;
+      return allowed;
+    }
+    auto context = http.authenticate(req, cfg.sessionIdName);
+    auto authz = domain();
+    foreach (check; checks)
+      allowed ~= http.authorize(context, check[0], check[1], authz) == AccessDecision.allow;
+    return allowed;
+  }
+
   /// 退出：只清本地缓存和本地 cookie，CAS 的会话让它自己按 tti 过期。
   string logout(HTTPServerRequest req, HTTPServerResponse res) {
     if (sessions !is null) {

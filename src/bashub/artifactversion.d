@@ -7,8 +7,8 @@
  */
 
 module bashub.artifactversion;
-/// Maven `maven-metadata.xml` 的最小读取与版本刷新：只取 `<versioning><latest>`。
-/// 网络请求留给调用方，方便测试解析与刷新逻辑而不必访问 Maven Central。
+/// Maven `maven-metadata.xml` 的最小读取与版本刷新：取 `<versioning><latest>` 与
+/// `<versioning><versions>`。网络请求留给调用方，方便测试解析与刷新逻辑而不必访问 Maven Central。
 
 import beangle.commons.xml : children, elementText, parseRoot;
 import beangle.data.query : Query;
@@ -40,6 +40,50 @@ string latestFromMetadata(string xml) {
 string artifactMetadataUrl(string groupId, string artifactId) {
   return "https://repo1.maven.org/maven2/" ~ groupId.replace(".", "/") ~ "/" ~ artifactId ~
     "/maven-metadata.xml";
+}
+
+/// 返回 `<versioning><versions>` 下的全部 `<version>`（保持 metadata 顺序）；没有时返回空数组。
+string[] versionsFromMetadata(string xml) {
+  auto root = parseRoot(xml);
+  string[] result;
+  foreach (versioning; children(root, "versioning")) {
+    foreach (versions; children(versioning, "versions")) {
+      foreach (each; children(versions, "version")) {
+        auto text = elementText(each).strip;
+        if (text.length > 0)
+          result ~= text;
+      }
+    }
+  }
+  return result;
+}
+
+/// 组件已发布版本：编辑应用部署版本时，既可从这些版本里选，也可手输其它版本。
+struct ArtifactVersions {
+  string latest;
+  string[] versions;
+}
+
+/// 读取组件的 metadata；网络或 XML 失败都返回空结果，由调用方决定回退。
+ArtifactVersions readArtifactVersions(string groupId, string artifactId, ArtifactMetadataLoader load) {
+  ArtifactVersions result;
+  if (load is null || groupId.length == 0 || artifactId.length == 0)
+    return result;
+  string xml;
+  try {
+    xml = load(artifactMetadataUrl(groupId, artifactId));
+  } catch (Exception e) {
+    return result;
+  }
+  if (xml.length == 0)
+    return result;
+  try {
+    result.latest = latestFromMetadata(xml);
+    result.versions = versionsFromMetadata(xml);
+  } catch (Exception e) {
+    // metadata 坏了：保留空结果，前端回退到 latestVersion 与手输。
+  }
+  return result;
 }
 
 /** 刷新指定组件的最新版本；返回实际发生变化的行数。
