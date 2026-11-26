@@ -253,6 +253,36 @@
       </div>
     </template>
   </t-drawer>
+
+  <t-dialog
+    v-model:visible="versionVisible"
+    header="编辑应用版本"
+    width="480px"
+    :confirm-btn="{ content: '保存', loading: versionSaving, disabled: !versionDraft.trim() }"
+    @confirm="saveVersion"
+  >
+    <div class="version-editor">
+      <p class="version-editor__meta">
+        <span>{{ versionAppLabel }}</span>
+        <span v-if="versionLatest">组件最新 {{ versionLatest }}</span>
+      </p>
+      <t-select
+        :model-value="versionDraft"
+        :options="versionOptions"
+        :loading="versionLoading"
+        filterable
+        clearable
+        placeholder="从已发布版本中选择"
+        @change="pickVersion"
+      />
+      <t-input
+        v-model="versionDraft"
+        clearable
+        placeholder="或直接输入任意版本号，如 4.20.17-SNAPSHOT"
+      />
+      <p class="drawer-hint">只修改部署配置中的版本，不会重启实例；重启实例后才生效。可指定旧版本或 SNAPSHOT，不要求最新。</p>
+    </div>
+  </t-dialog>
 </template>
 
 <script setup lang="ts">
@@ -266,6 +296,7 @@ import ResourceDetailPanel from '@/components/ResourceDetailPanel.vue'
 import {
   attributeText,
   callResourceAction,
+  getArtifactVersions,
   getPlainJson,
   getResourceDetail,
   indexIncluded,
@@ -613,9 +644,23 @@ function renderCell(field: FieldSchema) {
       case 'boolean':
         return render('span', {}, text === '是' || text === 'true' ? cell.trueText || '是' : cell.falseText || '否')
       case 'updatable': {
-        if (!source || attributeText(displayValue(source, 'updatable')) !== '是') return render('span', {}, text)
+        if (!source) return render('span', {}, text)
+        const upgradable = attributeText(displayValue(source, 'updatable')) === '是'
         const latest = attributeText(displayValue(source, 'artifact.latestVersion'))
-        return render('span', { title: `可升级至 ${latest}` }, [text, render('span', { class: 'cell-update-arrow' }, ' ↑')])
+        return render('button', {
+          type: 'button',
+          class: 'cell-version-edit',
+          title: upgradable ? `可升级至 ${latest}，点击编辑版本` : '点击编辑版本',
+          onClick: (event: Event) => {
+            event.stopPropagation()
+            openVersionEditor(source)
+          },
+        }, [
+          render('span', {}, text),
+          upgradable
+            ? render('span', { class: 'cell-update-arrow' }, ' ↑')
+            : render('span', { class: 'cell-edit-pencil' }, ' ✎'),
+        ])
       }
       case 'detail': {
         const source = params.row.__row as ResourceRow | undefined
@@ -802,6 +847,102 @@ const editingId = ref('')
 const editingRow = ref<ResourceRow>()
 const formRef = ref<FormInstanceFunctions>()
 const form = reactive<Record<string, unknown>>({})
+
+/** 应用部署的「编辑版本」：可从组件已发布版本中选，也可手输任意版本。 */
+const versionVisible = ref(false)
+const versionTarget = ref<ResourceRow>()
+const versionDraft = ref('')
+const versionSaving = ref(false)
+const versionLoading = ref(false)
+const remoteVersions = ref<string[]>([])
+const remoteLatest = ref('')
+const versionArtifact = computed<ResourceRow | undefined>(() => {
+  const target = versionTarget.value
+  if (!target) return undefined
+  const ref = relationshipTargets(target, 'artifact')[0]
+  return ref ? includedIndex.value.get(`${ref.type}:${ref.id}`) : undefined
+})
+const versionCurrent = computed(() => attributeText(versionTarget.value?.attributes.version))
+const versionLatest = computed(() => {
+  if (remoteLatest.value) return remoteLatest.value
+  const artifact = versionArtifact.value
+  return artifact ? attributeText(artifact.attributes.latestVersion) : ''
+})
+const versionAppLabel = computed(() => {
+  const artifact = versionArtifact.value
+  if (!artifact) return versionCurrent.value ? `应用 ${versionCurrent.value}` : ''
+  const name = attributeText(artifact.attributes.title) || attributeText(artifact.attributes.artifactId)
+  return name ? `应用 ${name}` : ''
+})
+const versionOptions = computed<SelectOption[]>(() => {
+  const values = new Set<string>()
+  const add = (value: unknown) => {
+    const text = attributeText(value)
+    if (text) values.add(text)
+  }
+  add(versionCurrent.value)
+  add(versionLatest.value)
+  remoteVersions.value.forEach(add)
+  const stored = versionArtifact.value?.attributes.versions
+  if (Array.isArray(stored)) stored.forEach(add)
+  return [...values]
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+    .map((value) => ({
+      value,
+      label: value === versionLatest.value ? `${value}（最新）` : value === versionCurrent.value ? `${value}（当前）` : value,
+    }))
+})
+
+function openVersionEditor(row: ResourceRow) {
+  versionTarget.value = row
+  versionDraft.value = attributeText(row.attributes.version)
+  remoteVersions.value = []
+  remoteLatest.value = ''
+  versionVisible.value = true
+  const ref = relationshipTargets(row, 'artifact')[0]
+  if (ref) void loadArtifactVersions(ref.id)
+}
+
+async function loadArtifactVersions(artifactId: string) {
+  versionLoading.value = true
+  try {
+    const info = await getArtifactVersions(artifactId)
+    if (Array.isArray(info.versions)) remoteVersions.value = info.versions.map(String)
+    remoteLatest.value = info.latest ? String(info.latest) : ''
+  } catch {
+    // 候选拉不到时保留当前/最新版本，仍可手输任意版本。
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+function pickVersion(value: unknown) {
+  if (value === null || value === undefined) return
+  const text = String(value)
+  if (text.length > 0) versionDraft.value = text
+}
+
+async function saveVersion() {
+  const version = versionDraft.value.trim()
+  const target = versionTarget.value
+  if (!target || !version) return
+  if (version === attributeText(target.attributes.version)) {
+    versionVisible.value = false
+    return
+  }
+  versionSaving.value = true
+  try {
+    await saveResource(schema.path, schema.type, { version }, {}, target.id)
+    MessagePlugin.success('版本已更新，未重启实例，重启后生效')
+    versionVisible.value = false
+    await loadRows()
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : '保存版本失败')
+  } finally {
+    versionSaving.value = false
+  }
+}
+
 const contextLabel = computed(() => {
   if (!contextField) return ''
   const raw = String(form[contextField.key] ?? '')
@@ -1147,6 +1288,8 @@ function onGridAction(payload: { action: DataGridAction; selectedRows: Record<st
     openEdit(selected[0])
   } else if (payload.action.code === 'delete' && selected[0]) {
     confirmRemove(selected[0])
+  } else if (payload.action.code === 'edit-version' && selected[0]) {
+    openVersionEditor(selected[0])
   } else if (tool) {
     confirmTool(tool.code, tool.label, tool.confirm, selected)
   }

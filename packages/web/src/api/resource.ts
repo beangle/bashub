@@ -116,6 +116,16 @@ export function getPlainJson<T>(path: string, query?: Record<string, string>): P
   return apiClient.getPlain<T>(path, { query })
 }
 
+/** 组件在 Maven Central 上已发布的版本；供应用部署的「编辑版本」给出候选。 */
+export interface ArtifactVersions {
+  latest: string
+  versions: string[]
+}
+
+export function getArtifactVersions(id: string): Promise<ArtifactVersions> {
+  return getPlainJson<ArtifactVersions>(resourceApiPath(`/artifacts/${id}/versions`))
+}
+
 /** 取某条记录的关联 id 列表（to-one 也返回单元素数组）。 */
 export function relationshipIds(row: ResourceRow | undefined, key: string): string[] {
   const data = row?.relationships[key]?.data

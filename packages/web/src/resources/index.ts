@@ -315,6 +315,10 @@ export const resourceSchemas: ResourceSchema[] = [
     formColumns: 3,
     tools: [
       {
+        code: 'edit-version', label: '编辑版本', action: 'edit-version',
+        selection: 'one', theme: 'default',
+      },
+      {
         code: 'upgrade', label: '升级到最新版', action: 'upgrade',
         selection: 'oneOrMore', theme: 'primary', confirm: '把所选应用升级到组件最新版本？',
       },
