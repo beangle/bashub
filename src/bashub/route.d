@@ -663,10 +663,8 @@ class HubService {
     auto endpoints = reg.find("endpoints");
     if (store.fetchRaw(endpoints, jsonText(endpoint["id"]), row))
       doc["certificate"] = Json(jsonText(rowGet(row, "certificate")));
-    auto expires = jsonText(rowGet(row, "certificate_not_after")).strip;
-    if (expires.length == 0)
-      expires = certificateNotAfter(jsonText(rowGet(row, "certificate")));
-    doc["certificateNotAfter"] = Json(expires);
+    // 只回列里的值：解析发生在保存时（`updateProjectEndpointCertificate`），读取一律读原数据。
+    doc["certificateNotAfter"] = Json(jsonText(rowGet(row, "certificate_not_after")));
     doc["keySet"] = Json(jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key")).length > 0);
     res.headers["Cache-Control"] = "no-store";
     writeJsonApi(res, doc, HTTPStatus.ok);
