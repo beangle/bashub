@@ -33,9 +33,21 @@
         class="mobile-manage-project"
         @click="openProject(project)"
       >
-        <span class="mobile-manage-project__text">
-          <span class="mobile-manage-project__title">{{ project.title }}</span>
-          <span class="mobile-manage-project__meta">{{ project.qualifiedName }}</span>
+        <span class="mobile-project-card__identity">
+          <img
+            v-if="project.logoUrl && !failedLogos[project.id]"
+            class="mobile-project-card__logo"
+            :src="project.logoUrl"
+            :alt="project.orgTitle"
+            @error="failedLogos[project.id] = true"
+          />
+          <span v-else class="mobile-project-card__logo mobile-project-card__logo--fallback">
+            {{ initials(project.title) }}
+          </span>
+          <span class="mobile-manage-project__text">
+            <span class="mobile-manage-project__title">{{ project.title }}</span>
+            <span class="mobile-manage-project__meta">{{ project.qualifiedName }}</span>
+          </span>
         </span>
         <span class="mobile-manage-project__badges">
           <t-tag v-if="pendingOf(project.id).upgrades > 0" size="small" variant="light" theme="warning">
@@ -72,14 +84,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { DialogPlugin } from 'tdesign-mobile-vue'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 import { MANAGE_CHECKS, loadManageCatalog, readCapabilities, refreshArtifactVersions } from '@/api/manage'
 import type { ResourcePage } from '@/api/resource'
-import { errorText, type ProjectInfo } from '@/monitor-model'
+import { errorText, initials, type ProjectInfo } from '@/monitor-model'
 import {
   buildApps,
   buildCerts,
@@ -101,6 +113,7 @@ const error = ref('')
 const message = ref('')
 const capabilities = ref<Record<string, boolean>>({})
 const capabilityError = ref(false)
+const failedLogos = reactive<Record<string, boolean>>({})
 
 const busy = computed(() => loading.value || catalog.loading.value)
 

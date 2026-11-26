@@ -1122,7 +1122,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--td-component-stroke);
 }
 
@@ -1143,7 +1143,7 @@ body {
 .mobile-manage-cert__title {
   overflow: hidden;
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1233,6 +1233,25 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.mobile-manage-targets .t-checkbox {
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+/* 卡片标题右侧的动作与监控页的「全部节点」链接同一号（12px，品牌色）。 */
+.mobile-header-action {
+  height: auto;
+  flex: none;
+  padding: 0;
+  color: var(--td-brand-color);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mobile-header-action.t-button--variant-text:not(.t-button--disabled):active {
+  background: transparent;
 }
 
 .mobile-manage-actions {

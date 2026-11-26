@@ -36,7 +36,9 @@ export interface ManageCert {
   engine: string
   /** `YYYY-MM-DD` 或空；后端只暴露公钥的到期日。 */
   expires: string
-  /** 距今天数；无法解析或未配置为 `null`。 */
+  /** `certificate` 属性里是否真有公钥证书；与 PC「公钥/私钥 已配置」同一口径。 */
+  hasCertificate: boolean
+  /** 距今天数；证书已配置但没记录到期日时为 `null`。 */
   daysLeft: number | null
   https: boolean
 }
@@ -107,6 +109,7 @@ export function buildCerts(rows: ResourceRow[], now: Date = new Date()): ManageC
       domain: attributeText(row.attributes.domain),
       engine: attributeText(row.attributes.engine),
       expires: expires.slice(0, 10),
+      hasCertificate: attributeText(row.attributes.certificate).includes('BEGIN CERTIFICATE'),
       daysLeft: daysUntil(expires, now),
       https: truthy(row.attributes.enableHttps),
     }
@@ -123,12 +126,21 @@ export function certAlerted(cert: ManageCert): boolean {
   return cert.daysLeft !== null && cert.daysLeft <= CERT_WARN_DAYS
 }
 
-/** 证书状态文本：未配置 / 已过期 N 天 / 剩余 N 天。 */
+/** 证书状态文本：未配置 / 已配置但到期未知 / 已过期 N 天 / 剩余 N 天。 */
 export function certLabel(cert: ManageCert): string {
-  if (cert.daysLeft === null) return '未配置证书'
+  if (!cert.hasCertificate) return '未配置证书'
+  if (cert.daysLeft === null) return '已配置 · 到期未知'
   if (cert.daysLeft < 0) return `已过期 ${Math.abs(cert.daysLeft)} 天`
   if (cert.daysLeft === 0) return '今天到期'
   return `剩余 ${cert.daysLeft} 天`
+}
+
+/** 证书标签配色：未配置中性、到期未知/临近警告、已过期严重。 */
+export function certTheme(cert: ManageCert): 'success' | 'danger' | 'warning' | 'default' {
+  if (!cert.hasCertificate) return 'default'
+  if (cert.daysLeft === null) return 'warning'
+  if (cert.daysLeft <= 0) return 'danger'
+  return cert.daysLeft <= CERT_WARN_DAYS ? 'warning' : 'success'
 }
 
 export function summarizeProjects(

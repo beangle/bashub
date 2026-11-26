@@ -43,6 +43,7 @@
           <h3 class="mobile-card__title">版本</h3>
           <t-button
             v-if="versionLatest && versionLatest !== version"
+            class="mobile-header-action"
             size="small"
             variant="text"
             @click="useLatest"
@@ -63,7 +64,13 @@
       <section class="mobile-card">
         <header class="mobile-card__head">
           <h3 class="mobile-card__title">部署目标</h3>
-          <t-button v-if="canEdit && servers.length > 0" size="small" variant="text" @click="targetsOpen = !targetsOpen">
+          <t-button
+            v-if="canEdit && servers.length > 0"
+            class="mobile-header-action"
+            size="small"
+            variant="text"
+            @click="targetsOpen = !targetsOpen"
+          >
             {{ targetsOpen ? '收起' : '修改' }}
           </t-button>
         </header>
@@ -83,9 +90,9 @@
       </section>
 
       <div class="mobile-actions mobile-manage-actions">
-        <t-button size="medium" variant="outline" :disabled="saving" @click="resetForm">还原</t-button>
+        <t-button size="small" variant="outline" :disabled="saving" @click="resetForm">还原</t-button>
         <t-button
-          size="medium"
+          size="small"
           theme="primary"
           :loading="saving"
           :disabled="!canSave"

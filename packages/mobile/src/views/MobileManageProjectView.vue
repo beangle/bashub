@@ -23,6 +23,7 @@
           <h3 class="mobile-card__title">应用部署</h3>
           <t-button
             v-if="canDeploy && upgradable.length > 0"
+            class="mobile-header-action"
             size="small"
             variant="text"
             :loading="upgrading"
@@ -75,11 +76,7 @@
               <p class="mobile-manage-cert__meta">{{ cert.domain || '无域名' }}</p>
             </div>
             <div class="mobile-manage-cert__side">
-              <t-tag
-                size="small"
-                variant="light"
-                :theme="cert.daysLeft === null ? 'default' : certAlerted(cert) ? 'danger' : 'success'"
-              >
+              <t-tag size="small" variant="light" :theme="certTheme(cert)">
                 {{ certLabel(cert) }}
               </t-tag>
               <span v-if="cert.expires" class="mobile-manage-cert__expires">{{ cert.expires }}</span>
@@ -98,10 +95,15 @@ import { DialogPlugin } from 'tdesign-mobile-vue'
 import { ArrowRightIcon, ArrowUpIcon } from 'tdesign-icons-vue-next'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
-import { MANAGE_CHECKS, loadManageCatalog, readCapabilities, upgradeWebapps } from '@/api/manage'
+import {
+  MANAGE_CHECKS,
+  loadManageCatalog,
+  readCapabilities,
+  upgradeWebapps,
+} from '@/api/manage'
 import type { ResourcePage } from '@/api/resource'
 import { errorText } from '@/monitor-model'
-import { buildApps, buildCerts, certAlerted, certLabel, type ManageApp } from '@/manage-model'
+import { buildApps, buildCerts, certLabel, certTheme, type ManageApp } from '@/manage-model'
 
 const route = useRoute()
 const router = useRouter()
@@ -139,6 +141,7 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
+    await catalog.load()
     const [data, caps] = await Promise.all([
       loadManageCatalog(),
       readCapabilities([MANAGE_CHECKS.deploy, MANAGE_CHECKS.deployEdit]).then(
@@ -198,7 +201,6 @@ async function runUpgrade(ids: string[], count: number): Promise<void> {
 }
 
 onMounted(() => {
-  void catalog.load()
   void load()
 })
 </script>
