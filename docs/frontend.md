@@ -199,6 +199,10 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   且同项目有多台在线节点时先给出节点选择，不调用会 409 的歧义接口。
 - 日志先读尾部再按需跟随；`useAgentLog` 统一处理 `reset`、错误状态与卸载时的流关闭。维护操作用
   二次确认、执行中禁用与错误详情（含后端 `logTail`），最长覆盖后端 120 秒等待。
+- PWA：`vite-plugin-pwa` 生成 `manifest.webmanifest`、`sw.js` 与图标；只预缓存应用壳，
+  `/api` 永远走网络；新版本通过页面确认框提示刷新。“我的”在 Android 触发
+  `beforeinstallprompt` 时显示“安装到桌面”，iOS 需用 Safari 的“添加到主屏幕”。
+  部署必须 HTTPS，且 `index.html`、`manifest.webmanifest`、`sw.js` 设 `no-cache`。
 - 手机布局契约：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，底部导航与列表行保持 44px，正文按钮用 TDesign 紧凑尺寸，
   卡片/列表替代宽表，操作常驻不依赖 hover；样式集中在 `packages/mobile/src/mobile.css`。
   手机端使用 TDesign Mobile Vue 的 TabBar/Grid/Cell/Search/Progress/Empty/Loading/Button/Tag/Dialog 与自身 CSS，不引入桌面端 `tdesign-vue-next`，也不引入 `@beangle/bui-vue` 的 DataGrid/AppShell 样式。

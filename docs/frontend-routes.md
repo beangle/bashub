@@ -126,7 +126,7 @@ PC 路由、PC 页面和 PC 的全局项目选择器保持不变。选定项目�
 
 服务器需要把 `/m/bashub/` 指向 `packages/mobile/dist`，并对 `/m/bashub/*` 做 history fallback
 到该目录的 `index.html`；`/api` 仍反代到同一个 D 后端，CAS 会话 cookie 同源共用，CAS 的 service
-白名单需要包含 `/m/bashub/`。
+白名单需要包含 `/m/bashub/`；手机端是 PWA，需 HTTPS，`index.html`/`manifest.webmanifest`/`sw.js` 设 `no-cache`。
 手机端自动验收只覆盖路由、类型、生产构建与静态布局契约；真实手机上的登录态、触控与横竖屏
 体验需要按上表做人工 UAT，自动通过不代表真机已验证。
 

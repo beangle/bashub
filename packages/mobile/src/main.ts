@@ -3,6 +3,7 @@ import 'tdesign-mobile-vue/dist/tdesign.css'
 import { initializeAuth, loadRuntimeConfig } from '@/auth'
 import App from './App.vue'
 import router from './router'
+import { setupPwa } from '@/pwa'
 import '@/mobile.css'
 
 async function mount(): Promise<void> {
@@ -10,6 +11,7 @@ async function mount(): Promise<void> {
   await loadRuntimeConfig()
   await initializeAuth()
   createApp(App).use(router).mount('#app')
+  setupPwa()
 }
 
 void mount()

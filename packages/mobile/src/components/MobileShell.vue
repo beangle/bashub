@@ -31,6 +31,11 @@
       </div>
     </header>
 
+    <div v-if="canInstall && !isStandalone" class="mobile-install-banner">
+      <span>安装到桌面</span>
+      <t-button size="small" theme="primary" @click="installApp">安装</t-button>
+    </div>
+
     <main class="mobile-shell__main">
       <router-view />
     </main>
@@ -58,6 +63,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChartIcon, UserIcon } from 'tdesign-icons-vue-next'
+import { canInstall, installApp, isStandalone } from '@/pwa'
 import { auth } from '@/auth'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 import { initials } from '@/monitor-model'

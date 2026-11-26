@@ -136,6 +136,18 @@ body {
   gap: 2px;
 }
 
+.mobile-install-banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  font-size: 12px;
+}
+
 .mobile-shell__main {
   flex: 1;
   min-height: 0;
@@ -263,6 +275,13 @@ body {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.mobile-card__link {
+  flex: none;
+  color: var(--td-brand-color);
+  font-size: 12px;
+  text-decoration: none;
 }
 
 .mobile-stat-grid {

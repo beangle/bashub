@@ -43,7 +43,7 @@ dub build -b release --compiler=ldc2        # D 后端 → target/d/bashub
 
 手机端监控台是平级的独立 SPA `packages/mobile`（部署在 `/m/bashub/`），与 PC 共用 CAS 会话和
 监控 API：先选择项目，再在项目工作区查看概览、节点、实例历史/日志并执行启停。手机端不读取 PC 的
-全局项目选择器，也不新增后端接口或前端依赖；路由、多 agent 约定与人工 UAT 边界见
+全局项目选择器，也不新增后端接口；支持安装到桌面（PWA，应用壳缓存、API 不缓存）；路由、多 agent 约定与人工 UAT 边界见
 [`docs/frontend-routes.md`](docs/frontend-routes.md) 的「手机端监控台（独立 SPA）」。
 
 D 代码分两块：**`beangle.*` 是可复用的框架**（数据面「资源注册表 → 查询计划 → SQL」、协议面

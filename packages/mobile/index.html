@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>BAS 手机监控</title>
+    <link rel="icon" href="%BASE_URL%icons/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon-180.png" />
+    <meta name="theme-color" content="#0052d9" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BAS 监控" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      // 尽早接住 beforeinstallprompt：浏览器可能在应用脚本执行前就触发安装提示。
+      window.__bashubInstallPrompt = null
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault()
+        window.__bashubInstallPrompt = event
+        window.dispatchEvent(new Event('bashub-install-available'))
+      })
+    </script>
   </head>
   <body>
     <div id="app"></div>

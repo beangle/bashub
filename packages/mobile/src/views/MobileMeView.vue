@@ -24,6 +24,15 @@
       </div>
     </section>
 
+    <section v-if="canInstall && !isStandalone" class="mobile-card">
+      <header class="mobile-card__head">
+        <h3 class="mobile-card__title">安装到桌面</h3>
+      </header>
+      <div class="mobile-actions">
+        <t-button size="small" theme="primary" @click="installApp">安装</t-button>
+      </div>
+    </section>
+
     <section class="mobile-card">
       <header class="mobile-card__head">
         <h3 class="mobile-card__title">PC 控制台</h3>
@@ -36,6 +45,7 @@
 <script setup lang="ts">
 import { auth } from '@/auth'
 import { initials } from '@/monitor-model'
+import { canInstall, installApp, isStandalone } from '@/pwa'
 
 const { currentUser, handleLogin, handleLogout } = auth.useAuth()
 
