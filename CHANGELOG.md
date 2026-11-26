@@ -2,11 +2,15 @@
 
 ## v0.0.9 (unreleased)
 
+- **应用部署指定版本**：`/config/webapps` 的版本单元格和「编辑版本」可修改单个部署的版本，既可从组件已发布版本里选（`GET /api/bashub/config/artifacts/{id}/versions` 实时读 Maven metadata），也可直接输入任意版本（旧版、SNAPSHOT 等），不再只能「升级到最新版」。只改配置版本，实例重启后生效。
+- **手机端「管理」标签**：手机端底部由「监控 / 我的」扩为「监控 / 管理 / 我的」；`/m/bashub/manage` 按项目汇总待升级应用与 30 天内到期证书，`/m/bashub/manage/projects/:project` 可把应用部署升级到组件最新版本、为单个应用指定任意版本（可从组件已发布版本里选，也可手输）、刷新组件最新版本，证书只读展示到期日。可升级判定沿用后端 `updatable`；升级只改配置版本，只更新配置并通知在线节点重新拉取，不会重启实例（重启实例后才生效）；不展示 Project key 与证书私钥，不提供删除、reset-key、bundle 下载与跨项目批量。
+- **能力查询端点**：新增 `GET /api/bashub/ems/authorizations?checks=resource:action,...`（一次最多 20 项），用与路由 guard 相同的 `authorize` 回答当前会话能否执行；手机端据此隐藏无权写操作，不做前端角色推断。未登记资源仍按 `unknownIsProtected`「登录即可」，与后端实际放行一致。
 - **项目上下文移到抽屉标题**：主机、群集和应用部署的编辑/新建抽屉不再显示不可修改的「配置」下拉，当前 Project 直接显示在抽屉标题旁，表单栅格可用空间更大。
 - **上下文与代理点绑定**：填写上下文后必须选择代理点，选择代理点后必须填写上下文；应用部署列表不再显示代理点、解压执行两列。
 - **无上下文的后台任务**：`cfg_webapps.context_path` 改为可空；没有上下文的部署不参与 HAProxy/Nginx 路由生成。新增迁移 `20261124-01-webapp-context-nullable.sql`。
 - **JSON 多行字段提交修复**：引擎的监听器/依赖 Jar、应用部署的对外路径按 JSON 数组提交，避免后端 JSON 列校验失败。
 - **项目总览排序**：按组织名称分组，同组织内按 `qualifiedName` 排序。
+- **磁盘监控显示调整**：磁盘行按挂载路径显示总容量/可用容量，不再显示挂载点数量；`/boot` 不计入监控。
 - **全局 Project 上下文**：顶部栏增加 Project 选择器，所有以 Project 为工作域的页面共用同一个当前 Project；切换功能后仍保持同一选择。
 - **外部路由**：新增 `/config/projects/{id}/external-routes`（不占菜单，从代理详情进入），按 `path -> host:port` 把外部系统接入 HAProxy map / Nginx location；支持启用/停用。
 - **HAProxy 路由 map 预览**：Project 详情的代理页在 HAProxy 类型下增加 `bas-routes.map` 只读预览和复制，内容与代理 bundle 一致。
