@@ -1,8 +1,8 @@
 /**
  * 手机端「管理」的取数与动作封装。
  *
- * 只调用既有端点：`config` 域的资源查询（`webapps` / `endpoints`）与两个既有动作
- * （`webapps/upgrade`、`artifacts/update-version`），以及新增的只读能力查询
+ * 只调用既有端点：`config` 域的资源查询（`webapps` / `endpoints` / `servers` / `artifacts`）与
+ * 两个既有动作（`webapps/upgrade`、`PATCH webapps/{id}`），以及只读能力查询
  * `ems/authorizations`（回答「当前会话能不能做这件事」）。
  */
 import { apiClient } from './client'
@@ -13,7 +13,6 @@ import { attributeText, callResourceAction, indexIncluded, listResource, relatio
 export const MANAGE_CHECKS = {
   deploy: '/config/webapps:post',
   deployEdit: '/config/webapps:patch',
-  artifacts: '/config/artifacts:post',
 } as const
 
 export type ManageCapabilities = Record<string, boolean>
@@ -111,9 +110,4 @@ export async function listProjectServers(projectId: string): Promise<ServerOptio
     })
     .map((row) => ({ id: row.id, label: attributeText(row.attributes.displayName) || attributeText(row.attributes.name) }))
     .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))
-}
-
-/** 从仓库刷新所有组件的最新版本元数据。 */
-export async function refreshArtifactVersions(): Promise<void> {
-  await callResourceAction('/artifacts', 'update-version', [])
 }

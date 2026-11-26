@@ -197,9 +197,8 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
   实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（管理：整库汇总待升级与到期证书、
   项目内列表与批量升级、点应用进详情页改版本（候选来自 `/config/artifacts/{id}/versions`，也可手输）与部署目标、
-  只读证书状态）、`MobileMeView`（用户、登录/退出）。
-- 管理边界：只读配置现状 + 三个窄写操作（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `version`、
-  `artifacts/update-version`）。可升级判定用
+  只读证书状态；全量刷新组件版本只在 PC 做）、`MobileMeView`（用户、登录/退出）。
+- 管理边界：只读配置现状 + 两个窄写操作（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `version`/`targets`）。可升级判定用
   后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供删除、reset-key、
   bundle 下载、跨项目批量；升级与指定版本都只改配置版本并通知在线节点重新拉取，不触发重启（提示「重启后生效」），也不承诺已部署。写操作先问能力
   （`/ems/authorizations`），无权限或能力查询失败时隐藏按钮并说明，不靠前端猜角色。
