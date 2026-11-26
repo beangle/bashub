@@ -62,7 +62,7 @@
                 :disabled="!micdnAllOnline || micdnReloading"
                 @click="confirmMicdnReload"
               >
-                Reload
+                重载
               </t-button>
               <t-button
                 v-else
@@ -72,7 +72,7 @@
                 :disabled="!proxyAllOnline || !proxyEngineValid || proxyApplying"
                 @click="confirmProxyApply"
               >
-                应用
+                重载
               </t-button>
             </div>
           </div>

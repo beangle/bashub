@@ -420,16 +420,9 @@ export function compareAgentHealth(left: AgentStatus, right: AgentStatus): numbe
   return rank(left) - rank(right) || (left.ip || left.host || '').localeCompare(right.ip || right.host || '')
 }
 
-/** 项目卡片排序：异常优先，正常其次，离线最后；同级按机构与配置名。 */
+/** 与 PC 项目总览一致：先机构名，再 qualifiedName；状态只展示，不参与排序。 */
 export function compareProjectHealth(left: MobileProject, right: MobileProject): number {
-  const rank = (status: ProjectStatus): number => {
-    if (status === 'critical') return 0
-    if (status === 'warning') return 1
-    if (status === 'ok') return 2
-    return 3
-  }
   return (
-    rank(left.status) - rank(right.status) ||
     left.orgName.localeCompare(right.orgName, 'zh-CN') ||
     left.qualifiedName.localeCompare(right.qualifiedName, 'zh-CN')
   )
