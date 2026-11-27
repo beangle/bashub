@@ -96,6 +96,19 @@ export async function saveResource(
   else await apiClient.post(resourcePath(path), { data })
 }
 
+/** 新建资源并返回新行 id（JSON:API `data.id`）。 */
+export async function createResource(
+  path: string,
+  type: string,
+  attributes: Record<string, unknown>,
+  relationships: Record<string, unknown>,
+): Promise<string> {
+  const document = await apiClient.post<JsonApiResource>(resourcePath(path), {
+    data: { type, attributes, relationships },
+  })
+  return document.data?.id ?? ''
+}
+
 export async function removeResource(path: string, id: string): Promise<void> {
   await apiClient.delete(`${resourcePath(path)}/${id}`)
 }

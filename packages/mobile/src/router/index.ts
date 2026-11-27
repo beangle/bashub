@@ -39,6 +39,11 @@ const router = createRouter({
       meta: { title: '项目部署' },
     },
     {
+      path: '/deploy/projects/:project/new',
+      component: () => import('@/views/MobileManageAppView.vue'),
+      meta: { title: '新增部署' },
+    },
+    {
       path: '/deploy/projects/:project/apps/:app',
       component: () => import('@/views/MobileManageAppView.vue'),
       meta: { title: '应用部署' },

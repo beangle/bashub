@@ -2,7 +2,7 @@
   <section class="mobile-page">
     <header class="mobile-page__head">
       <div class="mobile-page__heading">
-        <h2 class="mobile-page__title">{{ artifactTitle || app?.title || '应用部署' }}</h2>
+        <h2 class="mobile-page__title">{{ creating ? '新增部署' : (artifactTitle || app?.title || '应用部署') }}</h2>
         <p class="mobile-page__subtitle">{{ projectInfo?.qualifiedName || project }}</p>
       </div>
       <router-link class="mobile-back" :to="projectPath">返回项目</router-link>
@@ -12,10 +12,10 @@
     <MobileNotice v-if="message" theme="success" :message="message" />
     <MobileNotice v-if="catalogError" :message="catalogError" />
 
-    <div v-if="loading && !app" class="mobile-loading">
+    <div v-if="loading && !ready" class="mobile-loading">
       <t-loading size="24px" text="加载中" />
     </div>
-    <t-empty v-else-if="!app" description="该部署不存在，或已停用。" />
+    <t-empty v-else-if="!ready" description="该部署不存在，或已停用。" />
 
     <template v-else>
       <section class="mobile-card">
@@ -137,11 +137,23 @@
       <div class="mobile-actions mobile-manage-actions">
         <t-button size="small" variant="outline" :disabled="saving" @click="resetForm">还原</t-button>
         <t-button size="small" theme="primary" :loading="saving" :disabled="!canSave" @click="save">
-          保存
+          {{ creating ? '新增' : '保存' }}
+        </t-button>
+      </div>
+      <div v-if="canDelete" class="mobile-app-danger">
+        <t-button
+          size="small"
+          variant="outline"
+          theme="danger"
+          :loading="deleting"
+          :disabled="saving || deleting"
+          @click="confirmRemove"
+        >
+          卸载部署
         </t-button>
       </div>
       <p v-if="!canEdit" class="mobile-hint">当前账户无变更权限，仅展示。</p>
-      <p v-else class="mobile-hint">只改配置，不重启实例；重启实例后生效。</p>
+      <p v-else class="mobile-hint">{{ creating ? '只写配置，重启实例后生效。' : '只改配置，不重启实例；重启实例后生效。' }}</p>
     </template>
 
     <t-popup v-model:visible="artifactOpen" placement="bottom">
@@ -195,8 +207,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { DialogPlugin } from 'tdesign-mobile-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { DialogPlugin, Toast } from 'tdesign-mobile-vue'
 import { ArrowRightIcon, CheckIcon, CloseIcon } from 'tdesign-icons-vue-next'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
@@ -207,7 +219,9 @@ import {
   loadManageCatalog,
   readArtifactVersions,
   readCapabilities,
+  removeWebapp,
   saveWebapp,
+  createWebapp,
   type ArtifactOption,
   type EndpointOption,
   type ServerOption,
@@ -218,17 +232,23 @@ import { errorText } from '@/monitor-model'
 import { buildApps, type ManageApp } from '@/manage-model'
 
 const route = useRoute()
+const router = useRouter()
 const catalog = useProjectCatalog()
 
 const project = computed(() => String(route.params.project ?? ''))
 const appId = computed(() => String(route.params.app ?? ''))
+/** 没有 `:app` 段就是新增部署；复用同一张表单。 */
+const creating = computed(() => !route.params.app)
 const projectInfo = computed(() => catalog.projectOf(project.value))
+const projectId = computed(() => projectInfo.value?.id ?? '')
 const catalogError = computed(() => catalog.error.value)
 const projectPath = computed(() => `/deploy/projects/${encodeURIComponent(project.value)}`)
 
 const app = ref<ManageApp | null>(null)
+const ready = computed(() => creating.value || app.value !== null)
 const loading = ref(false)
 const saving = ref(false)
+const deleting = ref(false)
 const error = ref('')
 const message = ref('')
 
@@ -257,7 +277,10 @@ const targetIds = ref<string[]>([])
 const targetsOpen = ref(false)
 
 const capabilities = ref<Record<string, boolean>>({})
-const canEdit = computed(() => capabilities.value[MANAGE_CHECKS.deployEdit] === true)
+const canEdit = computed(() =>
+  capabilities.value[creating.value ? MANAGE_CHECKS.deploy : MANAGE_CHECKS.deployEdit] === true,
+)
+const canDelete = computed(() => !creating.value && capabilities.value[MANAGE_CHECKS.deployDelete] === true)
 
 const contextPathError = computed(() => {
   const value = contextPath.value.trim()
@@ -279,6 +302,7 @@ const canSave = computed(
     artifactId.value.length > 0 &&
     version.value.trim().length > 0 &&
     targetIds.value.length > 0 &&
+    (!creating.value || projectId.value.length > 0) &&
     contextPathError.value === '' &&
     !endpointMissing.value &&
     !endpointOrphan.value,
@@ -286,10 +310,14 @@ const canSave = computed(
 
 const filteredArtifacts = computed(() => {
   const term = artifactKeyword.value.trim().toLowerCase()
-  if (!term) return artifacts.value
-  return artifacts.value.filter((item) =>
-    [item.title, item.artifactName].some((value) => value.toLowerCase().includes(term)),
-  )
+  return artifacts.value.filter((item) => {
+    // 只允许当前项目的组件或通用组件；当前已选项始终保留，历史跨项目部署仍可编辑。
+    // 项目目录还没加载出来时不过滤，避免把本项目组件误藏掉。
+    if (projectId.value && item.projectId && item.projectId !== projectId.value && item.id !== artifactId.value) {
+      return false
+    }
+    return [item.title, item.artifactName].some((value) => value.toLowerCase().includes(term))
+  })
 })
 
 const selectedTargetNames = computed(() =>
@@ -333,7 +361,21 @@ function artifactMeta(item: ArtifactOption): string {
 
 function resetForm(): void {
   const current = app.value
-  if (!current) return
+  if (!current) {
+    artifactId.value = ''
+    artifactTitle.value = ''
+    artifactName.value = ''
+    contextPath.value = ''
+    endpointIds.value = []
+    version.value = ''
+    versionLatest.value = ''
+    versionOptions.value = []
+    targetIds.value = []
+    targetsOpen.value = false
+    endpointsOpen.value = false
+    message.value = ''
+    return
+  }
   artifactId.value = current.artifactId
   artifactTitle.value = current.title
   artifactName.value = current.artifactName
@@ -422,13 +464,15 @@ async function load(): Promise<void> {
     await catalog.load()
     const [data, caps, options] = await Promise.all([
       loadManageCatalog(),
-      readCapabilities([MANAGE_CHECKS.deployEdit]).then(
+      readCapabilities([MANAGE_CHECKS.deploy, MANAGE_CHECKS.deployEdit, MANAGE_CHECKS.deployDelete]).then(
         (value) => ({ ok: true as const, value }),
         () => ({ ok: false as const }),
       ),
       listProjectServers(projectInfo.value?.id ?? '').catch(() => [] as ServerOption[]),
     ])
-    app.value = buildApps(data.webapps, data.included).find((item) => item.id === appId.value) ?? null
+    app.value = creating.value
+      ? null
+      : buildApps(data.webapps, data.included).find((item) => item.id === appId.value) ?? null
     capabilities.value = caps.ok ? caps.value : {}
     servers.value = options
     endpoints.value = projectEndpoints(data.endpoints)
@@ -488,6 +532,10 @@ function proxyNote(current: ManageApp): string {
 }
 
 async function save(): Promise<void> {
+  if (creating.value) {
+    await runCreate()
+    return
+  }
   const current = app.value
   if (!current || !canSave.value) return
   const edit: WebappEdit = {
@@ -513,6 +561,69 @@ async function save(): Promise<void> {
   })
 }
 
+function confirmRemove(): void {
+  const current = app.value
+  if (!current || !canDelete.value || deleting.value)
+    return
+  const context = contextPath.value.trim()
+  const where = context ? `，上下文 ${context}` : '（后台任务）'
+  const dialog = DialogPlugin.confirm({
+    title: '卸载部署',
+    content: `从项目配置中移除「${artifactTitle.value || current.title}」${where}？关联的运行目标与代理点一并解除；已运行实例不会自动停止，重启后不再加载。`,
+    confirmBtn: '卸载',
+    cancelBtn: '取消',
+    onConfirm: () => {
+      dialog.destroy()
+      void runRemove(current.id)
+    },
+  })
+}
+
+async function runRemove(id: string): Promise<void> {
+  deleting.value = true
+  error.value = ''
+  try {
+    await removeWebapp(id)
+    Toast.success('已卸载部署')
+    await router.replace(projectPath.value)
+  } catch (reason) {
+    error.value = `卸载失败：${errorText(reason)}`
+  } finally {
+    deleting.value = false
+  }
+}
+
+async function runCreate(): Promise<void> {
+  if (!canSave.value)
+    return
+  if (!projectId.value) {
+    error.value = '项目目录未加载，无法新增部署。'
+    return
+  }
+  saving.value = true
+  error.value = ''
+  try {
+    const created = await createWebapp({
+      projectId: projectId.value,
+      artifactId: artifactId.value,
+      contextPath: contextPath.value.trim(),
+      version: version.value.trim(),
+      targetIds: [...targetIds.value],
+      endpointIds: [...endpointIds.value],
+    })
+    if (!created) {
+      error.value = '新增部署失败：服务端没有返回部署 id。'
+      return
+    }
+    Toast.success('已新增部署')
+    await router.push(`/deploy/projects/${encodeURIComponent(project.value)}/apps/${encodeURIComponent(created)}`)
+  } catch (reason) {
+    error.value = `新增部署失败：${errorText(reason)}`
+  } finally {
+    saving.value = false
+  }
+}
+
 async function runSave(edit: WebappEdit): Promise<void> {
   const current = app.value
   if (!current || saving.value) return
@@ -534,4 +645,12 @@ onMounted(() => {
   void catalog.load()
   void load()
 })
+
+// 新增成功后跳到 /apps/:id、或换项目/部署，组件实例会被复用，需要按路由重新加载。
+watch(
+  () => route.fullPath,
+  () => {
+    void load()
+  },
+)
 </script>

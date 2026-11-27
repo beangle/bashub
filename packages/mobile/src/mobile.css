@@ -1273,8 +1273,21 @@ body {
   height: 16px;
 }
 
+.mobile-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
 .mobile-app-field--plain .mobile-header-action {
   margin-left: auto;
+}
+
+.mobile-app-danger {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 
 .mobile-app-divider {

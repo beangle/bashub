@@ -2,17 +2,27 @@
  * 手机端「部署」的取数与动作封装。
  *
  * 只调用既有端点：`config` 域的资源查询（`webapps` / `endpoints` / `servers` / `artifacts`）与
- * 两个既有动作（`webapps/upgrade`、`PATCH webapps/{id}`），以及只读能力查询
+ * 保存动作（`PATCH webapps/{id}`），以及只读能力查询
  * `ems/authorizations`（回答「当前会话能不能做这件事」）。
  */
 import { apiClient } from './client'
 import { apiPath } from './prefix'
-import { attributeText, callResourceAction, indexIncluded, listResource, relationshipIds, saveResource, type ResourcePage } from './resource'
+import {
+  attributeText,
+  createResource,
+  indexIncluded,
+  listResource,
+  relationshipIds,
+  removeResource,
+  saveResource,
+  type ResourcePage,
+} from './resource'
 
 /** 部署页用到的能力项；键与 `resource:action` 完全一致，便于直接查表。 */
 export const MANAGE_CHECKS = {
   deploy: '/config/webapps:post',
   deployEdit: '/config/webapps:patch',
+  deployDelete: '/config/webapps:delete',
 } as const
 
 export type ManageCapabilities = Record<string, boolean>
@@ -64,12 +74,6 @@ export async function readCapabilities(checks: string[]): Promise<ManageCapabili
   return capabilities
 }
 
-/** 把所选应用部署的配置版本改成组件最新版本；实例重启后才生效。 */
-export async function upgradeWebapps(ids: string[]): Promise<void> {
-  if (ids.length === 0) return
-  await callResourceAction('/webapps', 'upgrade', ids)
-}
-
 /** 组件在 Maven Central 上已发布的版本；取不到时后端返回空列表，调用方回退到手工输入。 */
 export interface ArtifactVersions {
   latest: string
@@ -85,6 +89,8 @@ export async function readArtifactVersions(artifactId: string): Promise<Artifact
 /** 换组件用的组件目录条目：标题、Maven artifactId、默认上下文与最新版本。 */
 export interface ArtifactOption {
   id: string
+  /** 所属项目 id；空表示通用组件。 */
+  projectId: string
   title: string
   artifactName: string
   /** 组件默认上下文；为空表示该组件没有默认上下文（按后台任务部署）。 */
@@ -98,6 +104,7 @@ export async function listArtifacts(): Promise<ArtifactOption[]> {
   return page.rows
     .map((row) => ({
       id: row.id,
+      projectId: relationshipIds(row, 'project')[0] ?? '',
       title: attributeText(row.attributes.title) || attributeText(row.attributes.artifactId),
       artifactName: attributeText(row.attributes.artifactId),
       contextPath: attributeText(row.attributes.contextPath),
@@ -116,6 +123,36 @@ export interface WebappEdit {
   version: string
   targetIds: string[]
   endpointIds: string[]
+}
+
+/** 新增部署需要的字段；`projectId` 由当前项目上下文给出，不由用户选。 */
+export interface WebappCreate {
+  projectId: string
+  artifactId: string
+  contextPath: string
+  version: string
+  targetIds: string[]
+  endpointIds: string[]
+}
+
+/** 卸载部署：删除 webapp 配置并解除 targets/endpoints 关联；已运行实例不会自动停止。 */
+export async function removeWebapp(id: string): Promise<void> {
+  await removeResource('/webapps', id)
+}
+
+/** 新增应用部署；`urls` 传空数组满足列的 not null，后续代理路径按上下文回退。返回新部署 id。 */
+export async function createWebapp(create: WebappCreate): Promise<string> {
+  return createResource(
+    '/webapps',
+    'webapps',
+    { version: create.version, contextPath: create.contextPath, urls: [] },
+    {
+      artifact: { data: { type: 'artifacts', id: create.artifactId } },
+      project: { data: { type: 'projects', id: create.projectId } },
+      targets: { data: create.targetIds.map((target) => ({ type: 'servers', id: target })) },
+      endpoints: { data: create.endpointIds.map((endpoint) => ({ type: 'endpoints', id: endpoint })) },
+    },
+  )
 }
 
 /** 保存应用部署的组件、上下文、版本、运行目标与代理点；只改配置，不重启实例，重启后生效。 */
