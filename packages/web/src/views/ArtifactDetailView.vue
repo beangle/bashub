@@ -32,7 +32,7 @@
             <div class="fact"><span>打包类型</span><strong>{{ attributeText(artifact.attributes.packaging) || '—' }}</strong></div>
             <div class="fact"><span>部署上下文</span><strong><code>{{ attributeText(artifact.attributes.contextPath) || '—' }}</code></strong></div>
             <div class="fact"><span>面向平台</span><strong>{{ archLabel }}</strong></div>
-            <div class="fact"><span>默认项目</span><strong>{{ projectLabel }}</strong></div>
+            <div class="fact"><span>所属项目</span><strong>{{ projectLabel }}</strong></div>
             <div class="fact"><span>可执行文件</span><strong><code>{{ attributeText(artifact.attributes.exec) || '—' }}</code></strong></div>
           </div>
         </article>
@@ -121,9 +121,11 @@ const archLabel = computed(() => {
 })
 const projectLabel = computed(() => {
   const project = related(artifact.value, 'project', 'projects')
-  return project
-    ? attributeText(project.attributes.qualifiedName) || attributeText(project.attributes.name)
-    : '—'
+  if (!project)
+    return '—'
+  const name = attributeText(project.attributes.qualifiedName) || attributeText(project.attributes.name)
+  const title = attributeText(project.attributes.title)
+  return title && title !== name ? `${name} · ${title}` : name
 })
 
 function related(row: ResourceRow | undefined, key: string, type: string): ResourceRow | undefined {

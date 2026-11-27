@@ -238,6 +238,14 @@ async function loadOptions() {
         filters: field.optionsFilter && project ? { [field.optionsFilter]: project } : undefined,
       })
     }
+    // 应用部署的组件候选：当前项目的组件或通用组件；保留当前已选项，避免历史跨项目部署无法编辑。
+    if (ref.path === '/artifacts' && project) {
+      const current = String(form[field.key] ?? '')
+      result.rows = result.rows.filter((row) => {
+        const owner = relationshipIds(row, 'project')[0] || ''
+        return row.id === current || owner === '' || owner === project
+      })
+    }
     rows.set(field.key, result.rows)
     optionsCache[field.key] = result.rows.map((row) => ({
       label: ref.labelFields.map((name) => attributeText(row.attributes[name])).filter(Boolean).join(' ') || row.id,

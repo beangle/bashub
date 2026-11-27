@@ -59,7 +59,7 @@ export function isProjectRef(field: FieldSchema): boolean {
 /**
  * 资源是否以配置为工作域：查询条件里有配置，或表单里有必填的配置。
  * 命中后：查询条件默认取当前配置，新建表单的配置字段默认取当前配置。
- * （原 UI 里只有 farm/host/webapp 这样做，artifact/engine 的「针对配置」是各自可空的选项。）
+ * （原 UI 里只有 farm/host/webapp 这样做，artifact 的「所属项目」与 engine 的「配置」是各自可空的选项。）
  */
 export function isProjectScoped(schema: ResourceSchema): boolean {
   if (schema.followProject === false) return false

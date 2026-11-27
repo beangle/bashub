@@ -5,7 +5,7 @@ const organizationRef: ResourceRef = { path: '/organizations', type: 'organizati
 const projectRef: ResourceRef = {
   path: '/projects',
   type: 'projects',
-  labelFields: ['qualifiedName'],
+  labelFields: ['qualifiedName', 'title'],
   sort: 'org.name,name',
 }
 const platformRef: ResourceRef = { path: '/platforms', type: 'platforms', labelFields: ['name'] }
@@ -284,7 +284,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'latestVersion', label: '最新版本', required: true, column: false },
       { key: 'gav', label: 'GAV', form: false, sortable: false },
       { key: 'contextPath', label: '部署上下文', width: '15%' },
-      { key: 'project', label: '针对配置', type: 'ref', ref: projectRef, column: false },
+      { key: 'project', label: '所属项目', type: 'ref', ref: projectRef, column: false },
       { key: 'resolveSupport', label: '需要解析', type: 'boolean', width: '8%', section: '运行特征' },
       {
         key: 'container', label: '容器要求', form: false, sortable: false, width: '8%',

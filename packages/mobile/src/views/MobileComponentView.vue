@@ -51,7 +51,7 @@
               <dd>{{ form.contextPath || '无' }}</dd>
             </div>
             <div v-if="form.projectId" class="mobile-instance-fact">
-              <dt>默认项目</dt>
+              <dt>所属项目</dt>
               <dd>{{ projectLabel }}</dd>
             </div>
             <div v-if="!native" class="mobile-instance-fact mobile-instance-fact--wide">
@@ -133,13 +133,13 @@
           <input v-model="form.exec" class="mobile-component-row__input" type="text" :disabled="!canEdit" />
         </div>
         <div class="mobile-component-row">
-          <span class="mobile-component-row__label">默认项目</span>
+          <span class="mobile-component-row__label">所属项目</span>
           <span class="mobile-component-row__value">{{ projectLabel }}</span>
           <button
             v-if="canEdit"
             type="button"
             class="mobile-component-row__picker"
-            aria-label="选择默认项目"
+            aria-label="选择所属项目"
             @click="openSheet('project')"
           >
             <ArrowRightIcon class="mobile-component-row__chevron" />
@@ -281,7 +281,7 @@ const enabledCount = computed(() => deployments.value.filter((item) => item.enab
 
 const projectLabel = computed(() => {
   const found = projects.projects.value.find((item) => item.id === form.value.projectId)
-  return found ? `${found.title} · ${found.qualifiedName}` : '无（通用组件）'
+  return found ? `${found.qualifiedName} · ${found.title}` : '无（通用组件）'
 })
 
 /** 查看态只列开启的运行特征，避免一行三个「否」。 */
@@ -305,7 +305,11 @@ const sheetItems = computed<string[]>(() => {
   if (sheetKind.value === 'packaging') return [...PACKAGING_OPTIONS]
   if (sheetKind.value === 'arch') return ARCH_OPTIONS.map((item) => item.label)
   if (sheetKind.value === 'project') {
-    return ['无（通用组件）', ...projects.projects.value.map((item) => `${item.title} · ${item.qualifiedName}`)]
+    // 英文 qualifiedName 在前并按它排序，中文标题只作补充。
+    const items = [...projects.projects.value]
+      .sort((left, right) => left.qualifiedName.localeCompare(right.qualifiedName, 'en'))
+      .map((item) => `${item.qualifiedName} · ${item.title}`)
+    return ['无（通用组件）', ...items]
   }
   return []
 })

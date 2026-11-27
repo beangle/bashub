@@ -1,7 +1,7 @@
 /**
  * 手机端「组件」的取数与保存：只调用既有端点。
  *
- * 列表逐页取全量后前端搜索（与 PC 组件列表同源）；详情带默认项目；
+ * 列表逐页取全量后前端搜索（与 PC 组件列表同源）；详情带所属项目；
  * 部署情况走 `GET /config/artifacts/{id}/webapps`；保存走通用 `PATCH /config/artifacts/{id}`。
  * 不碰组件版本刷新端点，也不新建/删除组件。
  */
@@ -36,7 +36,7 @@ export async function loadArtifactCatalog(): Promise<ResourcePage> {
   return { rows, included, page: { number: 1, size: rows.length, total: rows.length } }
 }
 
-/** 组件详情：一并带回默认项目。 */
+/** 组件详情：一并带回所属项目。 */
 export function loadArtifactDetail(id: string) {
   return getResourceDetail('/artifacts', id, ['project'])
 }

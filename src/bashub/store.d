@@ -135,11 +135,41 @@ private void normalizeHubWrite(Store store, Registry reg, const Resource res, st
     return;
   }
   if (res.path == "webapps") {
+    validateWebappArtifact(store, reg, res, id, values);
     // 扩展库输入框允许换行粘贴；容器按逗号/分号拆分，保存时把换行折成逗号。
     if (auto value = "libs" in values)
       values["libs"] = Json(jsonText(*value).replace("\r\n", "\n").replace("\r", "").replace("\n", ",").strip);
     return;
   }
+}
+
+/// 新部署或更换组件时，只允许当前项目的组件或通用组件（`artifact.project` 为空）。
+///
+/// 已经部署、且这次没换组件的历史数据不受影响：PATCH 里组件没变（或没提交组件）直接放行，
+/// 避免老配置因为「换组件」之外的一次版本修改而无法保存。
+private void validateWebappArtifact(Store store, Registry reg, const Resource res, string id, ref Row values) {
+  auto artifactId = jsonText(rowGet(values, "artifact"));
+  if (artifactId.length == 0)
+    return;
+  string projectId = jsonText(rowGet(values, "project"));
+  if (id.length > 0) {
+    Json existing;
+    if (store.fetch(res, id, Query.init, existing)) {
+      auto current = jsonGet(existing, "data");
+      if (relationshipId(current, "artifact") == artifactId)
+        return;
+      if (projectId.length == 0)
+        projectId = relationshipId(current, "project");
+    }
+  }
+  if (projectId.length == 0)
+    return;
+  Json artifactDoc;
+  if (!store.fetch(reg.find("artifacts"), artifactId, Query.init, artifactDoc))
+    throw new StoreException("artifact", "组件不存在: " ~ artifactId);
+  auto owner = relationshipId(jsonGet(artifactDoc, "data"), "project");
+  if (owner.length > 0 && owner != projectId)
+    throw new StoreException("artifact", "组件属于其它项目，不能部署到当前项目");
 }
 
 private void validateHubAfterWrite(Store store, Registry reg, const Resource res, string id) {

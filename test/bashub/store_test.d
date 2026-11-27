@@ -276,3 +276,34 @@ private bool isHex(string text) {
   }
   return true;
 }
+
+@("a deployment only accepts its project's components or generic ones")
+unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  auto webapps = reg.find("webapps");
+
+  // 6001 属于 1002；部署到 1001 应被拒绝。
+  assertThrown!StoreException(store.create(webapps,
+      parseJsonString(`{"data":{"type":"webapps","attributes":{"version":"0.0.8","contextPath":"/bas","urls":[]},
+      "relationships":{"artifact":{"data":{"type":"artifacts","id":"6001"}},
+      "project":{"data":{"type":"projects","id":"1001"}}}}}`)));
+
+  // 通用组件 6002（project 为空）可以部署到任意项目。
+  auto created = store.create(webapps,
+      parseJsonString(`{"data":{"type":"webapps","attributes":{"version":"0.0.8","contextPath":"/tool","urls":[]},
+      "relationships":{"artifact":{"data":{"type":"artifacts","id":"6002"}},
+      "project":{"data":{"type":"projects","id":"1001"}}}}}`));
+  auto id = jsonText(created["data"]["id"]);
+
+  // 换成别的项目的组件应被拒绝。
+  Json updated;
+  assertThrown!StoreException(store.update(webapps, id,
+      parseJsonString(`{"data":{"type":"webapps","attributes":{"version":"0.0.8"},
+      "relationships":{"artifact":{"data":{"type":"artifacts","id":"6001"}}}}}`), updated));
+
+  // 组件没换（PATCH 不带 artifact）时，历史跨项目部署仍可改版本。
+  Json legacy;
+  assert(store.update(webapps, "7001",
+      parseJsonString(`{"data":{"type":"webapps","attributes":{"version":"0.0.9"}}}`), legacy));
+}
