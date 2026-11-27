@@ -127,6 +127,28 @@
         <t-empty v-else description="暂无应用。" />
       </section>
 
+      <section v-if="deployment && deployment.state !== 'ok'" class="mobile-card">
+        <header class="mobile-card__head">
+          <h3 class="mobile-card__title">配置状态</h3>
+          <t-tag size="small" variant="light" :theme="deployStateTheme">{{ deployStateLabel }}</t-tag>
+        </header>
+        <p v-if="deployment.state === 'undelivered'" class="mobile-hint">
+          配置尚未下发到该节点，稍后会自动同步。
+        </p>
+        <p v-else-if="deployment.state === 'unknown'" class="mobile-hint">
+          无法与当前配置对照（服务器未登记或配置已删除）。
+        </p>
+        <template v-else>
+          <ul class="mobile-deploy-items">
+            <li v-for="(item, index) in deployment.items ?? []" :key="index">
+              <span>{{ deployItemText(item) }}</span>
+              <code v-if="item.uri">{{ item.uri }}</code>
+            </li>
+          </ul>
+          <p class="mobile-hint">重启该实例后生效；这里只提示，不自动操作。</p>
+        </template>
+      </section>
+
       <section class="mobile-card">
         <MobileLogPanel
           title="实例日志"
@@ -153,6 +175,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   readAgentHistory,
   serviceAgentInstance,
+  type AgentDeployItem,
   type AgentServiceAction,
   type AgentStatus,
 } from '@/api/agents'
@@ -220,11 +243,32 @@ const instance = computed(() => findInstance(agent.value, instanceId.value))
 const ambiguous = computed(() => agentIp.value === '' && agents.value.length > 1)
 const running = computed(() => (instance.value ? isInstanceRunning(instance.value) : false))
 const webapps = computed(() => instance.value?.webapps ?? [])
+const deployment = computed(() => instance.value?.deployment)
 const agentIdentity = computed(() => (agent.value ? agentKey(agent.value) : ''))
 const nodesPath = computed(() => {
   const base = `/projects/${encodeURIComponent(project.value)}/nodes`
   return agentIp.value ? `${base}/${encodeURIComponent(agentIp.value)}` : base
 })
+
+const deployStateLabel = computed(() => {
+  switch (deployment.value?.state) {
+    case 'restart': return '待重启'
+    case 'undelivered': return '未下发'
+    case 'unknown': return '未知'
+    default: return ''
+  }
+})
+
+const deployStateTheme = computed<'warning' | 'default'>(() =>
+  deployment.value?.state === 'restart' ? 'warning' : 'default',
+)
+
+function deployItemText(item: AgentDeployItem): string {
+  if (item.action === 'load') return `待加载 ${item.context || '/'}`
+  if (item.action === 'remove') return `待删除 ${item.context || '/'}`
+  if (item.reason === 'port') return `待重启：端口 ${item.running ?? '—'} → ${item.configured ?? '—'}`
+  return `待重启 ${item.context || '/'}（访问路径变化）`
+}
 
 const instanceMemory = computed(() => {
   const target = instance.value

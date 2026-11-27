@@ -13,6 +13,11 @@
     <MobileNotice v-if="catalogError" :message="catalogError" />
     <MobileNotice v-if="opsError" :message="opsError" />
     <MobileNotice v-if="opsMessage" theme="success" :message="opsMessage" />
+    <MobileNotice
+      v-if="deployPending > 0"
+      theme="warning"
+      :message="`${deployPending} 个运行实例的部署配置待生效，重启对应实例后生效。`"
+    />
 
     <div v-if="catalogLoading && !projectInfo" class="mobile-loading">
       <t-loading size="24px" text="加载中" />
@@ -195,6 +200,16 @@ const health = computed(() => {
 })
 
 const agents = computed(() => [...statuses.value].sort(compareAgentHealth))
+
+/** 只统计在线实例；离线节点没有运行态可对照。unknown（服务器未登记）不算待生效。 */
+const deployPending = computed(() =>
+  agents.value
+    .flatMap((agent) => agent.basReport?.instances ?? [])
+    .filter((instance) => {
+      const state = instance.deployment?.state
+      return state === 'restart' || state === 'undelivered'
+    }).length,
+)
 
 interface AgentComponentState {
   active?: boolean

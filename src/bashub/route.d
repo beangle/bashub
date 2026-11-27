@@ -14,7 +14,7 @@ module bashub.route;
 
 import beangle.data.dao : DaoException;
 import beangle.data.query : Query, QueryException, parseQuery;
-import beangle.jsonapi.document : attributeBool, attributeLong, attributeText, errorDocument, okDocument, relationshipIds, unauthorizedDocument;
+import beangle.jsonapi.document : attributeBool, attributeLong, attributeStrings, attributeText, errorDocument, okDocument, relationshipIds, unauthorizedDocument;
 import beangle.data.resource : Registry, Resource;
 import beangle.jsonapi.router : JsonApiService, RouteOptions, collectParams, requireAuth, withFormatSuffix,
   writeJsonApi;
@@ -32,6 +32,7 @@ import bashub.config : HubConfig;
 import bashub.menus : MenuXmlException, exportMenus, importMenus;
 import bashub.project.menus : renderEmsMenus;
 import bashub.project.certificate : certificateNotAfter;
+import bashub.project.distribution : artifactGav;
 import bashub.project.manifest : renderSetlineManifest, sha256Hex;
 import bashub.project.micdnconfig : MicdnConfigException, MicdnProjectView, MicdnState, loadMicdnProject, loadMicdnState,
   ensureMicdnDownloadKey, micdnProjectDocument, normalizeComponentSpec, plainComponent,
@@ -1684,6 +1685,271 @@ class HubService {
     return index;
   }
 
+  /// 一台 server 上期望运行的 webapp：uri 含组件与版本，context/urls 与 server.xml 同源。
+  private static struct PlannedApp {
+    string uri;
+    string context;
+    string[] urls;
+  }
+
+  private static struct ServerPlan {
+    string id;
+    long httpPort;
+    PlannedApp[] apps;
+  }
+
+  /// 按 project 建「每台 server 期望运行什么」；以 server 的重启粒度对齐。
+  private ServerPlan[string] projectPlans(string projectId) {
+    ServerPlan[string] plans;
+    Json[string] farmsById;
+    Query farmQuery;
+    farmQuery.pageSize = 100000;
+    farmQuery.addFilter("project", projectId);
+    auto farmDoc = store.search(reg.find("farms"), farmQuery);
+    foreach (ref farm; farmDoc["data"]) {
+      if (farm.type == Json.Type.object)
+        farmsById[jsonText(farm["id"])] = farm;
+    }
+    if (farmsById.length == 0)
+      return plans;
+
+    Query serverQuery;
+    serverQuery.pageSize = 100000;
+    serverQuery.includes = ["farm"];
+    auto serverDoc = store.search(reg.find("servers"), serverQuery);
+    string[string] serverQualified;
+    foreach (ref server; serverDoc["data"]) {
+      if (server.type != Json.Type.object)
+        continue;
+      auto ids = relationshipIds(server, "farm");
+      if (ids.length == 0 || ids[0] !in farmsById)
+        continue;
+      auto qualified = attributeText(farmsById[ids[0]], "name") ~ "." ~ attributeText(server, "name");
+      serverQualified[jsonText(server["id"])] = qualified;
+      ServerPlan plan;
+      plan.id = qualified;
+      plan.httpPort = attributeLong(server, "httpPort");
+      plans[qualified] = plan;
+    }
+
+    Json[string] artifacts;
+    Query appQuery;
+    appQuery.pageSize = 100000;
+    appQuery.addFilter("project", projectId);
+    appQuery.includes = ["artifact"];
+    auto appDoc = store.search(reg.find("webapps"), appQuery);
+    foreach (ref item; appDoc["included"]) {
+      if (item.type == Json.Type.object && jsonText(item["type"]) == "artifacts")
+        artifacts[jsonText(item["id"])] = item;
+    }
+    foreach (ref row; appDoc["data"]) {
+      if (row.type != Json.Type.object)
+        continue;
+      auto attrs = row["attributes"];
+      if (jsonText(jsonGet(attrs, "enabled")) == "false")
+        continue;
+      auto artifactIds = relationshipIds(row, "artifact");
+      if (artifactIds.length == 0 || artifactIds[0] !in artifacts)
+        continue;
+      auto artifact = artifacts[artifactIds[0]];
+      PlannedApp app;
+      app.uri = "gav://" ~ artifactGav(artifact, attributeText(attrs, "version"));
+      app.context = normalizeWebappContext(attributeText(attrs, "contextPath"));
+      app.urls = attributeStrings(row, "urls");
+      foreach (serverId; relationshipIds(row, "targets")) {
+        if (serverId !in serverQualified)
+          continue;
+        auto qualified = serverQualified[serverId];
+        if (auto plan = qualified in plans)
+          (*plan).apps ~= app;
+      }
+    }
+    return plans;
+  }
+
+  private static string planAppKey(string uri, string context) {
+    return uri ~ "|" ~ context;
+  }
+
+  private static string sortedUrls(const string[] urls) {
+    auto copy = urls.dup;
+    copy.sort;
+    return copy.join(",");
+  }
+
+  private static string appUri(Json app) {
+    return jsonText(jsonGet(app, "uri"));
+  }
+
+  private static string appContext(Json app) {
+    return normalizeWebappContext(jsonText(jsonGet(app, "context")));
+  }
+
+  private static string appUrls(Json app) {
+    string[] urls;
+    auto items = jsonGet(app, "urls");
+    if (items.type == Json.Type.array)
+      foreach (ref item; items)
+        urls ~= jsonText(item);
+    return sortedUrls(urls);
+  }
+
+  /// agent 已下发的配置（declared）是否与 hub 的期望一致：应用集合、urls 与端口。
+  private static bool planDelivered(const ServerPlan plan, Json declaredServer) {
+    if (declaredServer.type != Json.Type.object)
+      return false;
+    string[string] declared;
+    auto apps = jsonGet(declaredServer, "webapps");
+    if (apps.type == Json.Type.array) {
+      foreach (ref app; apps) {
+        if (app.type != Json.Type.object)
+          continue;
+        declared[planAppKey(appUri(app), appContext(app))] = appUrls(app);
+      }
+    }
+    if (declared.length != plan.apps.length)
+      return false;
+    foreach (ref app; plan.apps) {
+      auto key = planAppKey(app.uri, app.context);
+      if (auto found = key in declared) {
+        if (*found != sortedUrls(app.urls))
+          return false;
+      } else {
+        return false;
+      }
+    }
+    // 端口 0 表示自动分配，agent 的 declared 里可能不写这个字段；缺失按 0 处理。
+    auto portJson = jsonGet(declaredServer, "httpPort");
+    auto declaredPort = portJson.type == Json.Type.int_ ? portJson.get!long : 0;
+    return declaredPort == plan.httpPort;
+  }
+
+  private static Json deployItem(string action, string uri, string context, string reason) {
+    Json item = Json.emptyObject;
+    item["action"] = Json(action);
+    if (uri.length > 0)
+      item["uri"] = Json(uri);
+    if (context.length > 0)
+      item["context"] = Json(context);
+    if (reason.length > 0)
+      item["reason"] = Json(reason);
+    return item;
+  }
+
+  /// 运行态与期望的差异：缺的待加载、多的待删除、同 key 但 urls/端口不同待重启。
+  private static Json[] runningDiffs(const ServerPlan plan, Json instance) {
+    Json[] items;
+    string[string] expected;
+    foreach (ref app; plan.apps)
+      expected[planAppKey(app.uri, app.context)] = sortedUrls(app.urls);
+
+    bool[string] running;
+    auto apps = jsonGet(instance, "webapps");
+    if (apps.type == Json.Type.array) {
+      foreach (ref app; apps) {
+        if (app.type != Json.Type.object)
+          continue;
+        auto uri = appUri(app);
+        auto context = appContext(app);
+        auto key = planAppKey(uri, context);
+        running[key] = true;
+        if (auto found = key in expected) {
+          if (*found != appUrls(app))
+            items ~= deployItem("restart", uri, context, "urls");
+        } else {
+          items ~= deployItem("remove", uri, context, "");
+        }
+      }
+    }
+    foreach (ref app; plan.apps) {
+      if (planAppKey(app.uri, app.context) in running)
+        continue;
+      items ~= deployItem("load", app.uri, app.context, "");
+    }
+    if (plan.httpPort > 0) {
+      auto portJson = jsonGet(instance, "httpPort");
+      auto actual = portJson.type == Json.Type.int_ ? portJson.get!long : -1;
+      if (actual != plan.httpPort) {
+        Json item = deployItem("restart", "", "", "port");
+        item["configured"] = Json(plan.httpPort);
+        item["running"] = Json(actual);
+        items ~= item;
+      }
+    }
+    return items;
+  }
+
+  /// 给每个在线实例补 `deployment`：ok / undelivered / restart / unknown。
+  private Json withDeploymentState(Json agentsJson) {
+    ServerPlan[string][string] cache;
+    foreach (ref agent; agentsJson) {
+      if (agent.type != Json.Type.object)
+        continue;
+      auto projectId = jsonText(agent["projectId"]);
+      auto report = jsonGet(agent, "basReport");
+      if (projectId.length == 0 || report.type != Json.Type.object)
+        continue;
+      if (projectId !in cache)
+        cache[projectId] = projectPlans(projectId);
+      auto plans = cache[projectId];
+
+      Json[string] declaredById;
+      auto declared = jsonGet(report, "declared");
+      if (declared.type == Json.Type.array) {
+        foreach (ref server; declared) {
+          if (server.type == Json.Type.object)
+            declaredById[jsonText(server["id"])] = server;
+        }
+      }
+      auto instances = jsonGet(report, "instances");
+      if (instances.type != Json.Type.array)
+        continue;
+      foreach (ref instance; instances) {
+        if (instance.type != Json.Type.object)
+          continue;
+        auto id = jsonText(instance["id"]);
+        auto plan = id in plans;
+        // 老 agent 可能只报 server name；在 project 内唯一时按后缀匹配，避免整台实例显示未知。
+        if (plan is null && id.length > 0 && id.indexOf(".") < 0) {
+          string matched;
+          foreach (key, _; plans) {
+            if (!key.endsWith("." ~ id))
+              continue;
+            if (matched.length > 0) {
+              matched = "";
+              break;
+            }
+            matched = key;
+          }
+          if (matched.length > 0)
+            plan = matched in plans;
+        }
+        if (plan is null) {
+          Json unknown = Json.emptyObject;
+          unknown["state"] = Json("unknown");
+          instance["deployment"] = unknown;
+          continue;
+        }
+        Json declaredServer;
+        if (auto found = id in declaredById)
+          declaredServer = *found;
+        if (!planDelivered(*plan, declaredServer)) {
+          Json undelivered = Json.emptyObject;
+          undelivered["state"] = Json("undelivered");
+          instance["deployment"] = undelivered;
+          continue;
+        }
+        auto items = runningDiffs(*plan, instance);
+        Json deploy = Json.emptyObject;
+        deploy["state"] = Json(items.length > 0 ? "restart" : "ok");
+        if (items.length > 0)
+          deploy["items"] = Json(items);
+        instance["deployment"] = deploy;
+      }
+    }
+    return agentsJson;
+  }
+
   private static string webappTitleOf(const WebappTitles titles, string context, string uri) {
     auto gav = gavKey(uri);
     if (gav.length > 0) {
@@ -1799,6 +2065,10 @@ class HubService {
       agentsJson = withWebappTitles(agentsJson);
     catch (Exception e)
       logWarn("Decorate agent webapps failed: %s", e.msg);
+    try
+      agentsJson = withDeploymentState(agentsJson);
+    catch (Exception e)
+      logWarn("Decorate agent deployment state failed: %s", e.msg);
     auto doc = Json.emptyObject;
     doc["agents"] = agentsJson;
     writeJsonApi(res, doc, HTTPStatus.ok);
@@ -3087,4 +3357,59 @@ private string hostOfUrl(string url) {
 private string mavenMetadata(string url) {
   auto metadata = curlGet(url);
   return metadata.isOk ? cast(string) metadata.body : null;
+}
+
+unittest {
+  Json makeApp(string uri, string context, string[] urls) {
+    Json app = Json.emptyObject;
+    app["uri"] = Json(uri);
+    app["context"] = Json(context);
+    Json[] items;
+    foreach (url; urls)
+      items ~= Json(url);
+    app["urls"] = Json(items);
+    return app;
+  }
+
+  HubService.ServerPlan plan;
+  plan.httpPort = 0;
+  HubService.PlannedApp planned;
+  planned.uri = "gav://org.example:demo:war:1.0.0";
+  planned.context = "/demo";
+  planned.urls = ["/demo"];
+  plan.apps ~= planned;
+
+  // declared 与期望一致：应用集合、urls 都对；端口 0 时 agent 可能不报 httpPort。
+  Json declared = Json.emptyObject;
+  declared["webapps"] = Json([makeApp(planned.uri, "/demo", ["/demo"])]);
+  assert(HubService.planDelivered(plan, declared));
+
+  // 版本不同即未下发。
+  Json old = Json.emptyObject;
+  old["webapps"] = Json([makeApp("gav://org.example:demo:war:0.9.0", "/demo", ["/demo"])]);
+  assert(!HubService.planDelivered(plan, old));
+
+  // 运行态旧版本：待删除旧 uri + 待加载新 uri。
+  Json instance = Json.emptyObject;
+  instance["webapps"] = Json([makeApp("gav://org.example:demo:war:0.9.0", "/demo", ["/demo"])]);
+  auto diffs = HubService.runningDiffs(plan, instance);
+  assert(diffs.length == 2);
+  bool sawRemove, sawLoad;
+  foreach (ref item; diffs) {
+    if (jsonText(item["action"]) == "remove") sawRemove = true;
+    if (jsonText(item["action"]) == "load") sawLoad = true;
+  }
+  assert(sawRemove && sawLoad);
+
+  // 端口不一致单独报 restart。
+  HubService.ServerPlan portPlan;
+  portPlan.httpPort = 8080;
+  portPlan.apps = plan.apps;
+  Json running = Json.emptyObject;
+  running["webapps"] = Json([makeApp(planned.uri, "/demo", ["/demo"])]);
+  running["httpPort"] = Json(8081L);
+  auto portDiffs = HubService.runningDiffs(portPlan, running);
+  assert(portDiffs.length == 1);
+  assert(jsonText(portDiffs[0]["action"]) == "restart");
+  assert(jsonText(portDiffs[0]["reason"]) == "port");
 }

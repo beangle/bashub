@@ -112,6 +112,10 @@
                 <div class="stat"><span>应用</span><strong>{{ enabledWebapps.length }}</strong></div>
                 <div class="stat"><span>在线节点</span><strong>{{ onlineAgents.length }}</strong></div>
                 <div class="stat"><span>运行实例</span><strong>{{ runningInstanceCount }}</strong></div>
+                <div class="stat">
+                  <span>配置待生效</span>
+                  <strong :class="{ 'text-warning': deployPendingCount > 0 }">{{ deployPendingCount }}</strong>
+                </div>
               </div>
             </article>
           </div>
@@ -732,6 +736,15 @@ const instanceRows = computed<InstanceRow[]>(() =>
     .sort((a, b) => (a.agent.host || a.agent.project).localeCompare(b.agent.host || b.agent.project)),
 )
 const runningInstanceCount = computed(() => instanceRows.value.filter((row) => row.running).length)
+
+/** 只统计运行实例的部署对账结果；unknown（服务器未登记）不算待生效。 */
+const deployPendingCount = computed(
+  () =>
+    instanceRows.value.filter(({ instance }) => {
+      const state = instance.deployment?.state
+      return state === 'restart' || state === 'undelivered'
+    }).length,
+)
 const stoppedInstanceCount = computed(() => instanceRows.value.filter((row) => !row.running).length)
 
 /** 服务表：运行中的排在停止的上面，同组按节点、群集、服务名排序。 */

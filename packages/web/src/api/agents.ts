@@ -62,6 +62,24 @@ export interface AgentWebapp {
   title?: string
 }
 
+export type AgentDeployAction = 'load' | 'remove' | 'restart'
+
+export interface AgentDeployItem {
+  action: AgentDeployAction
+  /** 配置侧或运行侧的 GAV；端口差异时为空。 */
+  uri?: string
+  context?: string
+  /** urls / port */
+  reason?: string
+  configured?: number
+  running?: number
+}
+
+export interface AgentDeployment {
+  state: 'ok' | 'undelivered' | 'restart' | 'unknown'
+  items?: AgentDeployItem[]
+}
+
 export interface AgentInstance {
   id?: string
   pid?: number
@@ -71,6 +89,8 @@ export interface AgentInstance {
   /** 进程 RSS（字节）；由 health 巡检补充。 */
   rssBytes?: number
   webapps?: AgentWebapp[]
+  /** 服务端按「配置期望 ↔ agent declared ↔ 运行实例」对账后的部署状态。 */
+  deployment?: AgentDeployment
   /** 前端合并 `instances` / `declared` 后得到的状态；接口本身只对运行实例给出 `running`。 */
   state?: 'running' | 'stopped' | 'error'
 }

@@ -73,6 +73,28 @@
         </dl>
       </article>
 
+      <article v-if="instance.deployment && instance.deployment.state !== 'ok'" class="detail-card">
+        <header class="detail-card__head">
+          <div>
+            <h3>配置状态</h3>
+            <p>配置期望与运行实例不一致时，重启实例后生效</p>
+          </div>
+          <t-tag size="small" variant="light" :theme="deployStateTheme">{{ deployStateLabel }}</t-tag>
+        </header>
+        <p v-if="instance.deployment.state === 'undelivered'" class="detail-empty">配置尚未下发到该节点，稍后会自动同步。</p>
+        <p v-else-if="instance.deployment.state === 'unknown'" class="detail-empty">无法与当前配置对照（服务器未登记或配置已删除）。</p>
+        <table v-else class="detail-table">
+          <thead><tr><th>动作</th><th>上下文</th><th>GAV</th></tr></thead>
+          <tbody>
+            <tr v-for="(item, index) in instance.deployment.items ?? []" :key="index">
+              <td>{{ deployItemText(item) }}</td>
+              <td>{{ item.context || '/' }}</td>
+              <td class="detail-gav" :title="item.uri || ''">{{ item.uri || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
       <article class="detail-card">
         <header class="detail-card__head">
           <div>
@@ -165,6 +187,7 @@ import {
   readAgentHistory,
   readAgentLog,
   serviceAgentInstance,
+  type AgentDeployItem,
   type AgentInstance,
   type AgentHistory,
   type AgentHealth,
@@ -283,6 +306,26 @@ function stateLabel(state: AgentHealth['state']): string {
 function isRunning(value: AgentInstance): boolean {
   return value.state !== 'stopped' && value.state !== 'error'
 }
+
+function deployItemText(item: AgentDeployItem): string {
+  if (item.action === 'load') return '待加载'
+  if (item.action === 'remove') return '待删除'
+  if (item.reason === 'port') return `待重启（端口 ${item.running ?? '—'} → ${item.configured ?? '—'}）`
+  return '待重启'
+}
+
+const deployStateLabel = computed(() => {
+  switch (instance.value?.deployment?.state) {
+    case 'restart': return '待重启'
+    case 'undelivered': return '未下发'
+    case 'unknown': return '未知'
+    default: return ''
+  }
+})
+
+const deployStateTheme = computed<'warning' | 'default'>(() =>
+  instance.value?.deployment?.state === 'restart' ? 'warning' : 'default',
+)
 
 function stateText(value: AgentInstance): string {
   if (value.state === 'error') return '异常'

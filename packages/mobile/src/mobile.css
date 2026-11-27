@@ -330,6 +330,28 @@ body {
   margin: 0;
 }
 
+.mobile-deploy-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobile-deploy-items li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.mobile-deploy-items code {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  word-break: break-all;
+}
+
 .mobile-instance-fact {
   display: flex;
   min-width: 0;

@@ -188,6 +188,12 @@
                         <td>{{ instance.httpPort ?? '-' }}</td>
                         <td class="instance-memory">{{ instanceMemory(instance) }}</td>
                         <td class="instance-apps">
+                          <t-tag
+                            v-if="instance.deployment && instance.deployment.state !== 'ok'"
+                            size="small"
+                            variant="light"
+                            :theme="deployStateTheme(instance)"
+                          >{{ deployStateText(instance) }}</t-tag>
                           <template v-if="(instance.webapps ?? []).length">
                             <div
                               v-for="app in instance.webapps"
@@ -1190,6 +1196,19 @@ function resetLog() {
   logTo.value = ''
   logError.value = ''
   resetLogWindow()
+}
+
+function deployStateText(instance: AgentInstance): string {
+  switch (instance.deployment?.state) {
+    case 'restart': return '待重启'
+    case 'undelivered': return '配置未下发'
+    case 'unknown': return '配置未知'
+    default: return ''
+  }
+}
+
+function deployStateTheme(instance: AgentInstance): 'warning' | 'default' {
+  return instance.deployment?.state === 'restart' ? 'warning' : 'default'
 }
 
 function instancesOf(agent: AgentStatus): AgentInstance[] {
