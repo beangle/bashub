@@ -283,7 +283,7 @@ export const resourceSchemas: ResourceSchema[] = [
       { key: 'title', label: '标题', required: true, width: '20%', section: '基本信息', cell: { type: 'link', href: '/config/artifacts/{id}' } },
       { key: 'artifactId', label: 'artifactId', required: true, column: false },
       { key: 'groupId', label: 'groupId', required: true, column: false },
-      { key: 'packaging', label: '打包类型', type: 'select', required: true, column: false, section: '构建与包', options: ['jar', 'war', 'bin', 'tar.gz'].map((value) => ({ label: value, value })) },
+      { key: 'packaging', label: '打包类型', type: 'select', required: true, column: false, section: '构建与包', options: ['jar', 'war', 'tar.gz'].map((value) => ({ label: value, value })) },
       { key: 'classifier', label: '分类器', column: false },
       { key: 'exec', label: '可执行文件', column: false, help: '仅 native 包：相对解压根目录；留空用 artifactId' },
       { key: 'arch', label: '面向平台', type: 'select', options: archOptions, width: '8%' },
