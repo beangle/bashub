@@ -1259,9 +1259,15 @@ body {
   padding: 4px 0 8px;
 }
 
-/* 版本输入框跟随卡片字号（TDesign 默认 16px，比周围 12–14px 的正文大一号）。 */
+/* 版本输入框跟随卡片字号（TDesign 默认 16px，比周围 12–14px 的正文大一号）。
+ * 真正的文字在 `.t-input__wrap .t-input__content` 上，那里用 font 简写设了 body-large，
+ * 只改 `.t-input` 不够，必须连 content 一起覆盖。 */
 .mobile-manage-version .t-input {
   padding: 8px 0;
+  font-size: 14px;
+}
+
+.mobile-manage-version .t-input .t-input__content {
   font-size: 14px;
 }
 
