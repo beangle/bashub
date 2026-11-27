@@ -175,7 +175,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `/micdn/projects/:id`、`/micdn/components`，监控使用 `/monitor/agents`。
   旧的无域页签组路径和资源独立页面入口都不注册，也没有重定向。
 
-## 手机端监控与管理系统（独立 SPA）
+## 手机端监控与部署（独立 SPA）
 
 手机端不在 `packages/web` 内，而是平级的 `packages/mobile`：独立 `package.json`、`vite.config.ts`、
 `index.html`、router 与构建产物，部署在 `/m/bashub/`（`VITE_APP_BASE` 控制）。PC 的壳层、路由与页面
@@ -183,24 +183,26 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
 
 - 认证与请求：`packages/mobile/src/auth.ts` 用与 PC 相同的 `@beangle/ems-app` 创建运行时配置和
   `createEmsAuth`；请求走同一套 `EmsJsonApiClient`，依赖同源 CAS cookie，不保存第二套 token。
-  `configs.json`、`sessions` 与监控端点两端口径一致；管理页另用只读的
+  `configs.json`、`sessions` 与监控端点两端口径一致；部署页另用只读的
   `GET /api/bashub/ems/authorizations?checks=resource:action,...` 询问「当前会话能不能做」，不自建权限模型。
 - 路由：`/` 项目列表、`/projects/:project` 项目概览、`/projects/:project/nodes` 节点、
-  `/projects/:project/instances/:instance` 实例、`/manage` 管理首页、`/manage/projects/:project`
-  项目管理、`/me` 我的。公开 URL 为基址 + 上述路径（例如 `/m/bashub/manage`）。
-- `MobileShell` 只负责布局：顶部固定当前项目（监控下点击回 `/`、管理下点击回 `/manage`）、底部固定
-  “监控 / 管理 / 我的”；概览、节点作为监控内的层级，管理页作为独立工作区，并复用 `auth` 的登录/退出。
+  `/projects/:project/instances/:instance` 实例、`/deploy` 部署首页、`/deploy/projects/:project`
+  项目部署、`/me` 我的。公开 URL 为基址 + 上述路径（例如 `/m/bashub/deploy`）。
+- `MobileShell` 只负责布局：顶部固定当前项目（监控下点击回 `/`、部署下点击回 `/deploy`）、底部固定
+  “监控 / 部署 / 我的”；概览、节点作为监控内的层级，部署页作为独立工作区，并复用 `auth` 的登录/退出。
 - 项目上下文只由 URL 的 `:project`（配置 `qualifiedName`）决定，不读写 PC 的
   `current_project_id`，也不提供全局 Project 下拉；刷新、深链和浏览器返回都保持当前项目。
 - 页面分工：`MobileProjectsView`（项目列表，合并 `/config/projects` 与 `/agents/summary`）、
   `MobileOverviewView`（当前项目健康与节点资源条，30 秒可见轮询）、`MobileNodesView`
   （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
-  实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（管理：整库汇总待升级与到期证书、
-  项目内列表与批量升级、点应用进详情页改版本（候选来自 `/config/artifacts/{id}/versions`，也可手输）与部署目标、
-  只读证书状态；全量刷新组件版本只在 PC 做）、`MobileMeView`（用户、登录/退出）。
-- 管理边界：只读配置现状 + 两个窄写操作（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `version`/`targets`）。可升级判定用
+  实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（部署：整库汇总待升级与到期证书、
+  项目内列表与批量升级、点应用进详情页改组件/上下文/代理点/版本/部署目标（版本候选来自 `/config/artifacts/{id}/versions`，也可手输；
+  上下文与代理点绑定，填了上下文必须选代理点）、只读证书状态；全量刷新组件版本只在 PC 做）、`MobileMeView`（用户、登录/退出）。
+- 部署边界：只读配置现状 + 两个写端点（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `artifact`/`contextPath`/`version`/`targets`/`endpoints`，
+  `urls`/`libs`/`unpack`/`enabled` 仍只在 PC 改）。可升级判定用
   后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供删除、reset-key、
-  bundle 下载、跨项目批量；升级与指定版本都只改配置版本并通知在线节点重新拉取，不触发重启（提示「重启后生效」），也不承诺已部署。写操作先问能力
+  bundle 下载、跨项目批量；升级、换组件/上下文都只改配置并通知在线节点重新拉取，不触发重启（提示「重启实例后生效」），
+  改上下文或代理点后还需在监控页重载代理配置才会下发，也不承诺已部署。写操作先问能力
   （`/ems/authorizations`），无权限或能力查询失败时隐藏按钮并说明，不靠前端猜角色。
 - 多 agent：实例启停、实例日志、agent 日志、节点立即刷新都显式传 `?agent=<ip>`；实例页缺少 agent
   且同项目有多台在线节点时先给出节点选择，不调用会 409 的歧义接口。
