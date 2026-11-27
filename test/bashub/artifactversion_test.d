@@ -95,6 +95,7 @@ unittest {
         Column("group_id", "groupId", Kind.text),
         Column("artifact_id", "artifactId", Kind.text),
         Column("latest_version", "latestVersion", Kind.text),
+        Column("versions", "versions", Kind.jsonArray),
       ],
       [], [], "id")
   ]);
@@ -109,7 +110,9 @@ unittest {
   ArtifactMetadataLoader loader = (string url) {
     requested ~= url;
     if (url.endsWith("/beangle-webmvc/maven-metadata.xml"))
-      return `<metadata><versioning><latest>4.6.0</latest></versioning></metadata>`;
+      return `<metadata><versioning><latest>4.6.0</latest>
+          <versions><version>4.5.0</version><version>4.6.0</version></versions>
+        </versioning></metadata>`;
     if (url.endsWith("/unchanged/maven-metadata.xml"))
       return `<metadata><versioning><latest>2.0.0</latest></versioning></metadata>`;
     return "";
@@ -120,6 +123,13 @@ unittest {
   assert(jsonText(rowGet(dao.findById(artifacts, "3001"), "latest_version")) == "4.6.0");
   assert(jsonText(rowGet(dao.findById(artifacts, "3002"), "latest_version")) == "1.0.0");
   assert(jsonText(rowGet(dao.findById(artifacts, "3003"), "latest_version")) == "2.0.0");
+  auto cached = rowGet(dao.findById(artifacts, "3001"), "versions");
+  assert(cached.length == 2);
+  assert(jsonText(cached[0]) == "4.5.0");
+  assert(jsonText(cached[1]) == "4.6.0");
+
+  // 同一份 metadata 再刷一遍：latest 与 versions 都没变，不应再写库。
+  assert(refreshArtifactVersions(reg, store, ["3001", "3002", "3003"], loader) == 0);
 }
 
 @("refresh all scans the unpaged artifact list")
@@ -131,6 +141,7 @@ unittest {
         Column("group_id", "groupId", Kind.text),
         Column("artifact_id", "artifactId", Kind.text),
         Column("latest_version", "latestVersion", Kind.text),
+        Column("versions", "versions", Kind.jsonArray),
       ],
       [], [], "id")
   ]);

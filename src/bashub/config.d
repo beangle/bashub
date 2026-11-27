@@ -99,6 +99,10 @@ HubConfig loadBashub(Ems ems) {
     mavenToken = appFileAttribute(ems.env.home, cfg.appName, "maven-download-token").strip;
   if (mavenToken.length > 0)
     cfg.mavenDownloadToken = mavenToken;
+  // 组件版本周期刷新间隔（分钟）：0 = 关闭；缺省 360。
+  auto refreshMinutes = appFileAttribute(ems.env.home, cfg.appName, "artifact-refresh-minutes").strip;
+  if (refreshMinutes.length > 0)
+    cfg.artifactRefreshMinutes = parseUIntAttr(refreshMinutes, "artifact refresh-minutes");
   // <agent health-interval="..." health-start="HH:MM" health-end="HH:MM"/>；
   // 兼容旧写法：<app agent-health-interval=...>。
   auto agentAttrs = appFileChildAttributes(ems.env.home, cfg.appName, "agent");
@@ -140,6 +144,8 @@ void validateBashubConfig(HubConfig cfg) {
   if (cfg.agentHealthIntervalSeconds > 0
       && (cfg.agentHealthIntervalSeconds < 60 || cfg.agentHealthIntervalSeconds > 24 * 60 * 60))
     throw new Exception("agent-health-interval must be 0 or between 60 and 86400 seconds");
+  if (cfg.artifactRefreshMinutes > 7 * 24 * 60)
+    throw new Exception("artifact-refresh-minutes must be 0 or at most 10080 (7 days)");
   if (cfg.agentHealthStartMinute >= 24 * 60 || cfg.agentHealthEndMinute >= 24 * 60)
     throw new Exception("agent-health-start/end must be HH:MM");
   if (cfg.agentHealthIntervalSeconds > 0 && cfg.agentHealthStartMinute == cfg.agentHealthEndMinute)

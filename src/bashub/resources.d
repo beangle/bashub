@@ -155,6 +155,7 @@ Registry hubRegistry() {
         Column("description", "description", Kind.text),
         Column("group_id", "groupId", Kind.text),
         Column("latest_version", "latestVersion", Kind.text),
+        Column("versions", "versions", Kind.jsonArray),
         Column("packaging", "packaging", Kind.text),
         Column("exec", "exec", Kind.text),
         Column("title", "title", Kind.text),

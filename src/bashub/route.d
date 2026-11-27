@@ -23,7 +23,7 @@ import beangle.data.value : Row, jsonGet, jsonText, rowGet;
 import beangle.commons.net.curl : curlGet;
 import beangle.security.session : Session, SessionRepo, nowSeconds;
 
-import bashub.artifactversion : readArtifactVersions, refreshArtifactVersions;
+import bashub.artifactversion : refreshArtifactVersions;
 import bashub.agent.channel : bearer;
 import bashub.agent.registry : AgentRegistry, AgentSession, RequestOutcome;
 import bashub.agent.socket : HealthSchedule, HeartbeatInterval, serveAgentSocket;
@@ -2602,10 +2602,11 @@ class HubService {
     writeJsonApi(res, okDocument(), HTTPStatus.ok);
   }
 
-  /// `GET /api/bashub/config/artifacts/:id/versions`：组件在 Maven Central 上已发布的版本。
+  /// `GET /api/bashub/config/artifacts/:id/versions`：组件已发布版本（读库里的缓存）。
   ///
-  /// 应用部署的「编辑版本」据此给出候选；取不到 metadata 时返回空列表，前端回退到
-  /// `latestVersion` 与手工输入，不影响指定任意版本。
+  /// 版本列表由周期刷新与手动 `update-version` 写入 `cfg_artifacts.versions`，
+  /// 这里只读库、不访问 Maven Central，所以打开部署详情不会再阻塞。
+  /// 缓存为空时返回空列表，前端回退到 `latestVersion` 与手工输入。
   void artifactVersions(HTTPServerRequest req, HTTPServerResponse res) {
     if (!requireAuth(req, res, opts))
       return;
@@ -2616,14 +2617,14 @@ class HubService {
       return;
     }
     auto attrs = jsonGet(jsonGet(artifact, "data"), "attributes");
-    auto info = readArtifactVersions(jsonText(jsonGet(attrs, "groupId")),
-        jsonText(jsonGet(attrs, "artifactId")), toDelegate(&mavenMetadata));
-
     auto items = appender!(Json[])();
-    foreach (each; info.versions)
-      items.put(Json(each));
+    auto cached = jsonGet(attrs, "versions");
+    if (cached.type == Json.Type.array) {
+      foreach (i; 0 .. cached.length)
+        items.put(Json(jsonText(cached[i])));
+    }
     auto doc = Json.emptyObject;
-    doc["latest"] = Json(info.latest);
+    doc["latest"] = Json(jsonText(jsonGet(attrs, "latestVersion")));
     doc["versions"] = Json(items.data);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }

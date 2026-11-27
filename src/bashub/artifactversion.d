@@ -115,22 +115,70 @@ size_t refreshArtifactVersions(Registry reg, Store store, const string[] ids, Ar
     if (xml.length == 0)
       continue;
 
-    string latest;
-    try {
-      latest = latestFromMetadata(xml).strip;
-    } catch (Exception e) {
-      continue;
-    }
-    auto current = jsonText(jsonGet(attrs, "latestVersion"));
-    if (latest.length == 0 || latest == current)
-      continue;
-
-    Row values;
-    values["latest_version"] = Json(latest);
-    if (store.updateColumns(res, id, values))
+    if (applyArtifactMetadata(reg, store, id, xml))
       updated++;
   }
   return updated;
+}
+
+/** 把一份 metadata XML 写进组件行：`latest_version` 与 `versions`（jsonb 数组）。
+ *
+ * 没有 `<versions>` 时不覆盖已有版本列表，只更新 `latest`；两者都没变则跳过写库。
+ * 返回是否实际写了库，供周期刷新统计。
+ */
+bool applyArtifactMetadata(Registry reg, Store store, string id, string xml) {
+  if (id.length == 0 || xml.length == 0)
+    return false;
+
+  string latest;
+  string[] versions;
+  try {
+    latest = latestFromMetadata(xml).strip;
+    versions = versionsFromMetadata(xml);
+  } catch (Exception e) {
+    return false;
+  }
+  if (latest.length == 0 && versions.length == 0)
+    return false;
+
+  auto res = reg.find("artifacts");
+  if (res.path.length == 0)
+    return false;
+  Json doc;
+  if (!store.fetch(res, id, Query.init, doc))
+    return false;
+  auto attrs = jsonGet(jsonGet(doc, "data"), "attributes");
+  auto currentLatest = jsonText(jsonGet(attrs, "latestVersion"));
+  if (latest.length == 0)
+    latest = currentLatest;
+
+  auto currentVersions = jsonGet(attrs, "versions");
+  bool versionsChanged = versions.length > 0 && !sameVersions(currentVersions, versions);
+  if (latest == currentLatest && !versionsChanged)
+    return false;
+
+  Row values;
+  values["latest_version"] = Json(latest);
+  if (versions.length > 0)
+    values["versions"] = jsonVersions(versions);
+  return store.updateColumns(res, id, values);
+}
+
+private Json jsonVersions(string[] versions) {
+  Json[] items;
+  foreach (each; versions)
+    items ~= Json(each);
+  return Json(items);
+}
+
+private bool sameVersions(Json current, string[] versions) {
+  if (current.type != Json.Type.array || current.length != versions.length)
+    return false;
+  foreach (i; 0 .. versions.length) {
+    if (jsonText(current[i]) != versions[i])
+      return false;
+  }
+  return true;
 }
 
 /// 刷新全部组件；周期任务用这个入口。

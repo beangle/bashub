@@ -15,7 +15,6 @@ import beangle.data.dao : Dao, DaoException;
 import beangle.data.dao.postgres : DbDao;
 import beangle.data.resource : Registry;
 import beangle.commons.sysprops : systemVars;
-import beangle.commons.net.curl : curlGet;
 import beangle.ems : emsFromEnvironment;
 import beangle.jsonapi.store : Store;
 import beangle.security.cas : CasConfig, CasSessionRepo;
@@ -23,7 +22,9 @@ import beangle.security.session : SessionRepo;
 
 import bashub.agent.registry : AgentRegistry;
 import bashub.agent.history : PostgresAgentHistoryStore;
-import bashub.artifactversion : refreshAllArtifactVersions;
+import beangle.data.query : Query;
+import beangle.data.value : jsonGet, jsonText;
+import bashub.artifactversion : applyArtifactMetadata, artifactMetadataUrl;
 import bashub.config;
 import bashub.logging;
 import bashub.resources;
@@ -32,14 +33,19 @@ import bashub.security : HubSecurity;
 import bashub.store;
 
 import vibe.core.args : setCommandLineArgs;
-import vibe.core.core : runApplication, setTimer;
+import vibe.core.core : runApplication, setTimer, Timer;
 import vibe.core.log : logError, logInfo, logWarn;
 import vibe.http.server : HTTPListener, HTTPServerSettings, listenHTTP;
 
-import core.time : minutes;
-import std.functional : toDelegate;
+import core.atomic : atomicOp;
+import core.time : Duration, msecs, minutes;
+import std.file : exists, readText, remove, tempDir;
+import std.path : buildPath;
+import std.process : Pid, spawnProcess, tryWait;
 import std.getopt : GetOptException, getopt;
 import std.stdio : stderr, writeln;
+
+import vibe.data.json : Json;
 
 /// 启动阶段失败（systemd 据此不重启）。
 enum ExitStartupError = 2;
@@ -218,21 +224,178 @@ private void warnSchemaDrift(Dao dao, Registry reg) {
 }
 
 /// 组件版本周期刷新。只在真实数据库后端启用：内存演示数据没有长期维护的意义。
+///
+/// metadata 交给独立 curl 子进程拉取，事件循环只做「轮询 + 写库」：单个组件最多 30 秒、
+/// 上百个组件串行时会把整个服务卡住几十分钟（见 `curlGet` 的同步 `execute`）。
 private void scheduleArtifactRefresh(HubConfig cfg, Registry reg, Store store) {
   if (cfg.artifactRefreshMinutes == 0 || store.backend != "postgres")
     return;
   setTimer(cfg.artifactRefreshMinutes.minutes, {
-    auto updated = refreshAllArtifactVersions(reg, store, toDelegate(&mavenMetadata));
-    if (updated > 0)
-      logInfo("Refreshed %s artifact versions", updated);
+    if (activeRefresh !is null)
+      return; // 上一轮还没跑完，跳过这一轮
+    activeRefresh = new ArtifactRefreshRunner(reg, store, { activeRefresh = null; });
+    activeRefresh.start();
   }, true);
   logInfo("Artifact version refresh scheduled every %s minutes", cfg.artifactRefreshMinutes);
 }
 
-/// 周期任务与手动 `/artifacts/update-version` 使用同一份 metadata 读取规则。
-private string mavenMetadata(string url) {
-  auto metadata = curlGet(url);
-  return metadata.isOk ? cast(string) metadata.body : null;
+/// 异步版本刷新：一次只跑一个 curl（不跟手动刷新抢带宽），每 200ms 回收结果并写库。
+private final class ArtifactRefreshRunner {
+  private static immutable size_t Concurrency = 1;
+  private static immutable Duration PollInterval = 200.msecs;
+
+  private static struct Job {
+    string id;
+    string bodyPath;
+    Pid pid;
+    bool done;
+  }
+
+  private Registry reg;
+  private Store store;
+  private void delegate() onDone;
+  private string[] ids;
+  private string[] urls;
+  private Job[] jobs;
+  private size_t next;
+  private size_t running;
+  private size_t updated;
+  private Timer ticker;
+  private bool ticking;
+
+  this(Registry reg, Store store, void delegate() onDone) {
+    this.reg = reg;
+    this.store = store;
+    this.onDone = onDone;
+  }
+
+  void start() {
+    auto res = reg.find("artifacts");
+    if (res.path.length == 0) {
+      finish();
+      return;
+    }
+    Json doc;
+    try {
+      auto q = Query.init;
+      q.pageSize = 0;
+      doc = store.search(res, q);
+    } catch (Exception e) {
+      logWarn("Artifact refresh: list failed: %s", e.msg);
+      finish();
+      return;
+    }
+    foreach (ref item; doc["data"]) {
+      auto id = jsonText(jsonGet(item, "id"));
+      auto attrs = jsonGet(item, "attributes");
+      auto groupId = jsonText(jsonGet(attrs, "groupId"));
+      auto artifactId = jsonText(jsonGet(attrs, "artifactId"));
+      if (id.length == 0 || groupId.length == 0 || artifactId.length == 0)
+        continue;
+      ids ~= id;
+      urls ~= artifactMetadataUrl(groupId, artifactId);
+    }
+    if (ids.length == 0) {
+      finish();
+      return;
+    }
+    ticker = setTimer(PollInterval, &tick, true);
+    ticking = true;
+    pump();
+  }
+
+  private void pump() {
+    while (running < Concurrency && next < ids.length) {
+      auto bodyPath = nextBodyPath();
+      Pid pid;
+      try {
+        pid = spawnProcess([
+          "curl", "--silent", "--show-error", "--fail", "--location",
+          "--connect-timeout", "5", "--max-time", "30",
+          "--output", bodyPath, urls[next],
+        ]);
+      } catch (Exception e) {
+        logWarn("Artifact refresh: start curl failed: %s", e.msg);
+        next++;
+        continue;
+      }
+      jobs ~= Job(ids[next], bodyPath, pid, false);
+      running++;
+      next++;
+    }
+  }
+
+  private void tick() {
+    foreach (ref job; jobs) {
+      if (job.done)
+        continue;
+      bool terminated;
+      int status;
+      try {
+        auto result = tryWait(job.pid);
+        terminated = result.terminated;
+        status = result.status;
+      } catch (Exception e) {
+        logWarn("Artifact refresh: wait failed: %s", e.msg);
+        job.done = true;
+        running--;
+        removeTemp(job.bodyPath);
+        continue;
+      }
+      if (!terminated)
+        continue;
+      job.done = true;
+      running--;
+      string xml;
+      try {
+        if (status == 0 && exists(job.bodyPath))
+          xml = readText(job.bodyPath);
+      } catch (Exception e) {
+        logWarn("Artifact refresh: read %s failed: %s", job.bodyPath, e.msg);
+      }
+      removeTemp(job.bodyPath);
+      if (xml.length == 0)
+        continue;
+      try {
+        if (applyArtifactMetadata(reg, store, job.id, xml))
+          updated++;
+      } catch (Exception e) {
+        logWarn("Artifact refresh: apply %s failed: %s", job.id, e.msg);
+      }
+    }
+    pump();
+    if (next >= ids.length && running == 0) {
+      logInfo("Refreshed %s artifact versions", updated);
+      finish();
+    }
+  }
+
+  private void finish() {
+    if (ticking) {
+      ticker.stop();
+      ticking = false;
+    }
+    if (onDone !is null)
+      onDone();
+  }
+
+  private static void removeTemp(string path) {
+    if (!exists(path))
+      return;
+    try
+      remove(path);
+    catch (Exception e) {
+    }
+  }
+}
+
+private shared uint refreshSeq;
+private __gshared ArtifactRefreshRunner activeRefresh;
+
+private string nextBodyPath() {
+  import std.conv : to;
+  auto n = atomicOp!"+="(refreshSeq, 1);
+  return buildPath(tempDir(), "bashub-versions-" ~ n.to!string ~ ".xml");
 }
 
 /// 会话仓库：配了 `<ems cas="...">` 就用 CAS 的会话服务（内存缓存 + 心跳定时器），

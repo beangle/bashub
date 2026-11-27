@@ -14,6 +14,7 @@ comment on column bas.cfg_artifacts.group_id is 'groupId?';
 comment on column bas.cfg_artifacts.id is '非业务主键:datetime';
 comment on column bas.cfg_artifacts.jsp_support is 'jspSupport?';
 comment on column bas.cfg_artifacts.latest_version is 'latestVersion?';
+comment on column bas.cfg_artifacts.versions is 'Maven metadata 的 versions 列表，由周期/手动刷新写入';
 comment on column bas.cfg_artifacts.packaging is 'packaging?';
 comment on column bas.cfg_artifacts.exec is 'native 可执行文件相对路径';
 comment on column bas.cfg_artifacts.project_id is 'Project?ID';

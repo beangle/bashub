@@ -45,6 +45,7 @@
             <column name="group_id" type="varchar(255)" nullable="false" comment="groupId?"/>
             <column name="jsp_support" type="boolean" nullable="false" defaultValue="false" comment="jspSupport?"/>
             <column name="latest_version" type="varchar(255)" nullable="false" comment="latestVersion?"/>
+            <column name="versions" type="jsonb" nullable="false" defaultValue="'[]'" comment="Maven metadata 的 versions 列表，由周期/手动刷新写入"/>
             <column name="packaging" type="varchar(255)" nullable="false" comment="packaging?"/>
             <column name="exec" type="varchar(255)" comment="native 可执行文件相对路径"/>
             <column name="project_id" type="bigint" comment="Project?ID"/>
