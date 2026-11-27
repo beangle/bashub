@@ -161,6 +161,20 @@ Project 详情的代理页在 HAProxy 类型下增加 `bas-routes.map` 只读预
 
 `cfg_webapps.context_path` 改为可空；没有上下文的部署视为后台任务，不生成任何代理路由。迁移文件：`db/postgresql/migrate/20261124-01-webapp-context-nullable.sql`。
 
+### 部署配置对账
+
+`/monitor/agents/status` 给每个运行实例补 `deployment`：hub 配置、agent 已下发的 `server.xml`（`declared`）与
+实际运行实例（`instances`）三方对账。新增/移入目标显示待加载，删除/移出目标显示待删除，版本、组件、上下文、
+`urls` 或端口变化显示待重启，配置还没到节点显示未下发。实例页与节点/项目概览只展示提示，不自动重启；
+判定粒度是 server，离线节点只能标未知。`libs`/`unpack` 等 agent 未上报的字段目前看不出来。
+
+### 部署组件限定
+
+新建部署或更换组件时，只能选当前项目自己的组件或通用组件（`artifact.project` 为空）；PC 表单与手机端
+换组件候选都按此过滤，后端在写入时校验，跨项目引用返回 400。已经部署、且本次没有更换组件的历史数据
+不受影响，仍可修改版本、上下文与运行目标。手机端部署项目页同时提供「新增」入口，走同一套候选过滤与后端校验；项目页不再提供批量「全部升级」，版本在详情逐个调整；详情页可「卸载部署」，
+删除配置并解除运行目标/代理点关联（已运行实例不会自动停止）。
+
 ### 组件版本缓存与刷新
 
 - `cfg_artifacts` 新增 `versions`(jsonb)：Maven metadata 的 `<versions>` 列表由周期刷新与

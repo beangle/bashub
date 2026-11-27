@@ -135,7 +135,7 @@ SPA 统一使用 `@beangle/ems-app` 的 `EmsJsonApiClient`（`packages/web/src/a
 | `servers` | Server | 群集实例；派生 `qualifiedName`（`群集.服务`）、`hostIp` 与 `displayName`（`群集.服务 (IP)`）；主机只能选当前 Project，代理统一使用 `httpPort`，不再有代理端口 |
 | `hosts` | Host | 详细系统版本、CPU 型号和体系结构存在只读 `hardware` JSON；表单只提交名称/IP/Project/组网分组/操作系统/内存/核心数/特性；`POST /api/bashub/config/hosts/{id}/adopt-agent` 从在线 Agent 回填 `hardware`，只回填空的 memory/cores；`GET /api/bashub/config/hosts/{id}/webapps?include=artifact` 返回部署到该主机的应用 |
 | `artifacts` | Artifact | 下发计算属性 `gav`；`GET /api/bashub/config/artifacts/{id}/webapps?include=artifact` 返回使用该组件的部署；`versions` 是 Maven metadata 里 `<versions>` 的 jsonb 缓存，由周期刷新与手动刷新写入；`GET /api/bashub/config/artifacts/{id}/versions` 只读该缓存返回 `{latest, versions}`（供手机端编辑应用部署版本时选版本，缓存为空时返回空列表）；`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[..]}`）从 Maven Central 的 `maven-metadata.xml` 刷新 `latestVersion` 与 `versions` |
-| `webapps` | Webapp | `enabled=false` 表示临时下线：保留配置和端口，但不生成 server.xml/代理路由、不参与告警和统计；允许 `contextPath` 为空（后台任务），空值不参与代理路由； `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 选择运行 server；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
+| `webapps` | Webapp | `enabled=false` 表示临时下线：保留配置和端口，但不生成 server.xml/代理路由、不参与告警和统计；允许 `contextPath` 为空（后台任务），空值不参与代理路由； `contextPath` 是部署上下文；`urls` 是对外 URL 前缀（一行一个，反代/setline 按它转发，留空按 `contextPath`）；`targets` 选择运行 server；新建或更换组件时 `artifact.project` 必须为空或等于 `webapp.project`（历史部署未换组件不受影响）；下发 `gav/artifactName/updatable`。额外 `POST /api/bashub/config/webapps/upgrade`（body `{"ids":[..]}`） |
 | `platform-features` | PlatformFeature | 菜单是 `平台与功能` 页签组里的「平台功能」页签 |
 | `platform-feature-scripts` | PlatformFeatureScript | 无独立列表页，在平台功能详情页维护；`scripts` 写入时去掉 `\r` |
 
@@ -228,7 +228,11 @@ Freemarker 模板运行时，不属于 JSON:API。
   `basReport.declared` 是本机 `server.xml` 声明的实例，控制台按 `id` 合并两者，停止后仍保留实例行并
   提供启动入口。`basReport.instances[].webapps[].title` 与 `basReport.declared[].webapps[].title`
   都由 hub 读 project 的 webapp 配置反查 artifact.title 后补上（先按 gav，再按 context）：agent 只上报 gav/context，不扩协议，
-  也不要求 SPA 有配置读取权限。`org` 是 project 所属机构的展示信息 `{name,title,shortTitle,logoUrl}`（按 project
+  也不要求 SPA 有配置读取权限。运行实例还带 `deployment`：`state` 为 `ok` / `undelivered` / `restart` / `unknown`，
+  `items` 列出差异项（`action` 为 `load` / `remove` / `restart`，带 `uri`/`context`，端口差异带 `reason:"port"` 与
+  `configured`/`running`）。判定按 server（`farm.name`）对比 hub 配置、agent 的 `declared`（本机 server.xml）与
+  `instances`（运行态）：新增/移入目标 → 待加载，删除/移出目标 → 待删除，版本/组件/上下文/urls/端口变化 → 待重启，
+  hub 配置与 `declared` 不一致 → 未下发。只看在线节点；`libs`/`unpack` 等 agent 未上报的字段看不出来。`org` 是 project 所属机构的展示信息 `{name,title,shortTitle,logoUrl}`（按 project
   名的 `org.` 前缀从 `organizations` 查得），SPA 只用它的 Logo 与兜底标题；查不到就省略该字段。
 - 读轻量摘要：`GET /api/bashub/monitor/agents/summary` → `{"agents":[…]}`，每台机器一项，只含
   project / projectId / projectTitle / ip / host / org / basctl / bas / supports / connectedAt / lastSeenAt / healthAt / health

@@ -149,7 +149,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   空值不覆盖（与旧 `ProjectHelper.remember` 一致，清空条件=看全部，不会抹掉记忆）；记忆的配置若已被删除，
   加载选项后会被丢弃，避免下拉框显示裸 id。宿主/门户下发的 `?contextProjectId=<id>` 优先级最高
   （参数名沿用 ems-app 的 `EMS_URL_PARAMS.contextProjectId`）。`refs`→projects（如静态组的「针对配置」）不算，
-  artifact/engine 的「针对配置」是可空选项、不参与记忆。
+  artifact 的「所属项目」与 engine 的「配置」是可空选项、不参与记忆。
 - 必填查询条件（菜单管理的「应用」，`filters` 里标 `required: true`）：**未选定时不发列表请求**，
   数据区只显示「请先选择应用」，避免空条件把全量菜单拉回来（原 `MenuAction.indexSetting` 也是先选应用再加载）。
   默认值优先取记忆：URL 显式给的查询条件优先级最高，其次是 localStorage 里上次选的应用
@@ -197,13 +197,14 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `MobileOverviewView`（当前项目健康与节点资源条，30 秒可见轮询）、`MobileNodesView`
   （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
   实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（部署：整库汇总待升级与到期证书、
-  项目内列表与批量升级、点应用进详情页改组件/上下文/代理点/版本/部署目标（版本候选来自 `/config/artifacts/{id}/versions`，也可手输；
-  上下文与代理点绑定，填了上下文必须选代理点）、只读证书状态；组件版本刷新只在 PC 组件详情做单组件刷新，批量由后台周期任务做）、
+  项目内列表与新增、卸载、点应用进详情页改组件/上下文/代理点/版本/部署目标或卸载部署（项目页可新增部署；版本候选来自 `/config/artifacts/{id}/versions`，也可手输；
+  上下文与代理点绑定，填了上下文必须选代理点；换组件只列当前项目或通用组件）、只读证书状态；组件版本刷新只在 PC 组件详情做单组件刷新，批量由后台周期任务做）、
   `MobileComponentListView` / `MobileComponentView`（组件：列表按 groupId → artifactId 排序并支持搜索，
   详情展示定义字段与各 Project 的部署情况并可 PATCH 编辑（字段随打包类型收窄：jar/war 无平台/分类器/可执行文件，tar.gz 无解析/JSP/WebSocket），部署行跳部署详情）、`MobileMeView`（用户、登录/退出）。
-- 部署边界：只读配置现状 + 两个写端点（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `artifact`/`contextPath`/`version`/`targets`/`endpoints`，
+- 部署状态对账：服务端用 agent 上报的 `declared`（已下发的 server.xml）与 `instances`（运行态）对照 hub 配置，给运行实例补 `deployment`；实例页显示「待重启/待加载/待删除/未下发」，项目概览汇总「N 个实例配置待生效」，只提示不自动重启。判定粒度是 server（重启单位），离线节点只能标未知。
+- 部署边界：只读配置现状 + 三个写端点（`POST webapps` 新增、`PATCH webapps/{id}` 只改 `artifact`/`contextPath`/`version`/`targets`/`endpoints`、`DELETE webapps/{id}` 卸载部署，
   `urls`/`libs`/`unpack`/`enabled` 仍只在 PC 改）。可升级判定用
-  后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供删除、reset-key、
+  后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供 reset-key、
   bundle 下载、跨项目批量；升级、换组件/上下文都只改配置并通知在线节点重新拉取，不触发重启（提示「重启实例后生效」），
   改上下文或代理点后还需在监控页重载代理配置才会下发，也不承诺已部署。写操作先问能力
   （`/ems/authorizations`），无权限或能力查询失败时隐藏按钮并说明，不靠前端猜角色。组件页同理：
