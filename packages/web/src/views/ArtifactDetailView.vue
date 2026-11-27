@@ -8,6 +8,11 @@
           <router-link class="title-back" :to="listPath">← 返回组件管理</router-link>
         </div>
       </div>
+      <div class="page-actions">
+        <t-button variant="outline" :disabled="!artifact || refreshing" :loading="refreshing" @click="confirmRefresh">
+          刷新最新版本
+        </t-button>
+      </div>
     </div>
 
     <t-loading :loading="loading" show-overlay>
@@ -66,12 +71,13 @@
 </template>
 
 <script setup lang="ts">
-import { MessagePlugin } from 'tdesign-vue-next'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resourceApiPath } from '@/api/prefix'
 import {
   attributeText,
+  callResourceAction,
   fetchDocument,
   getResourceDetail,
   indexIncluded,
@@ -87,6 +93,7 @@ const router = useRouter()
 const listPath = resourceApiPath(ARTIFACTS_PATH)
 const artifactId = String(route.params.id || '')
 const loading = ref(false)
+const refreshing = ref(false)
 const artifact = ref<ResourceRow>()
 const webapps = ref<ResourceRow[]>([])
 const enabledWebapps = computed(() => webapps.value.filter(isWebappEnabled))
@@ -141,7 +148,7 @@ function projectLogo(webapp: ResourceRow): string {
   return project ? attributeText(related(project, 'org', 'organizations')?.attributes.logoUrl) : ''
 }
 
-onMounted(async () => {
+async function load(): Promise<void> {
   loading.value = true
   try {
     const [detail, deploymentDoc] = await Promise.all([
@@ -156,6 +163,33 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+/** 只刷新当前组件：读取 Maven metadata 并写回 latestVersion 与 versions。 */
+function confirmRefresh(): void {
+  if (!artifact.value || refreshing.value)
+    return
+  const dialog = DialogPlugin.confirm({
+    header: '刷新最新版本',
+    body: `将从 Maven Central 读取 ${artifactName.value || '该组件'} 的最新版本，并更新版本候选列表。`,
+    onConfirm: async () => {
+      dialog.destroy()
+      refreshing.value = true
+      try {
+        await callResourceAction(ARTIFACTS_PATH, 'update-version', [artifactId])
+        await load()
+        MessagePlugin.success('已刷新最新版本')
+      } catch (error) {
+        MessagePlugin.error(error instanceof Error ? error.message : '刷新最新版本失败')
+      } finally {
+        refreshing.value = false
+      }
+    },
+  })
+}
+
+onMounted(() => {
+  void load()
 })
 </script>
 

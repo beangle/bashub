@@ -270,12 +270,6 @@ export const resourceSchemas: ResourceSchema[] = [
     description: '可部署的 jar/war 构件',
     sort: 'artifactId',
     formColumns: 3,
-    tools: [
-      {
-        code: 'update-version', label: '刷新最新版本', action: 'update-version',
-        selection: 'oneOrMore', theme: 'primary', confirm: '刷新所选组件的最新版本号？',
-      },
-    ],
     filters: [{ key: 'artifactId', label: 'artifactId' }, { key: 'groupId', label: 'groupId' }],
     // 列序对齐原 artifact/list.ftl：标题 → GAV → 部署上下文 → 面向平台 → 需要解析 → 容器要求。
     columns: ['title', 'gav', 'contextPath', 'arch', 'resolveSupport', 'container'],
