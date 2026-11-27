@@ -104,7 +104,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 主机详情页的脚本下载使用机器端点，不在 `/config/hosts` 资源下；这里的 `{project}` 是配置的
 `qualifiedName`，`{hostIp}` 是该主机的 IP。
 
-### 手机端监控与部署（独立 SPA）
+### 手机端监控、部署与组件（独立 SPA）
 
 手机端是 `packages/mobile` 里的独立 SPA，与 `packages/web` 平级，部署在 `/m/bashub/`
 （`VITE_APP_BASE`）。它有自己的 `index.html`、router、构建产物与部署目录，不挂在 PC 路由下；
@@ -120,6 +120,8 @@ PC 路由、PC 页面和 PC 的全局项目选择器保持不变。选定项目�
 | `/m/bashub/deploy` | 部署首页：按项目汇总待升级应用与到期证书，`MobileManageView` | `GET /api/bashub/config/webapps/search?include=artifact`（逐页取全量）<br>`GET /api/bashub/config/endpoints/search`<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:post` |
 | `/m/bashub/deploy/projects/:project` | 项目部署：应用部署升级与证书现状，`MobileManageProjectView` | `GET /api/bashub/config/webapps/search?include=artifact`<br>`GET /api/bashub/config/endpoints/search`<br>`POST /api/bashub/config/webapps/upgrade`（`{"ids":[...]}`）<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:post` |
 | `/m/bashub/deploy/projects/:project/apps/:app` | 应用部署详情/编辑：组件、上下文、代理点、版本与部署目标，`MobileManageAppView` | `GET /api/bashub/config/webapps/search?include=artifact`<br>`GET /api/bashub/config/servers/search?include=farm`（按当前 Project 过滤）<br>`GET /api/bashub/config/artifacts/search`（换组件的候选，逐页取全量后前端搜索）<br>`GET /api/bashub/config/artifacts/{id}/versions`（版本候选，取不到返回空列表）<br>`PATCH /api/bashub/config/webapps/{id}`（`attributes.version` + `attributes.contextPath` + `relationships.artifact` + `relationships.targets` + `relationships.endpoints`）<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:patch` |
+| `/m/bashub/components` | 组件列表：先「定制组件」（绑定 Project 的按项目分组，带项目 Logo）再「通用组件」，组内按 groupId → artifactId 排序，支持搜索标题 / groupId / artifactId，`MobileComponentListView` | `GET /api/bashub/config/artifacts/search`（逐页取全量后前端搜索） |
+| `/m/bashub/components/:artifact` | 组件详情/编辑：定义字段与部署情况，`MobileComponentView` | `GET /api/bashub/config/artifacts/{id}?include=project`<br>`GET /api/bashub/config/artifacts/{id}/webapps?include=project,project.org`（每个 Project 的实际版本与上下文）<br>`PATCH /api/bashub/config/artifacts/{id}`（标题、坐标、打包、平台、版本、上下文、默认项目、开关与描述）<br>`GET /api/bashub/ems/authorizations?checks=/config/artifacts:patch` |
 | `/m/bashub/me` | 当前用户、登录/退出，`MobileMeView` | `GET /api/bashub/ems/sessions`<br>`POST /api/bashub/ems/sessions/logout`（由现有 auth 封装） |
 
 `{project}` 是配置的 `qualifiedName`。同一 project 有多台在线节点时，实例日志、agent 日志、立即上报和
@@ -133,7 +135,8 @@ PC 路由、PC 页面和 PC 的全局项目选择器保持不变。选定项目�
 隐藏无权动作，不做前端角色推断。手机端不展示 Project key、证书私钥，也不提供删除、reset-key、
 bundle 下载与跨项目批量。升级、换组件、改上下文/代理点、改版本都只改 `cfg_webapps` 配置并通知在线节点重新拉取，
 不触发重启（重启实例后才生效）；改上下文或代理点后还需让代理节点重新应用 bundle（监控页「重载」），也不做部署承诺；
-版本是自由文本，不校验仓库里是否存在（与 PC 表单一致）。
+版本是自由文本，不校验仓库里是否存在（与 PC 表单一致）。「组件」页只用 `artifacts` 的既有查询、
+`artifacts/{id}/webapps` 与 `PATCH`，不提供新建、删除和版本刷新。
 
 服务器需要把 `/m/bashub/` 指向 `packages/mobile/dist`，并对 `/m/bashub/*` 做 history fallback
 到该目录的 `index.html`；`/api` 仍反代到同一个 D 后端，CAS 会话 cookie 同源共用，CAS 的 service

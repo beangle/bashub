@@ -55,9 +55,6 @@
               </div>
               <p class="mobile-manage-app__meta">{{ app.contextPath || '无上下文' }}</p>
             </div>
-            <div class="mobile-manage-app__side">
-              <ArrowRightIcon class="mobile-manage-app__chevron" />
-            </div>
           </article>
         </div>
       </section>
@@ -93,7 +90,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { DialogPlugin } from 'tdesign-mobile-vue'
-import { ArrowRightIcon } from 'tdesign-icons-vue-next'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 import {

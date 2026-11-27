@@ -187,9 +187,10 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `GET /api/bashub/ems/authorizations?checks=resource:action,...` 询问「当前会话能不能做」，不自建权限模型。
 - 路由：`/` 项目列表、`/projects/:project` 项目概览、`/projects/:project/nodes` 节点、
   `/projects/:project/instances/:instance` 实例、`/deploy` 部署首页、`/deploy/projects/:project`
-  项目部署、`/me` 我的。公开 URL 为基址 + 上述路径（例如 `/m/bashub/deploy`）。
+  项目部署、`/components` 组件列表、`/components/:artifact` 组件详情、`/me` 我的。
+  公开 URL 为基址 + 上述路径（例如 `/m/bashub/deploy`、`/m/bashub/components`）。
 - `MobileShell` 只负责布局：顶部固定当前项目（监控下点击回 `/`、部署下点击回 `/deploy`）、底部固定
-  “监控 / 部署 / 我的”；概览、节点作为监控内的层级，部署页作为独立工作区，并复用 `auth` 的登录/退出。
+  “监控 / 部署 / 组件 / 我的”；概览、节点作为监控内的层级，部署与组件作为独立工作区，并复用 `auth` 的登录/退出。
 - 项目上下文只由 URL 的 `:project`（配置 `qualifiedName`）决定，不读写 PC 的
   `current_project_id`，也不提供全局 Project 下拉；刷新、深链和浏览器返回都保持当前项目。
 - 页面分工：`MobileProjectsView`（项目列表，合并 `/config/projects` 与 `/agents/summary`）、
@@ -197,13 +198,16 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
   实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（部署：整库汇总待升级与到期证书、
   项目内列表与批量升级、点应用进详情页改组件/上下文/代理点/版本/部署目标（版本候选来自 `/config/artifacts/{id}/versions`，也可手输；
-  上下文与代理点绑定，填了上下文必须选代理点）、只读证书状态；全量刷新组件版本只在 PC 做）、`MobileMeView`（用户、登录/退出）。
+  上下文与代理点绑定，填了上下文必须选代理点）、只读证书状态；全量刷新组件版本只在 PC 做）、
+  `MobileComponentListView` / `MobileComponentView`（组件：列表按 groupId → artifactId 排序并支持搜索，
+  详情展示定义字段与各 Project 的部署情况并可 PATCH 编辑（字段随打包类型收窄：jar/war 无平台/分类器/可执行文件，tar.gz 无解析/JSP/WebSocket），部署行跳部署详情）、`MobileMeView`（用户、登录/退出）。
 - 部署边界：只读配置现状 + 两个写端点（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `artifact`/`contextPath`/`version`/`targets`/`endpoints`，
   `urls`/`libs`/`unpack`/`enabled` 仍只在 PC 改）。可升级判定用
   后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供删除、reset-key、
   bundle 下载、跨项目批量；升级、换组件/上下文都只改配置并通知在线节点重新拉取，不触发重启（提示「重启实例后生效」），
   改上下文或代理点后还需在监控页重载代理配置才会下发，也不承诺已部署。写操作先问能力
-  （`/ems/authorizations`），无权限或能力查询失败时隐藏按钮并说明，不靠前端猜角色。
+  （`/ems/authorizations`），无权限或能力查询失败时隐藏按钮并说明，不靠前端猜角色。组件页同理：
+  只读 `artifacts` 列表/详情 + `PATCH /config/artifacts/{id}` 一个写端点，不新建、不删除、不刷新最新版本。
 - 多 agent：实例启停、实例日志、agent 日志、节点立即刷新都显式传 `?agent=<ip>`；实例页缺少 agent
   且同项目有多台在线节点时先给出节点选择，不调用会 409 的歧义接口。
 - 日志先读尾部再按需跟随；`useAgentLog` 统一处理 `reset`、错误状态与卸载时的流关闭。维护操作用

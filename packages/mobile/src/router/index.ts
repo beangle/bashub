@@ -43,6 +43,16 @@ const router = createRouter({
       component: () => import('@/views/MobileManageAppView.vue'),
       meta: { title: '应用部署' },
     },
+    {
+      path: '/components',
+      component: () => import('@/views/MobileComponentListView.vue'),
+      meta: { title: '组件' },
+    },
+    {
+      path: '/components/:artifact',
+      component: () => import('@/views/MobileComponentView.vue'),
+      meta: { title: '组件详情' },
+    },
     { path: '/me', component: () => import('@/views/MobileMeView.vue'), meta: { title: '我的' } },
   ],
 })

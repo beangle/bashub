@@ -1172,20 +1172,6 @@ body {
   background: var(--td-bg-color-container-active);
 }
 
-.mobile-manage-app__side {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-}
-
-.mobile-manage-app__chevron {
-  width: 18px;
-  height: 18px;
-  flex: none;
-  color: var(--td-text-color-placeholder);
-}
-
 /* 部署详情页：组件选择行、上下文与代理点、组件选择弹层。 */
 .mobile-app-field {
   display: flex;
@@ -1470,4 +1456,276 @@ body {
   margin-right: 8px;
   color: var(--td-text-color-placeholder);
   font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- 组件 */
+
+.mobile-component-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-component-list__section {
+  margin: 8px 0 0;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mobile-component-list__count {
+  margin-left: 4px;
+  color: var(--td-text-color-placeholder);
+  font-weight: 400;
+}
+
+.mobile-component-list__project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.mobile-component-list__logo {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+  object-fit: contain;
+  background: var(--td-bg-color-container-active);
+}
+
+.mobile-component-list__logo--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--td-brand-color);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mobile-component-list__project-title {
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.mobile-component-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+  background: var(--td-bg-color-container);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.mobile-component-item:active {
+  background: var(--td-bg-color-container-active);
+}
+
+.mobile-component-item__text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-component-item__title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-component-item__meta {
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-component-item__version {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 组件详情表单：一行一个字段，标签列固定宽度，输入/值自适应。 */
+.mobile-component-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.mobile-component-row:last-child {
+  border-bottom: 0;
+}
+
+.mobile-component-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.mobile-component-row__label {
+  width: 84px;
+  flex: none;
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+}
+
+.mobile-component-row__input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+
+.mobile-component-row__input::placeholder {
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-component-row__input:disabled {
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-component-row__value {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-component-row__picker {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-component-row__chevron {
+  width: 16px;
+  height: 16px;
+}
+
+.mobile-component-row .t-switch {
+  margin-left: auto;
+  flex: none;
+}
+
+.mobile-component-row__textarea {
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.mobile-component-row__textarea:disabled {
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-component-deploy-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-component-deploy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.mobile-component-deploy:last-child {
+  border-bottom: 0;
+}
+
+.mobile-component-deploy:active {
+  background: var(--td-bg-color-container-active);
+}
+
+.mobile-component-deploy__logo {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: contain;
+  background: var(--td-bg-color-container-active);
+}
+
+.mobile-component-deploy__logo--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--td-brand-color);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.mobile-component-deploy__title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-component-deploy__context {
+  max-width: 96px;
+  flex: none;
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-component-deploy__version {
+  flex: none;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 组件查看态：紧凑事实网格里需要占满一行或整段说明的字段。 */
+.mobile-instance-fact--wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-component-description {
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
