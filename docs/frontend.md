@@ -198,7 +198,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
   实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（部署：整库汇总待升级与到期证书、
   项目内列表与批量升级、点应用进详情页改组件/上下文/代理点/版本/部署目标（版本候选来自 `/config/artifacts/{id}/versions`，也可手输；
-  上下文与代理点绑定，填了上下文必须选代理点）、只读证书状态；全量刷新组件版本只在 PC 做）、
+  上下文与代理点绑定，填了上下文必须选代理点）、只读证书状态；组件版本刷新只在 PC 组件详情做单组件刷新，批量由后台周期任务做）、
   `MobileComponentListView` / `MobileComponentView`（组件：列表按 groupId → artifactId 排序并支持搜索，
   详情展示定义字段与各 Project 的部署情况并可 PATCH 编辑（字段随打包类型收窄：jar/war 无平台/分类器/可执行文件，tar.gz 无解析/JSP/WebSocket），部署行跳部署详情）、`MobileMeView`（用户、登录/退出）。
 - 部署边界：只读配置现状 + 两个写端点（`webapps/upgrade`、`PATCH webapps/{id}` 只改 `artifact`/`contextPath`/`version`/`targets`/`endpoints`，

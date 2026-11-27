@@ -71,7 +71,7 @@ SPA 页面路由使用与后端一致的能力域前缀：`/ems/*`、`/config/*`
 | `/config/farm-hosts?tab=farms` | 群集管理，`farms` | `/api/bashub/config/farms` | 详情页/编辑页内直接维护服务 |
 | `/config/farm-hosts?tab=hosts` | 主机管理，`hosts` | `/api/bashub/config/hosts` | 名称链接跳到 `/config/hosts/{id}` |
 | `/config/engines` | 引擎管理，`engines` | `/api/bashub/config/engines` | — |
-| `/config/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 批量刷新版本：`POST /api/bashub/config/artifacts/update-version` |
+| `/config/artifacts` | 组件管理，`artifacts` | `/api/bashub/config/artifacts` | 单组件刷新版本：`POST /api/bashub/config/artifacts/update-version`（body `{"ids":[id]}`） |
 | `/config/artifacts/:id` | 组件详情，`ArtifactDetailView` | `GET /api/bashub/config/artifacts/{id}`、`GET /api/bashub/config/artifacts/{id}/webapps?include=project` |
 | `/config/webapps` | 应用部署，`webapps` | `/api/bashub/config/webapps` | 批量升级：`POST /api/bashub/config/webapps/upgrade` |
 | `/ems/app-config?tab=apps` | 应用管理，`apps` | `/api/bashub/ems/apps` | — |
@@ -119,7 +119,7 @@ PC 路由、PC 页面和 PC 的全局项目选择器保持不变。选定项目�
 | `/m/bashub/projects/:project/instances/:instance` | 实例详情，`MobileInstanceView` | `GET /api/bashub/monitor/agents/{project}/history?days=30\|180`<br>`GET /api/bashub/monitor/agents/{project}/log?instance=...[&agent=<ip>]`<br>SSE：`GET /api/bashub/monitor/agents/{project}/log/follow?instance=...&tail=...[&agent=<ip>]`<br>`POST /api/bashub/monitor/agents/{project}/service/{action}[?agent=<ip>]`，`action` 为 `start` / `stop` / `restart` |
 | `/m/bashub/deploy` | 部署首页：按项目汇总待升级应用与到期证书，`MobileManageView` | `GET /api/bashub/config/webapps/search?include=artifact`（逐页取全量）<br>`GET /api/bashub/config/endpoints/search`<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:post` |
 | `/m/bashub/deploy/projects/:project` | 项目部署：应用部署升级与证书现状，`MobileManageProjectView` | `GET /api/bashub/config/webapps/search?include=artifact`<br>`GET /api/bashub/config/endpoints/search`<br>`POST /api/bashub/config/webapps/upgrade`（`{"ids":[...]}`）<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:post` |
-| `/m/bashub/deploy/projects/:project/apps/:app` | 应用部署详情/编辑：组件、上下文、代理点、版本与部署目标，`MobileManageAppView` | `GET /api/bashub/config/webapps/search?include=artifact`<br>`GET /api/bashub/config/servers/search?include=farm`（按当前 Project 过滤）<br>`GET /api/bashub/config/artifacts/search`（换组件的候选，逐页取全量后前端搜索）<br>`GET /api/bashub/config/artifacts/{id}/versions`（版本候选，取不到返回空列表）<br>`PATCH /api/bashub/config/webapps/{id}`（`attributes.version` + `attributes.contextPath` + `relationships.artifact` + `relationships.targets` + `relationships.endpoints`）<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:patch` |
+| `/m/bashub/deploy/projects/:project/apps/:app` | 应用部署详情/编辑：组件、上下文、代理点、版本与部署目标，`MobileManageAppView` | `GET /api/bashub/config/webapps/search?include=artifact`<br>`GET /api/bashub/config/servers/search?include=farm`（按当前 Project 过滤）<br>`GET /api/bashub/config/artifacts/search`（换组件的候选，逐页取全量后前端搜索）<br>`GET /api/bashub/config/artifacts/{id}/versions`（版本候选，读库缓存；没有缓存时为空列表）<br>`PATCH /api/bashub/config/webapps/{id}`（`attributes.version` + `attributes.contextPath` + `relationships.artifact` + `relationships.targets` + `relationships.endpoints`）<br>`GET /api/bashub/ems/authorizations?checks=/config/webapps:patch` |
 | `/m/bashub/components` | 组件列表：先「定制组件」（绑定 Project 的按项目分组，带项目 Logo）再「通用组件」，组内按 groupId → artifactId 排序，支持搜索标题 / groupId / artifactId，`MobileComponentListView` | `GET /api/bashub/config/artifacts/search`（逐页取全量后前端搜索） |
 | `/m/bashub/components/:artifact` | 组件详情/编辑：定义字段与部署情况，`MobileComponentView` | `GET /api/bashub/config/artifacts/{id}?include=project`<br>`GET /api/bashub/config/artifacts/{id}/webapps?include=project,project.org`（每个 Project 的实际版本与上下文）<br>`PATCH /api/bashub/config/artifacts/{id}`（标题、坐标、打包、平台、版本、上下文、默认项目、开关与描述）<br>`GET /api/bashub/ems/authorizations?checks=/config/artifacts:patch` |
 | `/m/bashub/me` | 当前用户、登录/退出，`MobileMeView` | `GET /api/bashub/ems/sessions`<br>`POST /api/bashub/ems/sessions/logout`（由现有 auth 封装） |
@@ -177,9 +177,9 @@ EMS 自身资源使用 `ems` 域：
 
 | API | 使用页面 | 说明 |
 |---|---|---|
-| `POST /api/bashub/config/artifacts/update-version` | `/config/artifacts` | Body 为 `{"ids":[...]}`，从 Maven Central 刷新所选组件的最新版本 |
+| `POST /api/bashub/config/artifacts/update-version` | `/config/artifacts` | Body 为 `{"ids":[...]}`，从 Maven Central 刷新组件的最新版本；PC 只在组件详情页传单个 id |
 | `POST /api/bashub/config/webapps/upgrade` | `/config/webapps` | Body 为 `{"ids":[...]}`，把所选应用版本提升到组件的 `latestVersion` |
-| `GET /api/bashub/config/artifacts/{id}/versions` | 手机端 `/m/bashub/deploy/projects/:project/apps/:app` | 返回 `{"latest":"...","versions":[...]}`，供手机端编辑版本时列出组件已发布版本；取不到 metadata 时为空列表，仍可手输 |
+| `GET /api/bashub/config/artifacts/{id}/versions` | 手机端 `/m/bashub/deploy/projects/:project/apps/:app` | 返回 `{"latest":"...","versions":[...]}`（`cfg_artifacts.versions` 缓存，周期/手动刷新写入）；缓存为空时为空列表，仍可手输 |
 | `GET /api/bashub/config/hosts/{id}/webapps?include=artifact` | `/config/hosts/:id` | 查询部署到该主机上的应用；主机详情同时展示该主机的 setline listen 与 admin 端口 |
 | `GET /api/bashub/ems/menus/export?app={appId}` | `/ems/menu-config?tab=menus` | 返回 `{"xml":"..."}` |
 | `POST /api/bashub/ems/menus/import` | `/ems/menu-config?tab=menus` | `multipart/form-data`，字段 `app` + `menufile` |

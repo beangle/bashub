@@ -161,6 +161,15 @@ Project 详情的代理页在 HAProxy 类型下增加 `bas-routes.map` 只读预
 
 `cfg_webapps.context_path` 改为可空；没有上下文的部署视为后台任务，不生成任何代理路由。迁移文件：`db/postgresql/migrate/20261124-01-webapp-context-nullable.sql`。
 
+### 组件版本缓存与刷新
+
+- `cfg_artifacts` 新增 `versions`(jsonb)：Maven metadata 的 `<versions>` 列表由周期刷新与
+  「刷新最新版本」写入；`GET /config/artifacts/{id}/versions` 改为只读缓存，手机端打开部署详情、
+  切换组件不再实时访问 Maven Central。迁移文件：`db/postgresql/migrate/20261127-02-artifact-versions-cache.sql`。
+- 周期刷新不再阻塞事件循环：改为独立 `curl` 子进程（一次一个，单个连接 5 秒 / 总 30 秒超时）+ 定时轮询回收，
+  事件循环只做写库。新增应用配置 `artifact-refresh-minutes`（0 关闭，缺省 360，上限 7 天）。
+- 刷新入口收敛：组件列表页不再提供批量「刷新最新版本」，改为组件详情页的单组件刷新；批量刷新只由周期任务执行。
+
 ### 资源编辑页与详情页
 
 资源列表的「新建」「编辑」改为独立全页表单，不再使用抽屉；普通配置资源的详情从列表数据锚点直接打开抽屉；跨实体、长关系的复杂详情仍使用独立详情页。列表分页、排序、筛选写入 URL，表单带 `returnTo`，保存/取消/后退回到原位置。抽屉只保留给只读详情和简易查看。
@@ -310,7 +319,8 @@ maven/npm/native/www/static 的 `base` 固定为 `{micdn.home}/maven`、`{micdn.
 
 ## 升级
 
-- 数据库无迁移。
+- 数据库有迁移：按 `db/postgresql/migrate/` 的文件顺序执行；本版本新增 `20261124-01`、`20261124-02`、
+  `20261125-01`、`20261127-01`、`20261127-02`（组件版本缓存、打包类型去 `bin` 等）。
 - 本地 micdn 需要 **micdn 0.4.2** 及以上，才能使用 native `<remote>` 和 SNAPSHOT 上传自动 metadata；
   旧 micdn 会忽略这些新配置，native 缺失仍 404。
 - `basctl proxy` 应升级到 0.0.3 及以上，使用 ZIP bundle；`proxy:apply` 还需要对应版本的
