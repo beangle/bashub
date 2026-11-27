@@ -1,5 +1,5 @@
 /**
- * 手机端「管理」的取数与动作封装。
+ * 手机端「部署」的取数与动作封装。
  *
  * 只调用既有端点：`config` 域的资源查询（`webapps` / `endpoints` / `servers` / `artifacts`）与
  * 两个既有动作（`webapps/upgrade`、`PATCH webapps/{id}`），以及只读能力查询
@@ -9,7 +9,7 @@ import { apiClient } from './client'
 import { apiPath } from './prefix'
 import { attributeText, callResourceAction, indexIncluded, listResource, relationshipIds, saveResource, type ResourcePage } from './resource'
 
-/** 管理页用到的能力项；键与 `resource:action` 完全一致，便于直接查表。 */
+/** 部署页用到的能力项；键与 `resource:action` 完全一致，便于直接查表。 */
 export const MANAGE_CHECKS = {
   deploy: '/config/webapps:post',
   deployEdit: '/config/webapps:patch',
@@ -40,7 +40,7 @@ export interface ManageCatalog {
   endpoints: ResourcePage['rows']
 }
 
-/** 一次取回全部应用部署与代理点；管理首页的角标和项目页都从这里取数，不按项目 N+1 请求。 */
+/** 一次取回全部应用部署与代理点；部署首页的角标和项目页都从这里取数，不按项目 N+1 请求。 */
 export async function loadManageCatalog(): Promise<ManageCatalog> {
   const [webapps, endpoints] = await Promise.all([
     listAllRows('/webapps', ['artifact']),
@@ -82,18 +82,64 @@ export async function readArtifactVersions(artifactId: string): Promise<Artifact
   )
 }
 
-/** 保存应用部署的版本与运行目标；只提交 `version` 与 `targets` 两项，不重启实例，重启后生效。 */
-export async function saveWebapp(id: string, version: string, targetIds: string[]): Promise<void> {
+/** 换组件用的组件目录条目：标题、Maven artifactId、默认上下文与最新版本。 */
+export interface ArtifactOption {
+  id: string
+  title: string
+  artifactName: string
+  /** 组件默认上下文；为空表示该组件没有默认上下文（按后台任务部署）。 */
+  contextPath: string
+  latestVersion: string
+}
+
+/** 一次取回全部组件，供组件选择弹层在前端搜索；组件数量与 PC 列表同源，不按项目过滤。 */
+export async function listArtifacts(): Promise<ArtifactOption[]> {
+  const page = await listAllRows('/artifacts')
+  return page.rows
+    .map((row) => ({
+      id: row.id,
+      title: attributeText(row.attributes.title) || attributeText(row.attributes.artifactId),
+      artifactName: attributeText(row.attributes.artifactId),
+      contextPath: attributeText(row.attributes.contextPath),
+      latestVersion: attributeText(row.attributes.latestVersion),
+    }))
+    .sort(
+      (left, right) =>
+        left.title.localeCompare(right.title, 'zh-CN') || left.artifactName.localeCompare(right.artifactName),
+    )
+}
+
+/** 部署详情页一次保存的全部可变项；不变的部分也照原值提交，PATCH 是幂等覆盖。 */
+export interface WebappEdit {
+  artifactId: string
+  contextPath: string
+  version: string
+  targetIds: string[]
+  endpointIds: string[]
+}
+
+/** 保存应用部署的组件、上下文、版本、运行目标与代理点；只改配置，不重启实例，重启后生效。 */
+export async function saveWebapp(id: string, edit: WebappEdit): Promise<void> {
   await saveResource(
     '/webapps',
     'webapps',
-    { version },
-    { targets: { data: targetIds.map((target) => ({ type: 'servers', id: target })) } },
+    { version: edit.version, contextPath: edit.contextPath },
+    {
+      artifact: { data: { type: 'artifacts', id: edit.artifactId } },
+      targets: { data: edit.targetIds.map((target) => ({ type: 'servers', id: target })) },
+      endpoints: { data: edit.endpointIds.map((endpoint) => ({ type: 'endpoints', id: endpoint })) },
+    },
     id,
   )
 }
 
 export interface ServerOption {
+  id: string
+  label: string
+}
+
+/** 代理点选项：与 `ServerOption` 同形但语义不同，单独命名避免把服务当代理点。 */
+export interface EndpointOption {
   id: string
   label: string
 }

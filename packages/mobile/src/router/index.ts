@@ -29,17 +29,17 @@ const router = createRouter({
       meta: { title: '实例详情' },
     },
     {
-      path: '/manage',
+      path: '/deploy',
       component: () => import('@/views/MobileManageView.vue'),
-      meta: { title: '管理' },
+      meta: { title: '部署' },
     },
     {
-      path: '/manage/projects/:project',
+      path: '/deploy/projects/:project',
       component: () => import('@/views/MobileManageProjectView.vue'),
-      meta: { title: '项目管理' },
+      meta: { title: '项目部署' },
     },
     {
-      path: '/manage/projects/:project/apps/:app',
+      path: '/deploy/projects/:project/apps/:app',
       component: () => import('@/views/MobileManageAppView.vue'),
       meta: { title: '应用部署' },
     },

@@ -2,7 +2,7 @@
   <section class="mobile-page">
     <header class="mobile-page__head">
       <div class="mobile-page__heading">
-        <h2 class="mobile-page__title">管理</h2>
+        <h2 class="mobile-page__title">部署</h2>
       </div>
       <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
     </header>
@@ -44,9 +44,12 @@
           <span v-else class="mobile-project-card__logo mobile-project-card__logo--fallback">
             {{ initials(project.title) }}
           </span>
-          <span class="mobile-manage-project__text">
-            <span class="mobile-manage-project__title">{{ project.title }}</span>
-            <span class="mobile-manage-project__meta">{{ project.qualifiedName }}</span>
+          <span class="mobile-project-card__text">
+            <span class="mobile-project-card__title-row">
+              <span class="mobile-project-card__title">{{ project.title }}</span>
+              <span class="mobile-project-card__qualified">{{ project.qualifiedName }}</span>
+            </span>
+            <span class="mobile-project-card__meta">{{ project.orgTitle }}</span>
           </span>
         </span>
         <span class="mobile-manage-project__badges">
@@ -110,7 +113,7 @@ function score(projectId: string): number {
 }
 
 function openProject(project: ProjectInfo): void {
-  void router.push(`/manage/projects/${encodeURIComponent(project.qualifiedName)}`)
+  void router.push(`/deploy/projects/${encodeURIComponent(project.qualifiedName)}`)
 }
 
 async function load(): Promise<void> {
@@ -122,7 +125,7 @@ async function load(): Promise<void> {
     included.value = data.included
     endpoints.value = data.endpoints
   } catch (reason) {
-    error.value = `管理数据加载失败：${errorText(reason)}`
+    error.value = `部署数据加载失败：${errorText(reason)}`
   } finally {
     loading.value = false
   }

@@ -1,5 +1,5 @@
 /**
- * 手机端「管理」的纯数据模型：把 `webapps` / `endpoints` 的 JSON:API 行整理成展示行，
+ * 手机端「部署」的纯数据模型：把 `webapps` / `endpoints` 的 JSON:API 行整理成展示行，
  * 并按项目汇总待办。这里不发请求、不碰全局状态，也不重新实现版本比较——可升级判定直接用
  * 后端 `present` 给出的 `updatable`（`versionIsNewer` 只有一处实现）。
  */
@@ -9,12 +9,14 @@ import type { ProjectInfo } from '@/monitor-model'
 /** 证书到期预警窗口（天）；与后端 `certificateExpiring` 的列表提醒保持一致。 */
 export const CERT_WARN_DAYS = 30
 
-/** 一条应用部署：组件标题、上下文、当前版本与组件最新版本。 */
+/** 一条应用部署：组件、上下文、版本、运行目标与代理点。 */
 export interface ManageApp {
   id: string
   projectId: string
   /** 组件 id；用来读取「已发布版本」候选。 */
   artifactId: string
+  /** 组件的 Maven artifactId；详情页显示在组件标题下面。 */
+  artifactName: string
   title: string
   contextPath: string
   version: string
@@ -23,6 +25,8 @@ export interface ManageApp {
   targetIds: string[]
   /** 运行目标（服务）数量。 */
   targets: number
+  /** 绑定的代理点 id；上下文非空时至少一个，否则该部署不参与代理路由。 */
+  endpointIds: string[]
   /** 后端判定的「可升级」，前端不自行比较版本号。 */
   upgradable: boolean
 }
@@ -75,19 +79,22 @@ export function buildApps(rows: ResourceRow[], included: ResourceRow[] = []): Ma
     const artifactId = relationshipIds(row, 'artifact')[0] ?? ''
     const artifact = artifacts.get(artifactId)
     const attributes = row.attributes
+    const artifactName = attributeText(attributes.artifactName)
     return {
       id: row.id,
       projectId: relationshipIds(row, 'project')[0] ?? '',
       artifactId,
+      artifactName,
       title:
         (artifact && attributeText(artifact.attributes.title)) ||
-        attributeText(attributes.artifactName) ||
+        artifactName ||
         '未命名组件',
       contextPath: attributeText(attributes.contextPath),
       version: attributeText(attributes.version),
       latestVersion: artifact ? attributeText(artifact.attributes.latestVersion) : '',
       targetIds: relationshipIds(row, 'targets'),
       targets: relationshipIds(row, 'targets').length,
+      endpointIds: relationshipIds(row, 'endpoints'),
       upgradable: truthy(attributes.updatable),
     }
   })

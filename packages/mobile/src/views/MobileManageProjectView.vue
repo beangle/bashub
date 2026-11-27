@@ -46,15 +46,16 @@
             @keydown.enter="openApp(app)"
           >
             <div class="mobile-manage-app__text">
-              <p class="mobile-manage-app__title">{{ app.title }}</p>
+              <div class="mobile-manage-app__line">
+                <p class="mobile-manage-app__title">{{ app.title }}</p>
+                <span class="mobile-manage-app__version">
+                  <span>{{ app.version || '—' }}</span>
+                  <span v-if="upgradeTarget(app)" class="mobile-manage-app__to">→ {{ upgradeTarget(app) }}</span>
+                </span>
+              </div>
               <p class="mobile-manage-app__meta">{{ app.contextPath || '无上下文' }}</p>
             </div>
             <div class="mobile-manage-app__side">
-              <ArrowUpIcon
-                v-if="app.upgradable"
-                class="mobile-manage-app__arrow"
-                title="有可用的新版本"
-              />
               <ArrowRightIcon class="mobile-manage-app__chevron" />
             </div>
           </article>
@@ -92,7 +93,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { DialogPlugin } from 'tdesign-mobile-vue'
-import { ArrowRightIcon, ArrowUpIcon } from 'tdesign-icons-vue-next'
+import { ArrowRightIcon } from 'tdesign-icons-vue-next'
 import MobileNotice from '@/components/MobileNotice.vue'
 import { useProjectCatalog } from '@/composables/useProjectCatalog'
 import {
@@ -135,6 +136,16 @@ const certs = computed(() => {
 })
 const upgradable = computed(() => apps.value.filter((app) => app.upgradable))
 
+/**
+ * 可升级时行尾显示「当前 → 目标版本」。后端判可升级但组件最新版本没取到（或与当前版本串相同）时
+ * 只显示当前版本，不臆造「最新」。
+ */
+function upgradeTarget(app: ManageApp): string {
+  if (!app.upgradable) return ''
+  const latest = app.latestVersion.trim()
+  return latest && latest !== app.version.trim() ? latest : ''
+}
+
 const canDeploy = computed(() => capabilities.value[MANAGE_CHECKS.deploy] === true)
 
 async function load(): Promise<void> {
@@ -144,7 +155,7 @@ async function load(): Promise<void> {
     await catalog.load()
     const [data, caps] = await Promise.all([
       loadManageCatalog(),
-      readCapabilities([MANAGE_CHECKS.deploy, MANAGE_CHECKS.deployEdit]).then(
+      readCapabilities([MANAGE_CHECKS.deploy]).then(
         (value) => ({ ok: true as const, value }),
         () => ({ ok: false as const }),
       ),
@@ -154,7 +165,7 @@ async function load(): Promise<void> {
     endpoints.value = data.endpoints
     capabilities.value = caps.ok ? caps.value : {}
   } catch (reason) {
-    error.value = `管理数据加载失败：${errorText(reason)}`
+    error.value = `部署数据加载失败：${errorText(reason)}`
   } finally {
     loading.value = false
   }
@@ -166,7 +177,7 @@ async function reload(): Promise<void> {
 }
 
 function openApp(app: ManageApp): void {
-  void router.push(`/manage/projects/${encodeURIComponent(project.value)}/apps/${encodeURIComponent(app.id)}`)
+  void router.push(`/deploy/projects/${encodeURIComponent(project.value)}/apps/${encodeURIComponent(app.id)}`)
 }
 
 function confirmUpgradeAll(): void {

@@ -1058,7 +1058,7 @@ body {
   }
 }
 
-/* ---------------------------------------------------------------- 管理 */
+/* ---------------------------------------------------------------- 部署 */
 
 .mobile-manage-project {
   display: flex;
@@ -1078,30 +1078,6 @@ body {
 
 .mobile-manage-project:active {
   background: var(--td-bg-color-container-active);
-}
-
-.mobile-manage-project__text {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.mobile-manage-project__title {
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-manage-project__meta {
-  overflow: hidden;
-  color: var(--td-text-color-placeholder);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .mobile-manage-project__badges {
@@ -1149,6 +1125,35 @@ body {
   white-space: nowrap;
 }
 
+/* 应用部署行：标题与版本同一行，版本靠右成一列，方便竖着比较。 */
+.mobile-manage-app__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mobile-manage-app__line .mobile-manage-app__title {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.mobile-manage-app__version {
+  display: inline-flex;
+  margin-left: auto;
+  flex: none;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mobile-manage-app__to {
+  color: var(--td-warning-color);
+  font-weight: 600;
+}
+
 .mobile-manage-app__meta,
 .mobile-manage-cert__meta {
   overflow: hidden;
@@ -1174,18 +1179,213 @@ body {
   gap: 6px;
 }
 
-.mobile-manage-app__arrow {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  color: var(--td-warning-color);
-}
-
 .mobile-manage-app__chevron {
   width: 18px;
   height: 18px;
   flex: none;
   color: var(--td-text-color-placeholder);
+}
+
+/* 部署详情页：组件选择行、上下文与代理点、组件选择弹层。 */
+.mobile-app-field {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.mobile-app-field:disabled {
+  color: inherit;
+  opacity: 1;
+}
+
+.mobile-app-field__label {
+  width: 56px;
+  flex: none;
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+}
+
+.mobile-app-field__text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-app-field__title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-app-field__meta {
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-app-field__value {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-app-field__chevron {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--td-text-color-placeholder);
+}
+
+/* 上下文行：和「组件/代理点」共用一套标签列宽，避免和相邻行错位。 */
+.mobile-app-field__input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+
+.mobile-app-field__input::placeholder {
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-app-field__input:disabled {
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-app-field__clear {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--td-text-color-placeholder);
+}
+
+.mobile-app-field__clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mobile-app-field--plain .mobile-header-action {
+  margin-left: auto;
+}
+
+.mobile-app-divider {
+  height: 1px;
+  background: var(--td-component-stroke);
+}
+
+.mobile-app-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobile-hint--error {
+  color: var(--td-error-color);
+}
+
+.mobile-artifact-sheet {
+  display: flex;
+  height: 70vh;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px calc(12px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: var(--td-bg-color-container);
+}
+
+.mobile-artifact-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-artifact-sheet__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.mobile-artifact-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-artifact-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--td-component-stroke);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.mobile-artifact-item:last-child {
+  border-bottom: 0;
+}
+
+.mobile-artifact-item:active {
+  background: var(--td-bg-color-container-active);
+}
+
+.mobile-artifact-item__text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-artifact-item__title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-artifact-item__meta {
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-artifact-item__check {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--td-brand-color);
 }
 
 .mobile-manage-targets__summary {
@@ -1222,11 +1422,6 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.mobile-manage-editor__latest {
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
 }
 
 .mobile-manage-targets {
