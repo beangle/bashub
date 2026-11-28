@@ -169,18 +169,20 @@
                       >
                         <td class="instance-index">{{ index + 1 }}</td>
                         <td class="instance-name" :title="instance.id || '-'">
-                          <t-tag
-                            v-if="instance.deployment && instance.deployment.state !== 'ok'"
-                            size="small"
-                            variant="light"
-                            :theme="deployStateTheme(instance)"
-                          >{{ deployStateText(instance) }}</t-tag>
-                          <router-link
-                            v-if="instance.id"
-                            class="instance-name-link"
-                            :to="serverDetailPath(agent, instance)"
-                          >{{ instance.id }}</router-link>
-                          <span v-else>—</span>
+                          <div class="instance-name__stack">
+                            <t-tag
+                              v-if="instance.deployment && instance.deployment.state !== 'ok'"
+                              size="small"
+                              variant="light"
+                              :theme="deployStateTheme(instance)"
+                            >{{ deployStateText(instance) }}</t-tag>
+                            <router-link
+                              v-if="instance.id"
+                              class="instance-name-link"
+                              :to="serverDetailPath(agent, instance)"
+                            >{{ instance.id }}</router-link>
+                            <span v-else>—</span>
+                          </div>
                         </td>
                         <td>
                           <div
@@ -1954,12 +1956,16 @@ onBeforeUnmount(() => {
 }
 
 .instance-name {
+  max-width: 220px;
+  font-weight: 600;
+}
+
+.instance-name__stack {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  max-width: 220px;
-  font-weight: 600;
+  min-width: 0;
 }
 
 .instance-name-link {
