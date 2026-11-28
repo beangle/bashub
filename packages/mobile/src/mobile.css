@@ -1183,6 +1183,35 @@ body {
   gap: 4px;
 }
 
+.mobile-deploy-head {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mobile-deploy-search {
+  --td-search-height: 30px;
+  flex: 1;
+  max-width: 170px;
+  min-width: 0;
+}
+
+.mobile-deploy-search .t-search__input-box {
+  height: 30px;
+  padding: 2px 8px;
+}
+
+.mobile-deploy-search .t-search__input-box .t-input__keyword {
+  font-size: 12px;
+}
+
+.mobile-deploy-search .t-search__input-box .t-icon {
+  font-size: 16px;
+}
+
 .mobile-manage-list {
   display: flex;
   flex-direction: column;
@@ -1568,6 +1597,26 @@ body {
 }
 
 /* ---------------------------------------------------------------- 组件 */
+
+/* TDesign Search 的文字在 .t-search__input-box .t-input__keyword 上，用 font 简写设了 body-large；
+ * 必须匹配同样的选择器层级，只写 input 会被覆盖。 */
+.mobile-component-search {
+  --td-search-height: 34px;
+}
+
+.mobile-component-search .t-search__input-box {
+  height: 34px;
+  padding: 4px 10px;
+}
+
+.mobile-component-search .t-search__input-box .t-input__keyword {
+  font-size: 13px;
+}
+
+.mobile-component-search .t-search__input-box .t-icon {
+  font-size: 18px;
+}
+
 
 .mobile-component-list {
   display: flex;

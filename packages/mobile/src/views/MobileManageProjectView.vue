@@ -20,7 +20,13 @@
       <section class="mobile-card">
         <header class="mobile-card__head">
           <h3 class="mobile-card__title">应用部署</h3>
-          <span class="mobile-header-actions">
+          <div class="mobile-deploy-head">
+            <t-search
+              v-model="keyword"
+              class="mobile-deploy-search"
+              placeholder="搜索部署"
+              shape="round"
+            />
             <t-button
               v-if="canDeploy"
               class="mobile-header-action"
@@ -30,13 +36,14 @@
             >
               新增
             </t-button>
-          </span>
+          </div>
         </header>
 
         <t-empty v-if="apps.length === 0" description="该项目还没有部署应用。" />
+        <t-empty v-else-if="filteredApps.length === 0" description="没有匹配的部署。" />
         <div v-else class="mobile-manage-list">
           <article
-            v-for="app in apps"
+            v-for="app in filteredApps"
             :key="app.id"
             class="mobile-manage-app is-tappable"
             role="button"
@@ -116,6 +123,15 @@ const allCerts = computed(() => buildCerts(endpoints.value))
 const apps = computed(() => {
   const id = projectInfo.value?.id
   return id ? allApps.value.filter((app) => app.projectId === id) : []
+})
+
+const keyword = ref('')
+const filteredApps = computed(() => {
+  const term = keyword.value.trim().toLowerCase()
+  if (!term) return apps.value
+  return apps.value.filter((app) =>
+    [app.title, app.artifactName, app.contextPath, app.version].some((value) => value.toLowerCase().includes(term)),
+  )
 })
 const certs = computed(() => {
   const id = projectInfo.value?.id

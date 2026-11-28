@@ -26,7 +26,12 @@
       </div>
     </div>
 
-    <t-search v-model="keyword" placeholder="搜索标题 / groupId / artifactId" shape="round" />
+    <t-search
+      v-model="keyword"
+      class="mobile-component-search"
+      placeholder="搜索标题 / groupId / artifactId"
+      shape="round"
+    />
 
     <div v-if="loading && rows.length === 0" class="mobile-loading">
       <t-loading size="24px" text="加载中" />
