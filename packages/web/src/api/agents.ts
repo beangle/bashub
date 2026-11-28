@@ -76,7 +76,7 @@ export interface AgentDeployItem {
 }
 
 export interface AgentDeployment {
-  state: 'ok' | 'undelivered' | 'restart' | 'unknown'
+  state: 'ok' | 'undelivered' | 'restart' | 'stopped' | 'unknown'
   items?: AgentDeployItem[]
 }
 

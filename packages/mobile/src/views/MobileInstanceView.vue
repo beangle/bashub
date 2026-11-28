@@ -138,6 +138,9 @@
         <p v-else-if="deployment.state === 'unknown'" class="mobile-hint">
           无法与当前配置对照（服务器未登记或配置已删除）。
         </p>
+        <p v-else-if="deployment.state === 'stopped'" class="mobile-hint">
+          实例已停止，配置已下发，启动后生效。
+        </p>
         <template v-else>
           <ul class="mobile-deploy-items">
             <li v-for="(item, index) in deployment.items ?? []" :key="index">
@@ -314,6 +317,7 @@ const deployStateLabel = computed(() => {
   switch (deployment.value?.state) {
     case 'restart': return '待重启'
     case 'undelivered': return '未下发'
+    case 'stopped': return '已停止'
     case 'unknown': return '未知'
     default: return ''
   }

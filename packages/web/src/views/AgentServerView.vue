@@ -332,6 +332,7 @@ const deployHint = computed(() => {
   switch (instance.value?.deployment?.state) {
     case 'restart': return '配置不一致，建议重启'
     case 'undelivered': return '配置未下发'
+    case 'stopped': return '已停止，启动后生效'
     case 'unknown': return '配置未知'
     default: return ''
   }

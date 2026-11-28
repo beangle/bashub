@@ -10,7 +10,7 @@
 - **手机端去掉「全部升级」**：项目部署页不再提供批量升级，可升级仍在行上标出「当前 → 目标版本」，需要升级时进部署详情逐个调整版本。
 - **手工启停记录**：PC/手机触发的实例 start/stop/restart 写入 `bas.mon_server_events`（实例、动作、操作人、操作人 IP、执行节点、结果与原因）；新增 `GET /monitor/agents/{project}/events` 查询，PC 在线节点页每个 Project 加「启停记录」、实例详情显示最近 20 条；手机项目概览加「启停记录」入口、实例页显示该实例最近记录。节点离线/超时/失败也记录。
 - **代理配置应用状态**：`cfg_endpoints.proxy_applied` 按 IP 记录最近一次成功应用的 bundle hash + 时间（`proxy/apply` 成功时写入）；`GET /config/projects/{id}/proxy-state` 对比当前 manifest hash，PC 代理页和手机项目概览显示「代理待应用」。不改 agent、不轮询；首次升级后未知，应用一次后才有基准。
-- **部署配置对账**：`GET /monitor/agents/status` 的每个运行实例新增 `deployment`（`ok` / `undelivered` / `restart` / `unknown` + `items`）；按 server 对比 hub 配置、agent `declared` 与运行 `instances`，新增/移入 → 待加载，删除/移出 → 待删除，版本/组件/上下文/urls/端口变化 → 待重启，配置未到节点 → 未下发；实例页显示明细，节点/项目概览汇总待生效数量，只提示不自动重启。`libs`/`unpack` 等 agent 未上报字段为盲区。
+- **部署配置对账**：`GET /monitor/agents/status` 的每个运行实例新增 `deployment`（`ok` / `undelivered` / `restart` / `unknown` + `items`）；按 server 对比 hub 配置、agent `declared` 与运行 `instances`，新增/移入 → 待加载，删除/移出 → 待删除，版本/组件/上下文/urls/端口变化 → 待重启，配置未到节点 → 未下发；实例页显示明细，停止的实例标记「已停止，启动后生效」，节点/项目概览汇总待生效数量，只提示不自动重启。`libs`/`unpack` 等 agent 未上报字段为盲区。
 - **手机端卸载部署**：部署详情页加「卸载部署」（`DELETE /config/webapps/{id}`，需 `/config/webapps:delete`），确认后删除配置并解除目标/代理点关联，回到项目部署页；已运行实例不会自动停止，重启后不再加载。
 - **手机端新增部署**：部署项目页的「应用部署」卡片加「新增」，复用部署详情表单（组件、上下文、代理点、版本、部署目标），组件候选限定当前项目或通用组件；新增成功跳到该部署详情。
 - **部署组件限定**：新建部署或更换组件时只能选当前项目自己的组件或通用组件（`artifact.project` 为空），PC 表单与手机端换组件候选都按此过滤，后端在写入时校验并对跨项目引用返回 400；已部署且本次没换组件的历史数据不受影响，仍可改版本/上下文/目标。

@@ -1999,7 +1999,25 @@ class HubService {
     return items;
   }
 
-  /// 给每个在线实例补 `deployment`：ok / undelivered / restart / unknown。
+  /// 在 plan 里找实例对应的 server；老 agent 可能只报 server name，project 内唯一时按后缀兜底。
+  private static string findServerKey(ServerPlan[string] plans, string id) {
+    if (id in plans)
+      return id;
+    if (id.length == 0 || id.indexOf(".") >= 0)
+      return "";
+    string matched;
+    foreach (key, _; plans) {
+      if (!key.endsWith("." ~ id))
+        continue;
+      if (matched.length > 0)
+        return "";
+      matched = key;
+    }
+    return matched;
+  }
+
+  /// 给每个在线实例补 `deployment`：ok / undelivered / restart / unknown；
+  /// 停着的实例只有 `declared`，补 `stopped`（配置已下发，启动后生效）或 `undelivered`。
   private Json withDeploymentState(Json agentsJson) {
     ServerPlan[string][string] cache;
     foreach (ref agent; agentsJson) {
@@ -2022,49 +2040,58 @@ class HubService {
         }
       }
       auto instances = jsonGet(report, "instances");
-      if (instances.type != Json.Type.array)
-        continue;
-      foreach (ref instance; instances) {
-        if (instance.type != Json.Type.object)
-          continue;
-        auto id = jsonText(instance["id"]);
-        auto plan = id in plans;
-        // 老 agent 可能只报 server name；在 project 内唯一时按后缀匹配，避免整台实例显示未知。
-        if (plan is null && id.length > 0 && id.indexOf(".") < 0) {
-          string matched;
-          foreach (key, _; plans) {
-            if (!key.endsWith("." ~ id))
-              continue;
-            if (matched.length > 0) {
-              matched = "";
-              break;
-            }
-            matched = key;
+      bool[string] runningIds;
+      if (instances.type == Json.Type.array) {
+        foreach (ref instance; instances) {
+          if (instance.type != Json.Type.object)
+            continue;
+          auto id = jsonText(instance["id"]);
+          runningIds[id] = true;
+          auto planKey = findServerKey(plans, id);
+          if (planKey.length == 0) {
+            Json unknown = Json.emptyObject;
+            unknown["state"] = Json("unknown");
+            instance["deployment"] = unknown;
+            continue;
           }
-          if (matched.length > 0)
-            plan = matched in plans;
+          auto plan = plans[planKey];
+          Json declaredServer;
+          if (auto found = id in declaredById)
+            declaredServer = *found;
+          if (!planDelivered(plan, declaredServer)) {
+            Json undelivered = Json.emptyObject;
+            undelivered["state"] = Json("undelivered");
+            instance["deployment"] = undelivered;
+            continue;
+          }
+          auto items = runningDiffs(plan, instance);
+          Json deploy = Json.emptyObject;
+          deploy["state"] = Json(items.length > 0 ? "restart" : "ok");
+          if (items.length > 0)
+            deploy["items"] = Json(items);
+          instance["deployment"] = deploy;
         }
-        if (plan is null) {
-          Json unknown = Json.emptyObject;
-          unknown["state"] = Json("unknown");
-          instance["deployment"] = unknown;
-          continue;
+      }
+
+      if (declared.type == Json.Type.array) {
+        foreach (ref server; declared) {
+          if (server.type != Json.Type.object)
+            continue;
+          auto id = jsonText(server["id"]);
+          if (id.length == 0 || id in runningIds)
+            continue;
+          auto planKey = findServerKey(plans, id);
+          if (planKey.length == 0) {
+            Json unknown = Json.emptyObject;
+            unknown["state"] = Json("unknown");
+            server["deployment"] = unknown;
+            continue;
+          }
+          auto plan = plans[planKey];
+          Json deploy = Json.emptyObject;
+          deploy["state"] = Json(planDelivered(plan, server) ? "stopped" : "undelivered");
+          server["deployment"] = deploy;
         }
-        Json declaredServer;
-        if (auto found = id in declaredById)
-          declaredServer = *found;
-        if (!planDelivered(*plan, declaredServer)) {
-          Json undelivered = Json.emptyObject;
-          undelivered["state"] = Json("undelivered");
-          instance["deployment"] = undelivered;
-          continue;
-        }
-        auto items = runningDiffs(*plan, instance);
-        Json deploy = Json.emptyObject;
-        deploy["state"] = Json(items.length > 0 ? "restart" : "ok");
-        if (items.length > 0)
-          deploy["items"] = Json(items);
-        instance["deployment"] = deploy;
       }
     }
     return agentsJson;
@@ -2505,9 +2532,25 @@ class HubService {
       writeJsonApi(res, errorDocument(504, "节点应答超时", reply.error), HTTPStatus.gatewayTimeout);
       break;
     case RequestOutcome.failed:
-      writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error), HTTPStatus.badGateway);
+      if (reply.error == "no-log")
+        writeJsonApi(res, emptyLogWindow(), HTTPStatus.ok);
+      else if (reply.error.startsWith("unsupported:"))
+        writeJsonApi(res, errorDocument(409, "节点不支持该指令", reply.error), HTTPStatus.conflict);
+      else
+        writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error), HTTPStatus.badGateway);
       break;
     }
+  }
+
+  /// 实例没有日志文件（未启动过或日志已清理）时返回空窗口，让页面显示“暂无日志”而不是 502。
+  private Json emptyLogWindow() {
+    Json window = Json.emptyObject;
+    window["total"] = Json(0L);
+    window["from"] = Json(0L);
+    window["to"] = Json(0L);
+    window["lines"] = Json.emptyArray;
+    window["truncated"] = Json(false);
+    return window;
   }
 
   /// `GET /api/bashub/monitor/agents/{project}/agent-log`：读取 agent 自身 console 日志。
@@ -2541,7 +2584,9 @@ class HubService {
       writeJsonApi(res, errorDocument(504, "节点应答超时", reply.error), HTTPStatus.gatewayTimeout);
       break;
     case RequestOutcome.failed:
-      if (reply.error.startsWith("unsupported:"))
+      if (reply.error == "no-log")
+        writeJsonApi(res, emptyLogWindow(), HTTPStatus.ok);
+      else if (reply.error.startsWith("unsupported:"))
         writeJsonApi(res, errorDocument(409, "节点不支持该指令", reply.error), HTTPStatus.conflict);
       else
         writeJsonApi(res, errorDocument(502, "节点应答失败", reply.error), HTTPStatus.badGateway);
@@ -3654,4 +3699,19 @@ unittest {
   assert(first == again);
   parts.config = "global 2";
   assert(HubService.proxyManifest(parts, "haproxy", "default") != first);
+}
+
+unittest {
+  HubService.ServerPlan[string] plans;
+  HubService.ServerPlan tools;
+  tools.id = "tools.server1";
+  plans[tools.id] = tools;
+  assert(HubService.findServerKey(plans, "tools.server1") == "tools.server1");
+  assert(HubService.findServerKey(plans, "server1") == "tools.server1");
+  assert(HubService.findServerKey(plans, "other.server1") == "");
+
+  HubService.ServerPlan platform;
+  platform.id = "platform.server1";
+  plans[platform.id] = platform;
+  assert(HubService.findServerKey(plans, "server1") == "");
 }

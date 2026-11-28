@@ -1208,6 +1208,7 @@ function deployStateText(instance: AgentInstance): string {
   switch (instance.deployment?.state) {
     case 'restart': return '待重启'
     case 'undelivered': return '配置未下发'
+    case 'stopped': return '启动后生效'
     case 'unknown': return '配置未知'
     default: return ''
   }
