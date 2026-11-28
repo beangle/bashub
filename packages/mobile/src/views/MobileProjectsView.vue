@@ -24,7 +24,12 @@
       </t-grid-item>
     </t-grid>
 
-    <t-search v-model="keyword" placeholder="搜索项目 / 机构" shape="round" />
+    <t-search
+      v-model="keyword"
+      class="mobile-project-search"
+      placeholder="搜索项目 / 机构"
+      shape="round"
+    />
 
       <div class="mobile-list">
         <button

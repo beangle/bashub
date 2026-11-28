@@ -1611,6 +1611,24 @@ body {
   font-size: 12px;
 }
 
+/* 监控首页的项目搜索同样跟随正文，避免 TDesign 默认的 16px 大字。 */
+.mobile-project-search {
+  --td-search-height: 36px;
+}
+
+.mobile-project-search .t-search__input-box {
+  height: 36px;
+  padding: 4px 12px;
+}
+
+.mobile-project-search .t-search__input-box .t-input__keyword {
+  font-size: 14px;
+}
+
+.mobile-project-search .t-search__input-box .t-icon {
+  font-size: 18px;
+}
+
 .mobile-component-search {
   --td-search-height: 34px;
 }
