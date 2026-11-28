@@ -17,9 +17,6 @@
         <template v-else>等待首次上报</template>
         · {{ secondsLeft }} 秒后自动刷新
       </span>
-      <t-button size="small" variant="outline" :loading="loading" @click="refresh()">
-        刷新
-      </t-button>
     </div>
 
     <MobileNotice v-if="error" :message="error" />

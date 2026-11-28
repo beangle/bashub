@@ -1,12 +1,5 @@
 <template>
   <section class="mobile-page">
-    <header class="mobile-page__head">
-      <div class="mobile-page__heading">
-        <h2 class="mobile-page__title">项目</h2>
-      </div>
-      <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
-    </header>
-
     <MobileNotice v-if="error" :message="error" />
 
     <t-grid :column="3" :border="false" class="mobile-stat-grid">
@@ -99,7 +92,6 @@ const {
   summaries,
   loading: monitorLoading,
   error: monitorError,
-  refresh: refreshMonitor,
 } = useAgentMonitor({ project: () => '', mode: 'summary' })
 
 const keyword = ref('')
@@ -125,10 +117,6 @@ const onlineProjects = computed(() => mergedProjects.value.filter((project) => p
 const totalNodes = computed(() => mergedProjects.value.reduce((sum, project) => sum + project.nodeCount, 0))
 const totalRunning = computed(() => mergedProjects.value.reduce((sum, project) => sum + project.running, 0))
 const totalInstances = computed(() => mergedProjects.value.reduce((sum, project) => sum + project.instanceTotal, 0))
-
-async function reload(): Promise<void> {
-  await Promise.all([catalog.load(true), refreshMonitor()])
-}
 
 function openProject(project: { qualifiedName: string }): void {
   void router.push(`/projects/${encodeURIComponent(project.qualifiedName)}`)

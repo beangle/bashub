@@ -124,6 +124,18 @@ body {
   gap: 2px;
 }
 
+.mobile-shell__brand-area {
+  margin-left: 6px;
+  color: var(--td-text-color-secondary);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.mobile-shell__brand-area::before {
+  content: "·";
+  margin-right: 6px;
+}
+
 .mobile-shell__brand-title {
   font-size: 16px;
   font-weight: 600;
@@ -275,6 +287,22 @@ body {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.mobile-card__heading {
+  min-width: 0;
+}
+
+.mobile-card__meta {
+  margin: 2px 0 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+}
+
+.mobile-card__links {
+  display: flex;
+  flex: none;
+  gap: 10px;
 }
 
 .mobile-card__link {
@@ -1600,17 +1628,6 @@ body {
 
 /* TDesign Search 的文字在 .t-search__input-box .t-input__keyword 上，用 font 简写设了 body-large；
  * 必须匹配同样的选择器层级，只写 input 会被覆盖。 */
-.mobile-component-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.mobile-component-heading__count {
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-}
-
 /* 监控首页的项目搜索同样跟随正文，避免 TDesign 默认的 16px 大字。 */
 .mobile-project-search {
   --td-search-height: 36px;

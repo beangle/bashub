@@ -1,15 +1,5 @@
 <template>
   <section class="mobile-page">
-    <div class="mobile-page__toolbar">
-      <span class="mobile-updated">
-        <template v-if="updatedAt">更新于 {{ updatedAt }}</template>
-        <template v-else>等待首次上报</template>
-        · {{ secondsLeft }} 秒后自动刷新
-      </span>
-      <t-button size="small" variant="outline" @click="router.push(eventsPath)">启停记录</t-button>
-      <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
-    </div>
-
     <MobileNotice v-if="error" :message="error" />
     <MobileNotice v-if="catalogError" :message="catalogError" />
     <MobileNotice v-if="opsError" :message="opsError" />
@@ -94,8 +84,17 @@
 
       <section class="mobile-card">
         <header class="mobile-card__head">
-          <h3 class="mobile-card__title">节点健康</h3>
-          <router-link class="mobile-card__link" :to="nodesPath">全部节点</router-link>
+          <div class="mobile-card__heading">
+            <h3 class="mobile-card__title">节点健康</h3>
+            <p class="mobile-card__meta">
+              <template v-if="updatedAt">更新于 {{ updatedAt }} · {{ secondsLeft }} 秒后刷新</template>
+              <template v-else>等待首次上报</template>
+            </p>
+          </div>
+          <div class="mobile-card__links">
+            <router-link class="mobile-card__link" :to="eventsPath">启停记录</router-link>
+            <router-link class="mobile-card__link" :to="nodesPath">全部节点</router-link>
+          </div>
         </header>
 
         <t-empty v-if="agents.length === 0" description="暂无在线节点。" />
@@ -188,7 +187,6 @@ const catalog = useProjectCatalog()
 const {
   summaries,
   statuses,
-  loading,
   error,
   updatedAt,
   secondsLeft,
@@ -200,7 +198,6 @@ const nodesPath = computed(() => `/projects/${encodeURIComponent(project.value)}
 const eventsPath = computed(() => `/projects/${encodeURIComponent(project.value)}/events`)
 const catalogLoading = computed(() => catalog.loading.value)
 const catalogError = computed(() => catalog.error.value)
-const busy = computed(() => loading.value || catalogLoading.value)
 
 const health = computed(() => {
   if (!projectInfo.value) {

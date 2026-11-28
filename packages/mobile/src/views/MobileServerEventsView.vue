@@ -12,7 +12,6 @@
 
     <div class="mobile-page__toolbar">
       <span class="mobile-updated">最近 {{ events.length }} 条 · 最新在前</span>
-      <t-button size="small" variant="outline" :loading="loading" @click="load">刷新</t-button>
     </div>
 
     <div v-if="loading && events.length === 0" class="mobile-loading">

@@ -1,12 +1,5 @@
 <template>
   <section class="mobile-page">
-    <header class="mobile-page__head">
-      <div class="mobile-page__heading">
-        <h2 class="mobile-page__title">部署</h2>
-      </div>
-      <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
-    </header>
-
     <MobileNotice v-if="error" :message="error" />
     <MobileNotice v-if="message" theme="success" :message="message" />
 
@@ -129,11 +122,6 @@ async function load(): Promise<void> {
   } finally {
     loading.value = false
   }
-}
-
-async function reload(): Promise<void> {
-  message.value = ''
-  await Promise.all([catalog.load(true), load()])
 }
 
 onMounted(() => {

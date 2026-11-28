@@ -1,13 +1,5 @@
 <template>
   <section class="mobile-page">
-    <header class="mobile-page__head">
-      <div class="mobile-page__heading mobile-component-heading">
-        <h2 class="mobile-page__title">组件</h2>
-        <span class="mobile-component-heading__count">{{ rows.length }} 个组件</span>
-      </div>
-      <t-button size="small" variant="outline" :loading="loading" @click="load">刷新</t-button>
-    </header>
-
     <MobileNotice v-if="error" :message="error" />
 
     <div class="mobile-component-tabs">

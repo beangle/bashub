@@ -1,8 +1,7 @@
 <template>
   <section class="mobile-page">
     <div class="mobile-page__toolbar">
-      <span class="mobile-updated">{{ projectInfo ? projectInfo.qualifiedName : project }}</span>
-      <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
+      <span class="mobile-updated">{{ deploySummary }}</span>
     </div>
 
     <MobileNotice v-if="error" :message="error" />
@@ -136,6 +135,16 @@ const filteredApps = computed(() => {
 const certs = computed(() => {
   const id = projectInfo.value?.id
   return id ? allCerts.value.filter((cert) => cert.projectId === id) : []
+})
+
+const upgradableCount = computed(() => apps.value.filter((app) => app.upgradable).length)
+const deploySummary = computed(() => {
+  if (busy.value) return '加载中…'
+  if (apps.value.length === 0) return '暂无部署'
+  const upgrades = upgradableCount.value
+  const parts = [upgrades > 0 ? `${apps.value.length} 个部署 · ${upgrades} 个可升级` : `${apps.value.length} 个部署 · 均为最新`]
+  if (certs.value.length > 0) parts.push(`${certs.value.length} 个代理点`)
+  return parts.join(' · ')
 })
 /**
  * 可升级时行尾显示「当前 → 目标版本」。后端判可升级但组件最新版本没取到（或与当前版本串相同）时

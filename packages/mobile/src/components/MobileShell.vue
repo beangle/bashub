@@ -21,7 +21,10 @@
         </span>
       </router-link>
       <div v-else class="mobile-shell__brand">
-        <span class="mobile-shell__brand-title">BAS 监控台</span>
+        <span class="mobile-shell__brand-title">
+          BAS 监控台
+          <span v-if="pageLabel" class="mobile-shell__brand-area">{{ pageLabel }}</span>
+        </span>
       </div>
 
       <div v-if="!currentUser" class="mobile-shell__account">
@@ -82,6 +85,14 @@ const router = useRouter()
 const catalog = useProjectCatalog()
 
 const project = computed(() => String(route.params.project ?? ''))
+
+/** 顶层首页的标题并到顶部品牌后，不再单独占一行。 */
+const pageLabel = computed(() => {
+  if (route.path === '/') return '项目'
+  if (route.path === '/deploy') return '部署'
+  if (route.path.startsWith('/components')) return '组件'
+  return ''
+})
 const projectInfo = computed(() => catalog.projectOf(project.value))
 const projectTitle = computed(() => projectInfo.value?.title || project.value)
 const projectLogo = computed(() => projectInfo.value?.logoUrl || '')
