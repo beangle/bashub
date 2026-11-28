@@ -34,6 +34,9 @@
             <p>来自 agent 最近一次上报</p>
           </div>
           <div class="detail-actions">
+            <span v-if="deployHint" class="deploy-hint" :class="`deploy-hint--${deployHintKind}`" :title="deployHintDetail">
+              {{ deployHint }}
+            </span>
             <t-button
               v-if="!isRunning(instance)"
               size="small"
@@ -73,28 +76,7 @@
         </dl>
       </article>
 
-      <article v-if="instance.deployment && instance.deployment.state !== 'ok'" class="detail-card">
-        <header class="detail-card__head">
-          <div>
-            <h3>配置状态</h3>
-            <p>配置期望与运行实例不一致时，重启实例后生效</p>
-          </div>
-          <t-tag size="small" variant="light" :theme="deployStateTheme">{{ deployStateLabel }}</t-tag>
-        </header>
-        <p v-if="instance.deployment.state === 'undelivered'" class="detail-empty">配置尚未下发到该节点，稍后会自动同步。</p>
-        <p v-else-if="instance.deployment.state === 'unknown'" class="detail-empty">无法与当前配置对照（服务器未登记或配置已删除）。</p>
-        <table v-else class="detail-table">
-          <thead><tr><th>动作</th><th>上下文</th><th>GAV</th></tr></thead>
-          <tbody>
-            <tr v-for="(item, index) in instance.deployment.items ?? []" :key="index">
-              <td>{{ deployItemText(item) }}</td>
-              <td>{{ item.context || '/' }}</td>
-              <td class="detail-gav" :title="item.uri || ''">{{ item.uri || '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </article>
-
+      <div class="detail-side">
       <article class="detail-card">
         <header class="detail-card__head">
           <div>
@@ -114,9 +96,6 @@
           </tbody>
         </table>
       </article>
-      </div>
-
-      <div class="detail-stack">
       <article class="detail-card">
         <header class="detail-card__head">
           <div>
@@ -145,7 +124,10 @@
           </tbody>
         </table>
       </article>
+      </div>
+      </div>
 
+      <div class="detail-stack">
       <article class="detail-card">
         <header class="detail-card__head">
           <div>
@@ -346,18 +328,24 @@ function deployItemText(item: AgentDeployItem): string {
   return '待重启'
 }
 
-const deployStateLabel = computed(() => {
+const deployHint = computed(() => {
   switch (instance.value?.deployment?.state) {
-    case 'restart': return '待重启'
-    case 'undelivered': return '未下发'
-    case 'unknown': return '未知'
+    case 'restart': return '配置不一致，建议重启'
+    case 'undelivered': return '配置未下发'
+    case 'unknown': return '配置未知'
     default: return ''
   }
 })
 
-const deployStateTheme = computed<'warning' | 'default'>(() =>
-  instance.value?.deployment?.state === 'restart' ? 'warning' : 'default',
-)
+const deployHintKind = computed(() => (instance.value?.deployment?.state === 'restart' ? 'warning' : 'muted'))
+
+const deployHintDetail = computed(() => {
+  const deployment = instance.value?.deployment
+  if (!deployment) return ''
+  if (deployment.state === 'undelivered') return '配置尚未下发到该节点，稍后会自动同步。'
+  if (deployment.state === 'unknown') return '无法与当前配置对照（服务器未登记或配置已删除）。'
+  return (deployment.items ?? []).map((item) => deployItemText(item)).join('；')
+})
 
 function stateText(value: AgentInstance): string {
   if (value.state === 'error') return '异常'
@@ -527,6 +515,10 @@ onBeforeUnmount(stopFollow)
 
 <style scoped>
 .server-detail-page { display: flex; flex-direction: column; gap: 12px; }
+.detail-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.deploy-hint { font-size: 12px; white-space: nowrap; }
+.deploy-hint--warning { color: var(--td-warning-color); }
+.deploy-hint--muted { color: var(--td-text-color-placeholder); }
 .page-subtitle { margin: 4px 0 0; color: var(--td-text-color-placeholder); font-size: 13px; }
 .empty-panel { padding: 32px 0; }
 .detail-grid {
@@ -551,7 +543,7 @@ onBeforeUnmount(stopFollow)
 .detail-card__head > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; min-width: 0; }
 .detail-card__head h3 { margin: 0; font-size: 16px; }
 .detail-card__head p { margin: 0; color: var(--td-text-color-placeholder); font-size: 12px; }
-.detail-actions { display: flex; gap: 6px; }
+.detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .detail-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 18px; margin: 14px 0 0; }
 .detail-facts div { min-width: 0; }
 .detail-facts dt { color: var(--td-text-color-placeholder); font-size: 11px; }
