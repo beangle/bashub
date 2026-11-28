@@ -138,9 +138,6 @@
         <p v-else-if="deployment.state === 'unknown'" class="mobile-hint">
           无法与当前配置对照（服务器未登记或配置已删除）。
         </p>
-        <p v-else-if="deployment.state === 'stopped'" class="mobile-hint">
-          实例已停止，配置已下发，启动后生效。
-        </p>
         <template v-else>
           <ul class="mobile-deploy-items">
             <li v-for="(item, index) in deployment.items ?? []" :key="index">
@@ -148,7 +145,6 @@
               <code v-if="item.uri">{{ item.uri }}</code>
             </li>
           </ul>
-          <p class="mobile-hint">重启该实例后生效；这里只提示，不自动操作。</p>
         </template>
       </section>
 
@@ -163,7 +159,7 @@
         <p v-else-if="serverEvents.length === 0" class="mobile-hint">暂无手工启停记录。</p>
         <ul v-else class="mobile-event-list">
           <li v-for="event in serverEvents" :key="event.id" class="mobile-event-item">
-            <t-tag size="small" variant="light" :theme="event.ok ? 'success' : 'error'">
+            <t-tag size="small" variant="light" :theme="!event.ok ? 'error' : event.action === 'stop' ? 'warning' : 'success'">
               {{ eventActionLabel(event.action) }}
             </t-tag>
             <span class="mobile-event-item__time">{{ eventTimeLabel(event.at) }}</span>
@@ -317,7 +313,6 @@ const deployStateLabel = computed(() => {
   switch (deployment.value?.state) {
     case 'restart': return '待重启'
     case 'undelivered': return '未下发'
-    case 'stopped': return '已停止'
     case 'unknown': return '未知'
     default: return ''
   }

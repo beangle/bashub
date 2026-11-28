@@ -201,7 +201,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   上下文与代理点绑定，填了上下文必须选代理点；换组件只列当前项目或通用组件）、只读证书状态；组件版本刷新只在 PC 组件详情做单组件刷新，批量由后台周期任务做）、
   `MobileComponentListView` / `MobileComponentView`（组件：列表顶部分段切换「定制组件 / 通用组件」，定制按项目分组带 Logo、通用平铺，组内按 groupId → artifactId 排序并支持搜索，
   详情展示定义字段与各 Project 的部署情况并可 PATCH 编辑（字段随打包类型收窄：jar/war 无平台/分类器/可执行文件，tar.gz 无解析/JSP/WebSocket），部署行跳部署详情）、`MobileMeView`（用户、登录/退出）。
-- 部署状态对账：服务端用 agent 上报的 `declared`（已下发的 server.xml）与 `instances`（运行态）对照 hub 配置，给运行实例补 `deployment`；实例页显示「待重启/待加载/待删除/未下发/已停止（启动后生效）」，项目概览汇总「N 个实例配置待生效」，只提示不自动重启。判定粒度是 server（重启单位），离线节点只能标未知。
+- 部署状态对账：服务端用 agent 上报的 `declared`（已下发的 server.xml）与 `instances`（运行态）对照 hub 配置，给运行实例补 `deployment`；实例页显示「待重启/待加载/待删除/未下发」，配置一致的停止实例不额外提示；项目概览汇总「N 个实例配置待生效」，只提示不自动重启。判定粒度是 server（重启单位），离线节点只能标未知。
 - 部署边界：只读配置现状 + 三个写端点（`POST webapps` 新增、`PATCH webapps/{id}` 只改 `artifact`/`contextPath`/`version`/`targets`/`endpoints`、`DELETE webapps/{id}` 卸载部署，
   `urls`/`libs`/`unpack`/`enabled` 仍只在 PC 改）。可升级判定用
   后端 `present` 的 `updatable`，前端不重算版本；证书只展示公钥到期日，不读私钥；不提供 reset-key、

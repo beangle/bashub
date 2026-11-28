@@ -2017,7 +2017,7 @@ class HubService {
   }
 
   /// 给每个在线实例补 `deployment`：ok / undelivered / restart / unknown；
-  /// 停着的实例只有 `declared`，补 `stopped`（配置已下发，启动后生效）或 `undelivered`。
+  /// 停着的实例只有 `declared`：配置一致就按 ok，只有未下发才补 `undelivered`。
   private Json withDeploymentState(Json agentsJson) {
     ServerPlan[string][string] cache;
     foreach (ref agent; agentsJson) {
@@ -2089,7 +2089,7 @@ class HubService {
           }
           auto plan = plans[planKey];
           Json deploy = Json.emptyObject;
-          deploy["state"] = Json(planDelivered(plan, server) ? "stopped" : "undelivered");
+          deploy["state"] = Json(planDelivered(plan, server) ? "ok" : "undelivered");
           server["deployment"] = deploy;
         }
       }

@@ -169,6 +169,12 @@
                       >
                         <td class="instance-index">{{ index + 1 }}</td>
                         <td class="instance-name" :title="instance.id || '-'">
+                          <t-tag
+                            v-if="instance.deployment && instance.deployment.state !== 'ok'"
+                            size="small"
+                            variant="light"
+                            :theme="deployStateTheme(instance)"
+                          >{{ deployStateText(instance) }}</t-tag>
                           <router-link
                             v-if="instance.id"
                             class="instance-name-link"
@@ -189,12 +195,6 @@
                         <td>{{ instance.httpPort ?? '-' }}</td>
                         <td class="instance-memory">{{ instanceMemory(instance) }}</td>
                         <td class="instance-apps">
-                          <t-tag
-                            v-if="instance.deployment && instance.deployment.state !== 'ok'"
-                            size="small"
-                            variant="light"
-                            :theme="deployStateTheme(instance)"
-                          >{{ deployStateText(instance) }}</t-tag>
                           <template v-if="(instance.webapps ?? []).length">
                             <div
                               v-for="app in instance.webapps"
@@ -1208,7 +1208,6 @@ function deployStateText(instance: AgentInstance): string {
   switch (instance.deployment?.state) {
     case 'restart': return '待重启'
     case 'undelivered': return '配置未下发'
-    case 'stopped': return '启动后生效'
     case 'unknown': return '配置未知'
     default: return ''
   }
@@ -1955,9 +1954,17 @@ onBeforeUnmount(() => {
 }
 
 .instance-name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   max-width: 220px;
-  overflow: hidden;
   font-weight: 600;
+}
+
+.instance-name-link {
+  max-width: 100%;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

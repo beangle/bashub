@@ -22,7 +22,7 @@
     <div v-else class="mobile-event-list">
       <article v-for="event in events" :key="event.id" class="mobile-card mobile-event">
         <div class="mobile-event__head">
-          <t-tag size="small" variant="light" :theme="event.ok ? 'success' : 'error'">
+          <t-tag size="small" variant="light" :theme="!event.ok ? 'error' : event.action === 'stop' ? 'warning' : 'success'">
             {{ actionLabel(event.action) }}
           </t-tag>
           <span class="mobile-event__time">{{ timeLabel(event.at) }}</span>

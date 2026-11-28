@@ -229,7 +229,7 @@ Freemarker 模板运行时，不属于 JSON:API。
   `basReport.declared` 是本机 `server.xml` 声明的实例，控制台按 `id` 合并两者，停止后仍保留实例行并
   提供启动入口。`basReport.instances[].webapps[].title` 与 `basReport.declared[].webapps[].title`
   都由 hub 读 project 的 webapp 配置反查 artifact.title 后补上（先按 gav，再按 context）：agent 只上报 gav/context，不扩协议，
-  也不要求 SPA 有配置读取权限。运行实例还带 `deployment`：`state` 为 `ok` / `undelivered` / `restart` / `stopped` / `unknown`，
+  也不要求 SPA 有配置读取权限。运行实例还带 `deployment`：`state` 为 `ok` / `undelivered` / `restart` / `unknown`，
   `items` 列出差异项（`action` 为 `load` / `remove` / `restart`，带 `uri`/`context`，端口差异带 `reason:"port"` 与
   `configured`/`running`）。判定按 server（`farm.name`）对比 hub 配置、agent 的 `declared`（本机 server.xml）与
   `instances`（运行态）：新增/移入目标 → 待加载，删除/移出目标 → 待删除，版本/组件/上下文/urls/端口变化 → 待重启，

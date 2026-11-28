@@ -338,7 +338,6 @@
                         <t-tag v-if="item.deployState === 'restart'" size="small" theme="warning" variant="light">待生效</t-tag>
                         <t-tag v-else-if="item.deployState === 'undelivered'" size="small" variant="light">未下发</t-tag>
                         <t-tag v-else-if="item.deployState === 'unknown'" size="small" variant="light">未知</t-tag>
-                        <t-tag v-else-if="item.deployState === 'stopped'" size="small" variant="light">启动后生效</t-tag>
                         <span v-else>—</span>
                       </td>
                     </tr>
@@ -616,7 +615,7 @@ interface ServerRunEntry {
   httpPort: string
   heap: string
   running: boolean
-  deployState: 'ok' | 'undelivered' | 'restart' | 'stopped' | 'unknown' | ''
+  deployState: 'ok' | 'undelivered' | 'restart' | 'unknown' | ''
 }
 
 const sectionItems: SectionItem[] = [
