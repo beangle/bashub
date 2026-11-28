@@ -3,7 +3,8 @@
 BAS 控制台这一个产品的 monorepo，两部分各自独立构建：
 
 0.0.8 发布说明见 [docs/release-0.0.8.md](docs/release-0.0.8.md)，变更摘要见
-[CHANGELOG.md](CHANGELOG.md)。
+[CHANGELOG.md](CHANGELOG.md)。监控与部署状态怎么读、怎么操作见
+[docs/monitoring.md](docs/monitoring.md)。
 
 | 部分 | 位置 | 构建 | 产物 |
 |---|---|---|---|

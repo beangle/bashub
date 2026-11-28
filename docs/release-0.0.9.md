@@ -179,10 +179,20 @@ jsonb：`ip -> {hash, at}`）。`GET /config/projects/{id}/proxy-state` 用当�
 
 ### 部署配置对账
 
-`/monitor/agents/status` 给每个运行实例补 `deployment`：hub 配置、agent 已下发的 `server.xml`（`declared`）与
+`/monitor/agents/status` 给每个实例补 `deployment`：hub 配置、agent 已下发的 `server.xml`（`declared`）与
 实际运行实例（`instances`）三方对账。新增/移入目标显示待加载，删除/移出目标显示待删除，版本、组件、上下文、
-`urls` 或端口变化显示待重启，配置还没到节点显示未下发。实例页与节点/项目概览只展示提示，不自动重启；
-判定粒度是 server，离线节点只能标未知。`libs`/`unpack` 等 agent 未上报的字段目前看不出来。
+`urls` 或端口变化显示待重启，配置还没到节点显示未下发。停止的实例也参与对账：配置一致按 `ok`，不额外提示
+「启动后生效」；只有未下发才显示「未下发」。实例页与节点/项目概览只展示提示，不自动重启；判定粒度是 server，
+离线节点只能标未知。`libs`/`unpack` 等 agent 未上报的字段目前看不出来。运行版本来自
+`instances[].webapps[].uri`（GAV），是实例启动清单，不是应用级实时健康。
+
+完整操作说明见 [monitoring.md](monitoring.md)。
+
+### 实例日志读取
+
+实例没有 `console.out`（从未启动或日志已清理）时，`GET /monitor/agents/{project}/log` 返回空窗口，
+页面显示「暂无日志」，不再返回误导性的 502；agent 不支持 `log:read` 时返回 409，其它 agent 失败才保留 502。
+日志是实例启动时的 console 输出，不提供应用级健康检查。
 
 ### 部署组件限定
 
