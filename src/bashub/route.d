@@ -1828,30 +1828,29 @@ class HubService {
   /// 按 project 建「每台 server 期望运行什么」；以 server 的重启粒度对齐。
   private ServerPlan[string] projectPlans(string projectId) {
     ServerPlan[string] plans;
-    Json[string] farmsById;
     Query farmQuery;
     farmQuery.pageSize = 100000;
     farmQuery.addFilter("project", projectId);
     auto farmDoc = store.search(reg.find("farms"), farmQuery);
-    foreach (ref farm; farmDoc["data"]) {
+    string[] farmIds;
+    foreach (ref farm; farmDoc["data"])
       if (farm.type == Json.Type.object)
-        farmsById[jsonText(farm["id"])] = farm;
-    }
-    if (farmsById.length == 0)
+        farmIds ~= jsonText(farm["id"]);
+    if (farmIds.length == 0)
       return plans;
 
     Query serverQuery;
     serverQuery.pageSize = 100000;
-    serverQuery.includes = ["farm"];
+    serverQuery.addFilter("farm.id", farmIds.join(","));
     auto serverDoc = store.search(reg.find("servers"), serverQuery);
     string[string] serverQualified;
     foreach (ref server; serverDoc["data"]) {
       if (server.type != Json.Type.object)
         continue;
-      auto ids = relationshipIds(server, "farm");
-      if (ids.length == 0 || ids[0] !in farmsById)
+      // 用服务端派生属性，避免依赖 store.search 是否带出 relationships。
+      auto qualified = attributeText(server, "qualifiedName");
+      if (qualified.length == 0)
         continue;
-      auto qualified = attributeText(farmsById[ids[0]], "name") ~ "." ~ attributeText(server, "name");
       serverQualified[jsonText(server["id"])] = qualified;
       ServerPlan plan;
       plan.id = qualified;
@@ -1859,29 +1858,23 @@ class HubService {
       plans[qualified] = plan;
     }
 
-    Json[string] artifacts;
     Query appQuery;
     appQuery.pageSize = 100000;
     appQuery.addFilter("project", projectId);
-    appQuery.includes = ["artifact"];
     auto appDoc = store.search(reg.find("webapps"), appQuery);
-    foreach (ref item; appDoc["included"]) {
-      if (item.type == Json.Type.object && jsonText(item["type"]) == "artifacts")
-        artifacts[jsonText(item["id"])] = item;
-    }
     foreach (ref row; appDoc["data"]) {
       if (row.type != Json.Type.object)
         continue;
       auto attrs = row["attributes"];
       if (jsonText(jsonGet(attrs, "enabled")) == "false")
         continue;
-      auto artifactIds = relationshipIds(row, "artifact");
-      if (artifactIds.length == 0 || artifactIds[0] !in artifacts)
+      // webapp 的 `gav` 属性由后端按 artifact + version 算好，和 server.xml 的 uri 同源。
+      auto gav = jsonText(jsonGet(attrs, "gav"));
+      if (gav.length == 0)
         continue;
-      auto artifact = artifacts[artifactIds[0]];
       PlannedApp app;
-      app.uri = "gav://" ~ artifactGav(artifact, attributeText(attrs, "version"));
-      app.context = normalizeWebappContext(attributeText(attrs, "contextPath"));
+      app.uri = "gav://" ~ gav;
+      app.context = normalizeWebappContext(jsonText(jsonGet(attrs, "contextPath")));
       app.urls = attributeStrings(row, "urls");
       foreach (serverId; relationshipIds(row, "targets")) {
         if (serverId !in serverQualified)
