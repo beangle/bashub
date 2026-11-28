@@ -112,8 +112,15 @@ function onTabChange(payload: string | number | { value: string | number }): voi
   const value = String(typeof payload === 'object' ? payload.value : payload)
   if (value === 'me') void router.push('/me')
   else if (value === 'components') void router.push('/components')
-  else if (value === 'deploy') void router.push('/deploy')
-  else if (value === 'monitor') void router.push('/')
+  else if (value === 'deploy') void router.push(projectAreaPath('deploy'))
+  else if (value === 'monitor') void router.push(projectAreaPath('monitor'))
+}
+
+/** 两个项目域互相切换时保留 URL 里的 :project；没有项目上下文就回各自的项目列表。 */
+function projectAreaPath(area: 'monitor' | 'deploy'): string {
+  if (!project.value) return area === 'deploy' ? '/deploy' : '/'
+  const name = encodeURIComponent(project.value)
+  return area === 'deploy' ? `/deploy/projects/${name}` : `/projects/${name}`
 }
 
 onMounted(() => {
