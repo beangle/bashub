@@ -1561,17 +1561,16 @@ body {
   gap: 8px;
 }
 
-.mobile-component-list__section {
-  margin: 8px 0 0;
-  color: var(--td-text-color-secondary);
-  font-size: 12px;
-  font-weight: 600;
+.mobile-component-tabs {
+  display: flex;
+  align-items: center;
+  margin: 2px 0;
 }
 
-.mobile-component-list__count {
+.mobile-component-tabs__count {
   margin-left: 4px;
-  color: var(--td-text-color-placeholder);
-  font-weight: 400;
+  font-size: 11px;
+  opacity: 0.75;
 }
 
 .mobile-component-list__project {
