@@ -68,6 +68,30 @@ export async function saveEndpointCertificate(
   )
   return document as unknown as EndpointCertificateInfo
 }
+export type ProxyNodeState = 'applied' | 'pending' | 'unknown' | 'error'
+
+export interface ProxyNodeStatus {
+  ip: string
+  state: ProxyNodeState
+  appliedHash?: string
+  appliedAt?: string
+}
+
+export interface ProxyEndpointStatus {
+  name: string
+  engine: string
+  hash: string
+  nodes: ProxyNodeStatus[]
+}
+
+/** 各代理节点最近一次应用的 bundle hash 与当前配置对比；按需调用，不轮询。 */
+export async function readProjectProxyState(projectId: string): Promise<ProxyEndpointStatus[]> {
+  const document = await getPlainJson<{ data?: ProxyEndpointStatus[] }>(
+    apiPath('config', `/projects/${encodeURIComponent(projectId)}/proxy-state`),
+  )
+  return document.data ?? []
+}
+
 export interface ProxyApplyResult {
   host: string
   ok: boolean

@@ -47,6 +47,7 @@ import bashub.security : HubSecurity;
 import bashub.store : projectKey;
 
 import core.time : seconds;
+import std.datetime.systime : Clock;
 import vibe.data.json : Json;
 import vibe.core.core : sleep;
 import vibe.core.path : toNativeString;
@@ -568,40 +569,64 @@ class HubService {
     }
   }
 
-  private ubyte[] createProxyBundle(ProjectContext project, string engine, string endpointName,
+  private static struct ProxyBundleParts {
+    string configPath;
+    string config;
+    string certificate;
+    string privateKey;
+    string routeMapFile;
+    string routeMap;
+  }
+
+  private ProxyBundleParts proxyBundleParts(ProjectContext project, string engine, string endpointName,
       string certDir = "", string routeMapPath = "") {
     Json endpoint;
     if (!findEndpointJson(project, endpointName, endpoint))
       throw new Exception("endpoint not found: " ~ endpointName);
-    auto config = renderProxyForEndpoint(store, reg, project, endpointName, certDir, routeMapPath);
-    if (config.length == 0)
+    ProxyBundleParts parts;
+    parts.config = renderProxyForEndpoint(store, reg, project, endpointName, certDir, routeMapPath);
+    if (parts.config.length == 0)
       throw new Exception("empty proxy config");
     Row row;
-    string certificate;
-    string privateKey;
     auto endpoints = reg.find("endpoints");
     if (store.fetchRaw(endpoints, jsonText(endpoint["id"]), row))
-      certificate = jsonText(rowGet(row, "certificate"));
-    privateKey = jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key"));
-    auto configPath = engine == "haproxy" ? "config/haproxy.cfg" : "config/nginx.conf";
-    auto routeMap = engine == "haproxy"
-        ? renderHaproxyMapForEndpoint(store, reg, project, endpointName, routeMapPath) : "";
-    auto routeMapFile = "config/bas-routes.map";
-    auto manifest = "{\n  \"schema\": 1,\n  \"engine\": \"" ~ engine ~ "\",\n"
+      parts.certificate = jsonText(rowGet(row, "certificate"));
+    parts.privateKey = jsonText(store.fetchColumn(endpoints, jsonText(endpoint["id"]), "private_key"));
+    parts.configPath = engine == "haproxy" ? "config/haproxy.cfg" : "config/nginx.conf";
+    parts.routeMapFile = "config/bas-routes.map";
+    if (engine == "haproxy")
+      parts.routeMap = renderHaproxyMapForEndpoint(store, reg, project, endpointName, routeMapPath);
+    return parts;
+  }
+
+  /// 与 bundle 里的 manifest.json 完全同源，对 manifest 取 sha256 就是稳定的 configHash。
+  private static string proxyManifest(const ProxyBundleParts parts, string engine, string endpointName) {
+    return "{\n  \"schema\": 1,\n  \"engine\": \"" ~ engine ~ "\",\n"
         ~ "  \"endpoint\": \"" ~ endpointName ~ "\",\n  \"files\": {\n"
-        ~ "    \"config\": {\"path\": \"" ~ configPath ~ "\", \"sha256\": \"" ~ sha256Hex(config) ~ "\"},\n"
-        ~ "    \"certificate\": {\"path\": \"certificate/cert.pem\", \"sha256\": \"" ~ sha256Hex(certificate) ~ "\"},\n"
-        ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(privateKey) ~ "\"}"
-        ~ (engine == "haproxy" ? ",\n    \"routeMap\": {\"path\": \"" ~ routeMapFile ~ "\", \"sha256\": \"" ~ sha256Hex(routeMap) ~ "\"}" : "")
+        ~ "    \"config\": {\"path\": \"" ~ parts.configPath ~ "\", \"sha256\": \"" ~ sha256Hex(parts.config) ~ "\"},\n"
+        ~ "    \"certificate\": {\"path\": \"certificate/cert.pem\", \"sha256\": \"" ~ sha256Hex(parts.certificate) ~ "\"},\n"
+        ~ "    \"privateKey\": {\"path\": \"certificate/key.pem\", \"sha256\": \"" ~ sha256Hex(parts.privateKey) ~ "\"}"
+        ~ (engine == "haproxy" ? ",\n    \"routeMap\": {\"path\": \"" ~ parts.routeMapFile ~ "\", \"sha256\": \"" ~ sha256Hex(parts.routeMap) ~ "\"}" : "")
         ~ "\n  }\n}\n";
+  }
+
+  private ubyte[] createProxyBundle(ProjectContext project, string engine, string endpointName,
+      string certDir = "", string routeMapPath = "") {
+    auto parts = proxyBundleParts(project, engine, endpointName, certDir, routeMapPath);
+    auto manifest = proxyManifest(parts, engine, endpointName);
     auto zip = new ZipArchive();
     addZip(zip, "manifest.json", manifest);
-    addZip(zip, configPath, config);
-    addZip(zip, "certificate/cert.pem", certificate);
-    addZip(zip, "certificate/key.pem", privateKey);
+    addZip(zip, parts.configPath, parts.config);
+    addZip(zip, "certificate/cert.pem", parts.certificate);
+    addZip(zip, "certificate/key.pem", parts.privateKey);
     if (engine == "haproxy")
-      addZip(zip, routeMapFile, routeMap);
+      addZip(zip, parts.routeMapFile, parts.routeMap);
     return cast(ubyte[]) zip.build().dup;
+  }
+
+  /// 当前配置的 bundle hash；和 endpoint 里记录的「最近一次应用」对比即可判断是否待应用。
+  private string proxyBundleHash(ProjectContext project, string engine, string endpointName) {
+    return sha256Hex(proxyManifest(proxyBundleParts(project, engine, endpointName), engine, endpointName));
   }
 
   private void addZip(ZipArchive zip, string name, string content) {
@@ -841,6 +866,15 @@ class HubService {
           "project.qualifiedName is empty"), HTTPStatus.internalServerError);
       return;
     }
+    // 应用前先算当前 bundle 的 hash；成功后按 IP 记录，供「已应用/待应用」对比。
+    string bundleHash;
+    try
+      bundleHash = proxyBundleHash(project, engine, endpointName);
+    catch (Exception e) {
+      writeJsonApi(res, errorDocument(500, "代理配置生成失败", e.msg), HTTPStatus.internalServerError);
+      return;
+    }
+
     Json[] entries;
     foreach (ip; ips) {
       auto reply = agents.proxyApply(projectName, ip, engine, endpointName);
@@ -851,8 +885,101 @@ class HubService {
         entry["error"] = Json(reply.error);
       entries ~= entry;
     }
+    bool anyApplied;
+    foreach (ref entry; entries)
+      if (jsonText(jsonGet(entry, "ok")) == "true")
+        anyApplied = true;
+    if (anyApplied) {
+      try {
+        auto endpointsRes = reg.find("endpoints");
+        auto endpointId = jsonText(endpoint["id"]);
+        Json applied = Json.emptyObject;
+        Row raw;
+        if (store.fetchRaw(endpointsRes, endpointId, raw)) {
+          auto current = rowGet(raw, "proxy_applied");
+          if (current.type == Json.Type.object)
+            applied = current;
+        }
+        auto appliedAt = Clock.currTime.toISOExtString;
+        foreach (ref entry; entries) {
+          if (jsonText(jsonGet(entry, "ok")) != "true")
+            continue;
+          Json record = Json.emptyObject;
+          record["hash"] = Json(bundleHash);
+          record["at"] = Json(appliedAt);
+          applied[jsonText(entry["host"])] = record;
+        }
+        Row values;
+        values["proxy_applied"] = applied;
+        store.updateColumns(endpointsRes, endpointId, values);
+      } catch (Exception e) {
+        logWarn("Record proxy applied hash failed: %s", e.msg);
+      }
+    }
     Json doc = Json.emptyObject;
     doc["data"] = Json(entries);
+    writeJsonApi(res, doc, HTTPStatus.ok);
+  }
+
+  /// `GET /api/bashub/config/projects/{id}/proxy-state`：逐 endpoint/IP 对比当前 bundle hash 与最近应用记录。
+  void projectProxyState(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    ProjectContext project;
+    if (!findProjectById(reg, store, req.params.get("id", ""), project)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found"), HTTPStatus.notFound);
+      return;
+    }
+    auto endpointsRes = reg.find("endpoints");
+    Json[] items;
+    foreach (endpoint; dataOf(store.search(endpointsRes, projectEndpointQuery(project.id)))) {
+      auto name = attributeText(endpoint, "name");
+      auto engine = attributeText(endpoint, "engine").strip;
+      if (engine != "haproxy" && engine != "nginx")
+        continue;
+      string hash;
+      try
+        hash = proxyBundleHash(project, engine, name);
+      catch (Exception e)
+        logWarn("Render proxy hash for state failed: %s", e.msg);
+      Json applied = Json.emptyObject;
+      Row raw;
+      if (store.fetchRaw(endpointsRes, jsonText(endpoint["id"]), raw)) {
+        auto value = rowGet(raw, "proxy_applied");
+        if (value.type == Json.Type.object)
+          applied = value;
+      }
+      Json[] nodes;
+      foreach (part; attributeText(endpoint, "ips").split(",")) {
+        auto ip = part.strip;
+        if (ip.length == 0)
+          continue;
+        Json node = Json.emptyObject;
+        node["ip"] = Json(ip);
+        if (hash.length == 0) {
+          node["state"] = Json("error");
+        } else {
+          auto stored = jsonGet(applied, ip);
+          if (stored.type == Json.Type.object) {
+            auto storedHash = jsonText(jsonGet(stored, "hash"));
+            node["state"] = Json(storedHash == hash ? "applied" : "pending");
+            node["appliedHash"] = Json(storedHash);
+            node["appliedAt"] = Json(jsonText(jsonGet(stored, "at")));
+          } else {
+            node["state"] = Json("unknown");
+          }
+        }
+        nodes ~= node;
+      }
+      Json item = Json.emptyObject;
+      item["name"] = Json(name);
+      item["engine"] = Json(engine);
+      item["hash"] = Json(hash);
+      item["nodes"] = Json(nodes);
+      items ~= item;
+    }
+    Json doc = Json.emptyObject;
+    doc["data"] = Json(items);
     writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
@@ -3265,6 +3392,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.config ~ "/projects/:id/server", &hub.projectServerView);
   router.get(api.config ~ "/projects/:id/proxy", &hub.projectProxyView);
   router.get(api.config ~ "/projects/:id/proxy-map", &hub.projectProxyMapView);
+  router.get(api.config ~ "/projects/:id/proxy-state", &hub.projectProxyState);
   router.get(api.config ~ "/projects/:id/proxy-bundle", &hub.projectProxyBundleView);
   router.post(api.config ~ "/projects/:id/proxy/apply", &hub.applyProjectProxy);
 
@@ -3412,4 +3540,19 @@ unittest {
   assert(portDiffs.length == 1);
   assert(jsonText(portDiffs[0]["action"]) == "restart");
   assert(jsonText(portDiffs[0]["reason"]) == "port");
+}
+
+unittest {
+  HubService.ProxyBundleParts parts;
+  parts.configPath = "config/haproxy.cfg";
+  parts.config = "global";
+  parts.certificate = "cert";
+  parts.privateKey = "key";
+  parts.routeMapFile = "config/bas-routes.map";
+  parts.routeMap = "map";
+  auto first = HubService.proxyManifest(parts, "haproxy", "default");
+  auto again = HubService.proxyManifest(parts, "haproxy", "default");
+  assert(first == again);
+  parts.config = "global 2";
+  assert(HubService.proxyManifest(parts, "haproxy", "default") != first);
 }

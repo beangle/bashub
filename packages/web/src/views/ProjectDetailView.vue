@@ -152,6 +152,9 @@
                   >
                     下载 ZIP
                   </t-button>
+                  <t-tag v-if="proxyStateLabel" :theme="proxyStateTheme" variant="light" :title="proxyStateDetail">
+                    {{ proxyStateLabel }}
+                  </t-tag>
                   <t-tag :theme="proxyConfig ? 'success' : 'default'" variant="light">
                     {{ proxyConfig ? '配置已生成' : '未生成配置' }}
                   </t-tag>
@@ -309,6 +312,7 @@
                       <th>HTTP</th>
                       <th>堆</th>
                       <th>状态</th>
+                      <th>配置</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -329,6 +333,12 @@
                         <t-tag size="small" :theme="item.running ? 'success' : 'warning'" variant="light">
                           {{ item.running ? '运行中' : '已停止' }}
                         </t-tag>
+                      </td>
+                      <td>
+                        <t-tag v-if="item.deployState === 'restart'" size="small" theme="warning" variant="light">待生效</t-tag>
+                        <t-tag v-else-if="item.deployState === 'undelivered'" size="small" variant="light">未下发</t-tag>
+                        <t-tag v-else-if="item.deployState === 'unknown'" size="small" variant="light">未知</t-tag>
+                        <span v-else>—</span>
                       </td>
                     </tr>
                   </tbody>
@@ -564,7 +574,9 @@ import {
   readEndpointCertificate,
   readProjectConfig,
   readProjectProxyMap,
+  readProjectProxyState,
   saveEndpointCertificate,
+  type ProxyEndpointStatus,
 } from '@/api/project-detail'
 import {
   attributeText,
@@ -603,6 +615,7 @@ interface ServerRunEntry {
   httpPort: string
   heap: string
   running: boolean
+  deployState: 'ok' | 'undelivered' | 'restart' | 'unknown' | ''
 }
 
 const sectionItems: SectionItem[] = [
@@ -629,6 +642,7 @@ const proxyConfig = ref('')
 const proxyMap = ref('')
 const bundleDownloading = ref(false)
 const proxyApplying = ref(false)
+const proxyStates = ref<ProxyEndpointStatus[]>([])
 const micdnReloading = ref(false)
 const serverConfig = ref('')
 const micdn = ref<MicdnProjectDocument>()
@@ -656,6 +670,31 @@ const proxyEngineLabel = computed(() => {
   if (proxyEngine.value === 'haproxy') return 'HAProxy'
   if (proxyEngine.value === 'nginx') return 'Nginx'
   return proxyEngine.value || '未设置'
+})
+
+const proxyStatus = computed(() =>
+  proxyStates.value.find((item) => item.name === attrOf(proxy.value, 'name')),
+)
+const proxyStateLabel = computed(() => {
+  const states = proxyStatus.value?.nodes.map((node) => node.state) ?? []
+  if (states.length === 0) return ''
+  if (states.every((state) => state === 'applied')) return '代理已应用'
+  if (states.some((state) => state === 'pending')) return '代理待应用'
+  if (states.some((state) => state === 'error')) return '代理配置生成失败'
+  return '代理状态未知'
+})
+const proxyStateTheme = computed<'success' | 'warning' | 'danger' | 'default'>(() => {
+  const states = proxyStatus.value?.nodes.map((node) => node.state) ?? []
+  if (states.length === 0) return 'default'
+  if (states.every((state) => state === 'applied')) return 'success'
+  if (states.some((state) => state === 'error')) return 'danger'
+  return states.some((state) => state === 'pending') ? 'warning' : 'default'
+})
+const proxyStateDetail = computed(() => {
+  const status = proxyStatus.value
+  if (!status) return ''
+  const labels: Record<string, string> = { applied: '已应用', pending: '待应用', unknown: '未知', error: '生成失败' }
+  return status.nodes.map((node) => `${node.ip}: ${labels[node.state] ?? node.state}`).join('；')
 })
 const sslProtocols = computed(() => attrOf(proxy.value, 'sslProtocols'))
 const sslCiphers = computed(() => attrOf(proxy.value, 'sslCiphers'))
@@ -781,6 +820,7 @@ const serviceRows = computed<ServerRunEntry[]>(() => {
       httpPort: attrOf(server, 'httpPort'),
       heap: heapText(server),
       running: instance ? isRunning(instance) : false,
+      deployState: instance?.deployment?.state ?? '',
     })
   }
 
@@ -800,6 +840,7 @@ const serviceRows = computed<ServerRunEntry[]>(() => {
         httpPort: instance.httpPort ? String(instance.httpPort) : '',
         heap: '',
         running: isRunning(instance),
+        deployState: instance.deployment?.state ?? '',
       })
     }
   }
@@ -992,6 +1033,7 @@ function applyProxy() {
         } else {
           MessagePlugin.success('代理已应用到节点')
         }
+        await loadProxyState()
         dialog.destroy()
       } catch (error) {
         showOperationError('代理应用失败', errorText(error))
@@ -1028,6 +1070,16 @@ async function copyText(value: string, label: string) {
 
 /** 打开证书编辑框：公钥回填，私钥不回显（留空保持原值）。 */
 const certificateEndpointName = computed(() => attrOf(proxy.value, 'name'))
+
+/** 只问「最近一次应用」的记录，不要求节点在线；打开代理页或应用后刷新一次。 */
+async function loadProxyState() {
+  try {
+    proxyStates.value = await readProjectProxyState(projectId)
+  } catch (reason) {
+    proxyStates.value = []
+    warning('proxyState', '代理应用状态', reason)
+  }
+}
 
 async function loadProxyMap() {
   proxyMap.value = ''
@@ -1184,6 +1236,7 @@ async function load() {
     proxy.value = endpoint ? endpointAsProxy(endpoint) : undefined
     await loadEndpointCertificate()
     await loadProxyMap()
+    await loadProxyState()
   } else {
     warning('endpoint', '代理点', endpointResult.reason)
   }

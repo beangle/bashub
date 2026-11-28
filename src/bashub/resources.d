@@ -72,6 +72,7 @@ Registry hubRegistry() {
         Column("maxconn", "maxconn", Kind.number),
         Column("ssl_ciphers", "sslCiphers", Kind.text),
         Column("ssl_protocols", "sslProtocols", Kind.text),
+        Column("proxy_applied", "proxyApplied", Kind.jsonDocument),
       ],
       [Relation("project", "project_id", "projects")],
       [],

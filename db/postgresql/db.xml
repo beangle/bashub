@@ -192,6 +192,7 @@
             <column name="maxconn" type="integer" nullable="false" defaultValue="30000" comment="最大连接数"/>
             <column name="ssl_ciphers" type="varchar(255)" comment="SSL ciphers"/>
             <column name="ssl_protocols" type="varchar(255)" comment="SSL protocols"/>
+            <column name="proxy_applied" type="jsonb" nullable="false" defaultValue="'{}'" comment="各代理节点最近一次成功应用的 bundle hash 与应用时间：ip -> {hash, at}"/>
           </columns>
           <constraints>
             <primary-key name="pk_cfg_endpoints" columns="id"/>

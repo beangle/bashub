@@ -14,7 +14,7 @@ import beangle.data.query : Query, parseQuery;
 import beangle.data.dao : DaoException;
 import beangle.data.dao.memory : MemoryDao;
 import beangle.data.resource : Registry, Resource, ValueList;
-import beangle.data.value : Row, jsonText;
+import beangle.data.value : Row, jsonGet, jsonText, rowGet;
 import beangle.jsonapi.store : Store, StoreException;
 
 import test.bashub.fixture : testDao;
@@ -306,4 +306,27 @@ unittest {
   Json legacy;
   assert(store.update(webapps, "7001",
       parseJsonString(`{"data":{"type":"webapps","attributes":{"version":"0.0.9"}}}`), legacy));
+}
+
+@("endpoint proxy applied hashes round-trip")
+unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  auto endpoints = reg.find("endpoints");
+
+  Json applied = Json.emptyObject;
+  Json record = Json.emptyObject;
+  record["hash"] = Json("abc123");
+  record["at"] = Json("2026-11-28T00:00:00Z");
+  applied["10.0.0.20"] = record;
+  Row values;
+  values["proxy_applied"] = applied;
+  assert(store.updateColumns(endpoints, "9001", values));
+
+  Row raw;
+  assert(store.fetchRaw(endpoints, "9001", raw));
+  auto stored = rowGet(raw, "proxy_applied");
+  assert(stored.type == Json.Type.object);
+  assert(jsonText(jsonGet(stored, "10.0.0.20")["hash"]) == "abc123");
+  assert(jsonText(jsonGet(stored, "10.0.0.20")["at"]) == "2026-11-28T00:00:00Z");
 }

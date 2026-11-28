@@ -168,6 +168,7 @@ comment on column bas.cfg_endpoints.enable_https is '是否启用 HTTPS';
 comment on column bas.cfg_endpoints.maxconn is '最大连接数';
 comment on column bas.cfg_endpoints.ssl_ciphers is 'SSL ciphers';
 comment on column bas.cfg_endpoints.ssl_protocols is 'SSL protocols';
+comment on column bas.cfg_endpoints.proxy_applied is '各代理节点最近一次成功应用的 bundle hash 与应用时间：ip -> {hash, at}';
 comment on table bas.cfg_webapps_endpoints is 'Webapp 与代理 endpoint 的关系';
 comment on column bas.cfg_webapps_endpoints.webapp_id is 'Webapp?ID';
 comment on column bas.cfg_webapps_endpoints.endpoint_id is 'Endpoint?ID';

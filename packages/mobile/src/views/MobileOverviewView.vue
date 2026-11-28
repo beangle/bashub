@@ -58,6 +58,12 @@
               <span class="mobile-service-version" :title="item.version">{{ item.version }}</span>
             </div>
             <div class="mobile-service-actions">
+              <t-tag
+                v-if="item.action === 'proxy' && proxyConfigPending"
+                size="small"
+                variant="light"
+                theme="warning"
+              >配置待应用</t-tag>
               <t-tag size="small" variant="light" :theme="item.theme">{{ item.text }}</t-tag>
               <t-button
                 v-if="item.action === 'micdn'"
@@ -151,8 +157,10 @@ import type { AgentStatus } from '@/api/agents'
 import {
   applyProjectProxy,
   getMicdnProject,
+  readProjectProxyState,
   reloadMicdnProject,
   type OperationResult,
+  type ProxyEndpointStatus,
 } from '@/api/project-ops'
 import { attributeText, listResource } from '@/api/resource'
 import { DialogPlugin } from 'tdesign-mobile-vue'
@@ -255,6 +263,7 @@ const proxyEndpoint = ref('')
 const proxyEngine = ref<'haproxy' | 'nginx' | ''>('')
 const micdnReloading = ref(false)
 const proxyApplying = ref(false)
+const proxyConfigState = ref<ProxyEndpointStatus | null>(null)
 
 function hostList(value: unknown): string[] {
   const text = Array.isArray(value) ? value.join(',') : String(value ?? '')
@@ -269,6 +278,10 @@ const micdnAllOnline = computed(() => micdnHosts.value.length > 0 && micdnHosts.
 const proxyAllOnline = computed(() => proxyHosts.value.length > 0 && proxyHosts.value.every((host) => agentForHost(host)))
 const proxyEngineValid = computed(() => proxyEngine.value === 'haproxy' || proxyEngine.value === 'nginx')
 
+const proxyConfigPending = computed(
+  () => proxyConfigState.value?.nodes.some((node) => node.state === 'pending') ?? false,
+)
+
 async function loadProjectOps(projectId: string | undefined): Promise<void> {
   opsLoading.value = true
   opsError.value = ''
@@ -276,6 +289,7 @@ async function loadProjectOps(projectId: string | undefined): Promise<void> {
   proxyHosts.value = []
   proxyEndpoint.value = ''
   proxyEngine.value = ''
+  proxyConfigState.value = null
   if (!projectId) {
     opsLoading.value = false
     return
@@ -300,12 +314,23 @@ async function loadProjectOps(projectId: string | undefined): Promise<void> {
       const engine = attributeText(endpoint.attributes.engine)
       proxyEngine.value = engine === 'haproxy' || engine === 'nginx' ? engine : ''
       proxyHosts.value = hostList(endpoint.attributes.ips)
+      await loadProxyConfigState(projectId)
     }
   } else {
     errors.push('代理 endpoint 加载失败')
   }
   opsError.value = errors.join('；')
   opsLoading.value = false
+}
+
+/** 只读「最近一次应用」的 hash 对比，不要求代理节点在线。 */
+async function loadProxyConfigState(projectId: string): Promise<void> {
+  try {
+    const states = await readProjectProxyState(projectId)
+    proxyConfigState.value = states.find((item) => item.name === proxyEndpoint.value) ?? null
+  } catch {
+    proxyConfigState.value = null
+  }
 }
 
 function operationError(results: OperationResult[]): string {
@@ -379,6 +404,7 @@ async function runProxyApply(): Promise<void> {
     if (failure) opsError.value = `代理应用失败：${failure}`
     else opsMessage.value = '代理配置已应用'
     await refresh(true)
+    await loadProxyConfigState(projectId)
   } catch (reason) {
     opsError.value = `代理应用失败：${errorText(reason)}`
   } finally {
