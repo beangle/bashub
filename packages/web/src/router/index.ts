@@ -87,6 +87,11 @@ const router = createRouter({
     { path: '/monitor/agents', component: () => import('@/views/AgentView.vue'), meta: { title: '在线节点' } },
     { path: '/monitor/overview', component: () => import('@/views/ProjectOverviewView.vue'), meta: { title: '项目总览' } },
     {
+      path: '/monitor/agents/:project/events',
+      component: () => import('@/views/AgentEventsView.vue'),
+      meta: { title: '启停记录' },
+    },
+    {
       path: '/monitor/agents/:project/history',
       component: () => import('@/views/AgentHistoryView.vue'),
       meta: { title: '运行历史' },

@@ -13,7 +13,7 @@ module bashub.route;
 /// 资源名是路由参数，所以「支持哪些资源」只由 `hubRegistry()` 决定，路由不用跟着改。
 
 import beangle.data.dao : DaoException;
-import beangle.data.query : Query, QueryException, parseQuery;
+import beangle.data.query : Query, QueryException, SortKey, parseQuery;
 import beangle.jsonapi.document : attributeBool, attributeLong, attributeStrings, attributeText, errorDocument, okDocument, relationshipIds, unauthorizedDocument;
 import beangle.data.resource : Registry, Resource;
 import beangle.jsonapi.router : JsonApiService, RouteOptions, collectParams, requireAuth, withFormatSuffix,
@@ -2328,9 +2328,12 @@ class HubService {
 
     auto project = req.params.get("project", "");
     auto session = pickAgent(req, res, project);
-    if (session is null)
+    if (session is null) {
+      recordServerEvent(req, project, instance, action, "", false, "agent unavailable");
       return;
+    }
     auto reply = agents.service(project, action, instance, ServiceTimeoutSeconds.seconds, session.ip);
+    recordServerEvent(req, project, instance, action, session.ip, reply.outcome == RequestOutcome.ok, reply.error);
     final switch (reply.outcome) {
     case RequestOutcome.ok: {
       auto doc = Json.emptyObject;
@@ -2354,6 +2357,108 @@ class HubService {
             HTTPStatus.badGateway);
       break;
     }
+  }
+
+  /// 手工启停事件落库：失败不影响动作本身；操作人取当前会话，IP 取 XFF 第一段或直连地址。
+  private void recordServerEvent(HTTPServerRequest req, string project, string instance, string action,
+      string agentIp, bool ok, string detail) {
+    try {
+      ProjectContext context;
+      if (!findProject(reg, store, project, context))
+        return;
+      Session userSession;
+      if (security !is null)
+        userSession = security.contextOf(req).session;
+      else
+        userSession = sessionOf(req);
+      string operatorName;
+      string operatorDisplay;
+      if (userSession !is null && userSession.principal !is null) {
+        operatorName = userSession.principal.name;
+        operatorDisplay = userSession.principal.description;
+      }
+      auto operatorIp = req.headers.get("X-Forwarded-For", "").strip;
+      if (operatorIp.length > 0) {
+        auto comma = operatorIp.indexOf(",");
+        if (comma >= 0)
+          operatorIp = operatorIp[0 .. comma].strip;
+      } else {
+        operatorIp = req.peer;
+      }
+      Json data = Json.emptyObject;
+      data["type"] = Json("server-events");
+      Json attrs = Json.emptyObject;
+      attrs["instance"] = Json(instance);
+      attrs["action"] = Json(action);
+      attrs["operator"] = Json(operatorName);
+      attrs["operatorName"] = Json(operatorDisplay);
+      attrs["operatorIp"] = Json(operatorIp);
+      attrs["agentIp"] = Json(agentIp);
+      attrs["ok"] = Json(ok);
+      attrs["detail"] = Json(detail.length > 1000 ? detail[0 .. 1000] : detail);
+      data["attributes"] = attrs;
+      Json projectData = Json.emptyObject;
+      projectData["type"] = Json("projects");
+      projectData["id"] = Json(context.id);
+      Json projectRel = Json.emptyObject;
+      projectRel["data"] = projectData;
+      Json rels = Json.emptyObject;
+      rels["project"] = projectRel;
+      data["relationships"] = rels;
+      Json body = Json.emptyObject;
+      body["data"] = data;
+      store.create(reg.find("server-events"), body);
+    } catch (Exception e) {
+      logWarn("Record server event failed: %s", e.msg);
+    }
+  }
+
+  /// `GET /api/bashub/monitor/agents/{project}/events?instance=&limit=`：手工启停事件，最新在前。
+  void agentServiceEvents(HTTPServerRequest req, HTTPServerResponse res) {
+    if (!requireAuth(req, res, opts))
+      return;
+    auto projectName = req.params.get("project", "");
+    ProjectContext context;
+    if (!findProject(reg, store, projectName, context)) {
+      writeJsonApi(res, errorDocument(404, "记录不存在", "project not found: " ~ projectName), HTTPStatus.notFound);
+      return;
+    }
+    int limit = 100;
+    try
+      limit = req.query.get("limit", "100").to!int;
+    catch (Exception e) {
+    }
+    if (limit < 1)
+      limit = 1;
+    if (limit > 500)
+      limit = 500;
+    auto instance = req.query.get("instance", "").strip;
+    Query query;
+    query.pageSize = cast(size_t) limit;
+    query.addFilter("project", context.id);
+    if (instance.length > 0)
+      query.addFilter("instance", instance);
+    query.sorts ~= SortKey("createdAt", true);
+    auto document = store.search(reg.find("server-events"), query);
+    Json[] items;
+    foreach (ref row; document["data"]) {
+      auto attrs = row["attributes"];
+      Json item = Json.emptyObject;
+      item["id"] = row["id"];
+      item["instance"] = attrs["instance"];
+      item["action"] = attrs["action"];
+      item["operator"] = attrs["operator"];
+      item["operatorName"] = attrs["operatorName"];
+      item["operatorIp"] = attrs["operatorIp"];
+      item["agentIp"] = attrs["agentIp"];
+      item["ok"] = attrs["ok"];
+      item["detail"] = attrs["detail"];
+      item["at"] = attrs["createdAt"];
+      items ~= item;
+    }
+    Json doc = Json.emptyObject;
+    doc["data"] = Json(items);
+    writeJsonApi(res, doc, HTTPStatus.ok);
   }
 
   /// agent 返回的限长排错字段原样挂在 `errors[0].meta`，不把它们拼进 `detail`。
@@ -3412,6 +3517,7 @@ HTTPServerRequestHandler buildHubRouter(HubConfig cfg, Registry reg, Store store
   router.get(api.monitor ~ "/agents/summary", &hub.agentSummary);
   router.get(api.monitor ~ "/agents/status", &hub.agentStatus);
   router.get(api.monitor ~ "/agents/:project/history", &hub.agentHistory);
+  router.get(api.monitor ~ "/agents/:project/events", &hub.agentServiceEvents);
   router.get(api.monitor ~ "/agents/:project/agent-log", &hub.agentOwnLog);
   router.get(api.monitor ~ "/agents/:project/log/follow", &hub.agentLogFollow);
   router.get(api.monitor ~ "/agents/:project/log", &hub.agentLog);

@@ -34,6 +34,29 @@
             <index name="idx_mon_server_samples_project_time" columns="project_id,sampled_at"/>
           </indexes>
         </table>
+        <table name="mon_server_events" comment="手工启停实例事件">
+          <columns>
+            <column name="id" type="bigint" nullable="false" comment="非业务主键:auto_increment"/>
+            <column name="project_id" type="bigint" nullable="false" comment="Project ID"/>
+            <column name="instance" type="varchar(255)" nullable="false" comment="server/实例 id"/>
+            <column name="action" type="varchar(16)" nullable="false" comment="start / stop / restart"/>
+            <column name="operator" type="varchar(255)" nullable="false" comment="操作人登录名"/>
+            <column name="operator_name" type="varchar(255)" comment="操作人显示名"/>
+            <column name="operator_ip" type="varchar(64)" comment="操作人 IP"/>
+            <column name="agent_ip" type="varchar(64)" comment="执行该动作的节点 IP"/>
+            <column name="ok" type="boolean" nullable="false" defaultValue="false" comment="是否成功"/>
+            <column name="detail" type="varchar(1024)" comment="失败原因或节点回执"/>
+            <column name="created_at" type="timestamp with time zone" nullable="false" defaultValue="now()" comment="事件时间"/>
+          </columns>
+          <constraints>
+            <primary-key name="pk_mon_server_events" columns="id"/>
+            <foreign-key name="fk_mon_server_events_project" column="project_id" referenced-table="bas.cfg_projects" referenced-column="id"/>
+          </constraints>
+          <indexes>
+            <index name="idx_mon_server_events_project_time" columns="project_id,created_at"/>
+            <index name="idx_mon_server_events_project_instance_time" columns="project_id,instance,created_at"/>
+          </indexes>
+        </table>
         <table name="cfg_artifacts" comment="Artifact?">
           <columns>
             <column name="id" type="bigint" nullable="false" comment="非业务主键:datetime"/>

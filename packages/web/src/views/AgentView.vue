@@ -60,6 +60,7 @@
                   刷新并上报
                 </t-button>
                 <t-button size="small" variant="outline" @click="goHistory(group.project)">运行历史</t-button>
+                <t-button size="small" variant="outline" @click="goEvents(group.project)">启停记录</t-button>
                 <t-button
                   v-if="group.agents[0]?.projectId"
                   size="small"
@@ -781,6 +782,11 @@ async function applyProxyFromMonitor() {
 function goHistory(project: string) {
   if (!project) return
   void router.push(`/monitor/agents/${encodeURIComponent(project)}/history`)
+}
+
+function goEvents(project: string) {
+  if (!project) return
+  void router.push(`/monitor/agents/${encodeURIComponent(project)}/events`)
 }
 
 /** 跳到该 project 的配置详情（管理 server.xml / webapp 的地方）。 */

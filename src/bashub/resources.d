@@ -147,6 +147,23 @@ Registry hubRegistry() {
       ],
       [],
       "name"),
+    // 只给 store.create/search 用；表前缀 mon_ 不属于 config/ems 能力域，不暴露通用 CRUD。
+    Resource(
+      "server-events", "serverEvents", "bas.mon_server_events", "id",
+      [
+        Column("instance", "instance", Kind.text),
+        Column("action", "action", Kind.text),
+        Column("operator", "operator", Kind.text),
+        Column("operator_name", "operatorName", Kind.text),
+        Column("operator_ip", "operatorIp", Kind.text),
+        Column("agent_ip", "agentIp", Kind.text),
+        Column("ok", "ok", Kind.boolean),
+        Column("detail", "detail", Kind.text),
+        Column("created_at", "createdAt", Kind.text),
+      ],
+      [Relation("project", "project_id", "projects")],
+      [], "",
+      [], [], "", ["instance", "action", "ok"]),
     Resource(
       "artifacts", "artifacts", "bas.cfg_artifacts", "id",
       [

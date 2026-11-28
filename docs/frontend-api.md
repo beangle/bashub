@@ -240,6 +240,7 @@ Freemarker 模板运行时，不属于 JSON:API。
   以及 `running` / `stopped` 计数，不携带 OS 与 webapps，供不需要实例明细的调用方使用。SPA 的实例表
   要显示 pid / 端口 / webapps，因此每 30 秒轮询的是完整 `/agents/status`；点节点的“刷新”会先让 agent
   重报再取一次。
+- 手工启停记录：`GET /api/bashub/monitor/agents/{project}/events?instance=&limit=` 返回 `{data:[{id,instance,action,operator,operatorName,operatorIp,agentIp,ok,detail,at}]}`，最新在前；`limit` 1–500，缺省 100。记录由 `POST .../service/{action}` 写入 `bas.mon_server_events`（含操作人、操作人 IP、执行节点与结果），节点离线/超时/失败也记一条。
 - 读运行历史：`GET /api/bashub/monitor/agents/{project}/history?days=180`。`days` 取 1–180，
   缺省调用方传 180。返回 `{project, projectId, from, to, days, samples:[{at, servers:{id:state}}]}`，
   `samples` 按时间升序；页面一次取回整个 project 的所有 server 状态，再在 SPA 本地计算

@@ -6,3 +6,5 @@ create index idx_igjx23gjat79rj5lkvviauo60 on bas.cfg_webapps_targets (webapp_id
 create index idx_83jo3q4ran84y9bhcfn062qdo on bas.ems_menus (parent_id);
 create index idx_8663nggim2n448wsyygff27s0 on bas.ems_menus_resources (menu_id);
 create index idx_mon_server_samples_project_time on bas.mon_server_samples (project_id,sampled_at);
+create index idx_mon_server_events_project_time on bas.mon_server_events (project_id,created_at);
+create index idx_mon_server_events_project_instance_time on bas.mon_server_events (project_id,instance,created_at);

@@ -220,6 +220,8 @@ unittest {
       assert(group == "config", item.path ~ ": " ~ item.table);
     else if (item.table.startsWith("bas.cdn_"))
       assert(group == "micdn", item.path ~ ": " ~ item.table);
+    else if (item.table.startsWith("bas.mon_"))
+      assert(group == "", item.path ~ ": " ~ item.table);
     else
       assert(false, "unclassified resource table: " ~ item.table);
   }

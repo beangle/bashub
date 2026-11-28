@@ -161,6 +161,14 @@ Project 详情的代理页在 HAProxy 类型下增加 `bas-routes.map` 只读预
 
 `cfg_webapps.context_path` 改为可空；没有上下文的部署视为后台任务，不生成任何代理路由。迁移文件：`db/postgresql/migrate/20261124-01-webapp-context-nullable.sql`。
 
+### 手工启停记录
+
+`POST /monitor/agents/{project}/service/{action}` 每次开始/停止/重启都会写一条
+`bas.mon_server_events`：实例、动作、操作人、操作人 IP、执行节点、成功/失败与原因。节点离线、
+超时或节点拒绝也记录，方便事后解释“谁在什么时候动过哪台实例”。`GET /monitor/agents/{project}/events`
+按 project 或 instance 查询；PC 在线节点页提供「启停记录」入口、实例详情展示最近 20 条，移动端项目概览「启停记录」页与实例详情卡片展示。
+迁移文件：`db/postgresql/migrate/20261128-02-mon-server-events.sql`。
+
 ### 代理配置应用状态
 
 `cfg_endpoints.proxy_applied` 记录每个代理 IP 最近一次成功应用的 bundle hash（`proxy/apply` 成功后写入，
@@ -342,7 +350,7 @@ maven/npm/native/www/static 的 `base` 固定为 `{micdn.home}/maven`、`{micdn.
 ## 升级
 
 - 数据库有迁移：按 `db/postgresql/migrate/` 的文件顺序执行；本版本新增 `20261124-01`、`20261124-02`、
-  `20261125-01`、`20261127-01`、`20261127-02`、`20261128-01`（组件版本缓存、打包类型去 `bin`、代理应用状态等）。
+  `20261125-01`、`20261127-01`、`20261127-02`、`20261128-01`、`20261128-02`（组件版本缓存、打包类型去 `bin`、代理应用状态、手工启停记录等）。
 - 本地 micdn 需要 **micdn 0.4.2** 及以上，才能使用 native `<remote>` 和 SNAPSHOT 上传自动 metadata；
   旧 micdn 会忽略这些新配置，native 缺失仍 404。
 - `basctl proxy` 应升级到 0.0.3 及以上，使用 ZIP bundle；`proxy:apply` 还需要对应版本的

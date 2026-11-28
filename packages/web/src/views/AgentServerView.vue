@@ -120,6 +120,35 @@
       <article class="detail-card">
         <header class="detail-card__head">
           <div>
+            <h3>启停记录</h3>
+            <p>最近 20 条手工 start / stop / restart，含操作人与其 IP</p>
+          </div>
+          <div class="detail-actions">
+            <t-button size="small" variant="text" @click="goEvents">全部记录</t-button>
+          </div>
+        </header>
+        <div v-if="eventsLoading" class="detail-empty">正在加载启停记录…</div>
+        <div v-else-if="serverEvents.length === 0" class="detail-empty">暂无手工启停记录。</div>
+        <table v-else class="detail-table">
+          <thead><tr><th>时间</th><th>动作</th><th>操作人</th><th>操作人 IP</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr v-for="event in serverEvents" :key="event.id">
+              <td>{{ eventTimeText(event.at) }}</td>
+              <td><t-tag size="small" variant="light" :theme="event.ok ? 'success' : 'danger'">{{ eventActionText(event.action) }}</t-tag></td>
+              <td>{{ event.operatorName || event.operator || '—' }}</td>
+              <td>{{ event.operatorIp || '—' }}</td>
+              <td>
+                <span>{{ event.ok ? '成功' : '失败' }}</span>
+                <span v-if="!event.ok && event.detail" class="event-error">{{ event.detail }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="detail-card">
+        <header class="detail-card__head">
+          <div>
             <h3>运行历史</h3>
             <p>最近 30 天采样；与完整历史页使用同一份 health 数据</p>
           </div>
@@ -195,6 +224,7 @@ import {
   type AgentServiceAction,
   type AgentStatus,
 } from '@/api/agents'
+import { readServerEvents, type ServerEvent, type ServerEventAction } from '@/api/events'
 
 const route = useRoute()
 const router = useRouter()
@@ -208,6 +238,8 @@ const error = ref('')
 const serviceLoading = ref(false)
 const history = ref<AgentHistory | null>(null)
 const historyLoading = ref(false)
+const serverEvents = ref<ServerEvent[]>([])
+const eventsLoading = ref(false)
 
 const agent = computed(() => agents.value.find((item) => item.project === project && (!agentIp || item.ip === agentIp)))
 const instance = computed(() => (agent.value ? agentInstances(agent.value).find((item) => item.id === instanceId) : undefined))
@@ -358,6 +390,38 @@ function shortTime(value?: string): string {
   return match ? `${match[1]} ${match[2]}` : value
 }
 
+function eventActionText(action: ServerEventAction): string {
+  if (action === 'start') return '启动'
+  if (action === 'stop') return '停止'
+  return '重启'
+}
+
+function eventTimeText(value?: string): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function goEvents(): void {
+  const base = `/monitor/agents/${encodeURIComponent(project)}/events`
+  const params = new URLSearchParams()
+  if (instanceId) params.set('instance', instanceId)
+  const ip = agentIp || agent.value?.ip || ''
+  if (ip) params.set('ip', ip)
+  void router.push(params.size > 0 ? `${base}?${params.toString()}` : base)
+}
+
+async function loadServerEvents(): Promise<void> {
+  eventsLoading.value = true
+  try {
+    serverEvents.value = await readServerEvents(project, { instance: instanceId, limit: 20 })
+  } catch {
+    serverEvents.value = []
+  } finally {
+    eventsLoading.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -405,6 +469,7 @@ function confirmService(action: AgentServiceAction) {
         MessagePlugin.error(reason instanceof Error ? reason.message : `${label}失败`)
       } finally {
         serviceLoading.value = false
+        void loadServerEvents()
       }
     },
   })
@@ -453,7 +518,7 @@ function goBack() {
 }
 
 onMounted(async () => {
-  await Promise.all([load(), loadHistory()])
+  await Promise.all([load(), loadHistory(), loadServerEvents()])
   if (instance.value) await readLog()
 })
 
@@ -493,6 +558,7 @@ onBeforeUnmount(stopFollow)
 .detail-facts dd { margin: 2px 0 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-home { font-family: monospace; }
 .detail-empty { padding: 12px 0; color: var(--td-text-color-placeholder); font-size: 12px; }
+.event-error { display: block; margin-top: 2px; color: var(--td-error-color); word-break: break-all; }
 .detail-table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 12px; }
 .detail-table th, .detail-table td { padding: 6px 8px; border-bottom: 1px solid var(--td-component-stroke); text-align: left; }
 .detail-table th { color: var(--td-text-color-placeholder); font-weight: 500; }

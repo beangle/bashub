@@ -28,3 +28,6 @@ alter table bas.ems_resources add constraint pk_nr89evw3ueq159rpu4dp2k1gc primar
 alter table bas.mon_server_samples add constraint pk_mon_server_samples primary key (id);
 alter table bas.mon_server_samples add constraint uq_mon_server_samples_point unique (project_id,sampled_at);
 alter table bas.mon_server_samples add constraint fk_mon_server_samples_project foreign key (project_id) references bas.cfg_projects (id);
+
+alter table bas.mon_server_events add constraint pk_mon_server_events primary key (id);
+alter table bas.mon_server_events add constraint fk_mon_server_events_project foreign key (project_id) references bas.cfg_projects (id);

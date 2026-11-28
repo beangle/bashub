@@ -330,6 +330,66 @@ body {
   margin: 0;
 }
 
+.mobile-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mobile-event {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-event__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mobile-event__time,
+.mobile-event__meta,
+.mobile-event-item__time,
+.mobile-event-item__meta {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
+.mobile-event__main {
+  margin: 0;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.mobile-event__meta {
+  margin: 0;
+}
+
+.mobile-event__error,
+.mobile-event-item__error {
+  margin: 0;
+  color: var(--td-error-color);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.mobile-event-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.mobile-event-item__error {
+  width: 100%;
+}
+
 .mobile-deploy-items {
   margin: 0;
   padding: 0;

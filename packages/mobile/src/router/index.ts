@@ -24,6 +24,11 @@ const router = createRouter({
       meta: { title: '主机详情' },
     },
     {
+      path: '/projects/:project/events',
+      component: () => import('@/views/MobileServerEventsView.vue'),
+      meta: { title: '启停记录' },
+    },
+    {
       path: '/projects/:project/instances/:instance',
       component: () => import('@/views/MobileInstanceView.vue'),
       meta: { title: '实例详情' },

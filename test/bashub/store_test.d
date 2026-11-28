@@ -330,3 +330,27 @@ unittest {
   assert(jsonText(jsonGet(stored, "10.0.0.20")["hash"]) == "abc123");
   assert(jsonText(jsonGet(stored, "10.0.0.20")["at"]) == "2026-11-28T00:00:00Z");
 }
+
+@("server events keep operator, action and project filter")
+unittest {
+  Registry reg;
+  auto store = newStore(reg);
+  auto events = reg.find("server-events");
+  auto created = store.create(events,
+      parseJsonString(`{"data":{"type":"server-events","attributes":{
+        "instance":"prod.web","action":"restart","operator":"admin","operatorName":"管理员",
+        "operatorIp":"10.0.0.5","agentIp":"10.0.0.10","ok":true,"detail":""},
+        "relationships":{"project":{"data":{"type":"projects","id":"1002"}}}}}`));
+  assert(jsonText(created["data"]["attributes"]["operator"]) == "admin");
+  assert(jsonText(created["data"]["attributes"]["action"]) == "restart");
+
+  auto page = store.search(events, parseQuery(["filter[project]": "1002", "sort": "-createdAt", "pageSize": "10"]));
+  assert(page["meta"]["page"]["total"].get!long == 1);
+  auto row = page["data"][0]["attributes"];
+  assert(jsonText(row["instance"]) == "prod.web");
+  assert(jsonText(row["operatorIp"]) == "10.0.0.5");
+  assert(row["ok"].get!bool);
+
+  auto other = store.search(events, parseQuery(["filter[project]": "1001"]));
+  assert(other["meta"]["page"]["total"].get!long == 0);
+}

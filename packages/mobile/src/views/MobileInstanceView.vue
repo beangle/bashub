@@ -150,6 +150,30 @@
       </section>
 
       <section class="mobile-card">
+        <header class="mobile-card__head">
+          <h3 class="mobile-card__title">启停记录</h3>
+          <router-link class="mobile-card__link" :to="eventsPath">全部</router-link>
+        </header>
+        <div v-if="eventsLoading && serverEvents.length === 0" class="mobile-loading">
+          <t-loading size="20px" text="加载中" />
+        </div>
+        <p v-else-if="serverEvents.length === 0" class="mobile-hint">暂无手工启停记录。</p>
+        <ul v-else class="mobile-event-list">
+          <li v-for="event in serverEvents" :key="event.id" class="mobile-event-item">
+            <t-tag size="small" variant="light" :theme="event.ok ? 'success' : 'error'">
+              {{ eventActionLabel(event.action) }}
+            </t-tag>
+            <span class="mobile-event-item__time">{{ eventTimeLabel(event.at) }}</span>
+            <span class="mobile-event-item__meta">
+              {{ event.operatorName || event.operator || '—' }}
+              <template v-if="event.operatorIp"> · {{ event.operatorIp }}</template>
+            </span>
+            <span v-if="!event.ok && event.detail" class="mobile-event-item__error">{{ event.detail }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="mobile-card">
         <MobileLogPanel
           title="实例日志"
           :lines="logLines"
@@ -182,6 +206,7 @@ import {
 import MobileHistoryStrip from '@/components/MobileHistoryStrip.vue'
 import MobileNotice from '@/components/MobileNotice.vue'
 import MobileLogPanel from '@/components/MobileLogPanel.vue'
+import { readServerEvents, type ServerEvent, type ServerEventAction } from '@/api/events'
 import { useAgentLog } from '@/composables/useAgentLog'
 import { useAgentMonitor } from '@/composables/useAgentMonitor'
 import {
@@ -245,6 +270,41 @@ const running = computed(() => (instance.value ? isInstanceRunning(instance.valu
 const webapps = computed(() => instance.value?.webapps ?? [])
 const deployment = computed(() => instance.value?.deployment)
 const agentIdentity = computed(() => (agent.value ? agentKey(agent.value) : ''))
+const eventsPath = computed(() => {
+  const base = `/projects/${encodeURIComponent(project.value)}/events`
+  return instanceId.value ? `${base}?instance=${encodeURIComponent(instanceId.value)}` : base
+})
+
+const serverEvents = ref<ServerEvent[]>([])
+const eventsLoading = ref(false)
+
+function eventActionLabel(action: ServerEventAction): string {
+  if (action === 'start') return '启动'
+  if (action === 'stop') return '停止'
+  return '重启'
+}
+
+function eventTimeLabel(value?: string): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+}
+
+async function loadServerEvents(): Promise<void> {
+  if (!project.value || !instanceId.value) return
+  eventsLoading.value = true
+  try {
+    serverEvents.value = await readServerEvents(project.value, {
+      instance: instanceId.value,
+      limit: 20,
+    })
+  } catch {
+    serverEvents.value = []
+  } finally {
+    eventsLoading.value = false
+  }
+}
+
 const nodesPath = computed(() => {
   const base = `/projects/${encodeURIComponent(project.value)}/nodes`
   return agentIp.value ? `${base}/${encodeURIComponent(agentIp.value)}` : base
@@ -386,6 +446,7 @@ async function runService(current: AgentStatus, instanceName: string, action: Ag
     const result = await serviceAgentInstance(current.project, instanceName, action, agent.value?.ip ?? current.ip)
     serviceResult.value = `${instanceName} 已${serviceLabel(action)}（${result.state}）`
     await loadHistory()
+    await loadServerEvents()
     await refresh(true)
   } catch (reason) {
     const failure = serviceFailure(reason)
@@ -393,6 +454,8 @@ async function runService(current: AgentStatus, instanceName: string, action: Ag
     serviceDetail.value = failure?.detail || ''
     serviceLogTail.value = failure?.logTail ?? []
     serviceTruncated.value = failure?.truncated ?? false
+    // 失败尝试也会落库，刷新一次记录让“谁动过”可见。
+    void loadServerEvents()
   } finally {
     serviceLoading.value = false
   }
@@ -438,6 +501,7 @@ watch([agentIdentity, instanceId], () => {
   serviceResult.value = ''
   if (!agent.value || !instance.value) return
   void loadHistory()
+  void loadServerEvents()
   openLogWindow()
 }, { immediate: true })
 </script>

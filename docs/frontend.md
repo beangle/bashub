@@ -195,7 +195,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   `current_project_id`，也不提供全局 Project 下拉；刷新、深链和浏览器返回都保持当前项目。
 - 页面分工：`MobileProjectsView`（项目列表，合并 `/config/projects` 与 `/agents/summary`）、
   `MobileOverviewView`（当前项目健康与节点资源条，30 秒可见轮询）、`MobileNodesView`
-  （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileInstanceView`（实例状态、30/180 天历史、
+  （节点卡片、实例、节点立即刷新与 agent 日志）、`MobileServerEventsView`（按 Project/实例查看手工启停事件）、`MobileInstanceView`（实例状态、30/180 天历史、启停记录、
   实例日志与跟随、启停）、`MobileManageView` / `MobileManageProjectView` / `MobileManageAppView`（部署：整库汇总待升级与到期证书、
   项目内列表与新增、卸载、点应用进详情页改组件/上下文/代理点/版本/部署目标或卸载部署（项目页可新增部署；版本候选来自 `/config/artifacts/{id}/versions`，也可手输；
   上下文与代理点绑定，填了上下文必须选代理点；换组件只列当前项目或通用组件）、只读证书状态；组件版本刷新只在 PC 组件详情做单组件刷新，批量由后台周期任务做）、
@@ -209,6 +209,7 @@ pnpm add @beangle/bui-vue@^0.0.5                   # 正式版直接写区间
   改上下文或代理点后还需在监控页重载代理配置才会下发，也不承诺已部署。写操作先问能力
   （`/ems/authorizations`），无权限或能力查询失败时隐藏按钮并说明，不靠前端猜角色。组件页同理：
   只读 `artifacts` 列表/详情 + `PATCH /config/artifacts/{id}` 一个写端点，不新建、不删除、不刷新最新版本。
+- 启停记录：PC 在线节点页每个 Project 卡有「启停记录」，实例详情展示该 server 最近 20 条手工启停事件；数据来自 `bas.mon_server_events`，含操作人、操作人 IP 与结果。
 - 多 agent：实例启停、实例日志、agent 日志、节点立即刷新都显式传 `?agent=<ip>`；实例页缺少 agent
   且同项目有多台在线节点时先给出节点选择，不调用会 409 的歧义接口。
 - 日志先读尾部再按需跟随；`useAgentLog` 统一处理 `reset`、错误状态与卸载时的流关闭。维护操作用

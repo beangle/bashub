@@ -6,6 +6,7 @@
         <template v-else>等待首次上报</template>
         · {{ secondsLeft }} 秒后自动刷新
       </span>
+      <t-button size="small" variant="outline" @click="router.push(eventsPath)">启停记录</t-button>
       <t-button size="small" variant="outline" :loading="busy" @click="reload">刷新</t-button>
     </div>
 
@@ -196,6 +197,7 @@ const {
 
 const projectInfo = computed(() => catalog.projectOf(project.value))
 const nodesPath = computed(() => `/projects/${encodeURIComponent(project.value)}/nodes`)
+const eventsPath = computed(() => `/projects/${encodeURIComponent(project.value)}/events`)
 const catalogLoading = computed(() => catalog.loading.value)
 const catalogError = computed(() => catalog.error.value)
 const busy = computed(() => loading.value || catalogLoading.value)
