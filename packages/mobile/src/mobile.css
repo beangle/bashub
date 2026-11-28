@@ -1600,6 +1600,17 @@ body {
 
 /* TDesign Search 的文字在 .t-search__input-box .t-input__keyword 上，用 font 简写设了 body-large；
  * 必须匹配同样的选择器层级，只写 input 会被覆盖。 */
+.mobile-component-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mobile-component-heading__count {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+}
+
 .mobile-component-search {
   --td-search-height: 34px;
 }
