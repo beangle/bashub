@@ -39,10 +39,20 @@
         <t-cell
           v-for="instance in instances"
           :key="instance.id || String(instance.pid)"
-          :title="instance.id || '未命名实例'"
           arrow
           @click="emit('open-instance', instance)"
         >
+          <template #title>
+            <span class="mobile-instance-title">
+              <span class="mobile-instance-title__name">{{ instance.id || '未命名实例' }}</span>
+              <t-tag
+                v-if="deployLabel(instance)"
+                size="small"
+                variant="light"
+                :theme="deployTheme(instance)"
+              >{{ deployLabel(instance) }}</t-tag>
+            </span>
+          </template>
           <template #note>
             <span class="mobile-instance-note">
               <span class="mobile-instance-note__memory">{{ instanceMemory(instance) }}</span>
@@ -140,6 +150,19 @@ const diskDetail = computed(() => {
   const mount = resources.value.diskMount || '/'
   return `${mount} ${formatBytes(resources.value.diskUsed)} / ${formatBytes(resources.value.diskTotal)}`
 })
+
+function deployLabel(instance: AgentInstance): string {
+  switch (instance.deployment?.state) {
+    case 'restart': return '待重启'
+    case 'undelivered': return '未下发'
+    case 'unknown': return '未知'
+    default: return ''
+  }
+}
+
+function deployTheme(instance: AgentInstance): 'warning' | 'default' {
+  return instance.deployment?.state === 'restart' ? 'warning' : 'default'
+}
 
 function instanceMemory(instance: AgentInstance): string {
   if (!isInstanceRunning(instance) || typeof instance.rssBytes !== 'number') return '—'

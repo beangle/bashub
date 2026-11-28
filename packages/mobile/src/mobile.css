@@ -536,6 +536,20 @@ body {
   white-space: nowrap;
 }
 
+.mobile-instance-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mobile-instance-title__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mobile-instance-note {
   display: flex;
   flex: none;
